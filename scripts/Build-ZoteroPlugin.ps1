@@ -5,7 +5,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$sourceDirectory = Join-Path $projectRoot 'integrations\zotero\instant-translate-selection'
+$sourceDirectory = Join-Path $projectRoot 'integrations\zotero\yita-selection'
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
     $OutputDirectory = Join-Path $projectRoot 'artifacts\integrations'
 }
@@ -23,14 +23,19 @@ foreach ($requiredFile in @('manifest.json', 'bootstrap.js', 'README.md')) {
 
 $manifest = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $resolvedSource 'manifest.json') |
     ConvertFrom-Json
-if ($manifest.applications.zotero.id -ne 'instant-translate-selection@franklai.local') {
+if ($manifest.applications.zotero.id -ne 'yita-selection@yita.local') {
     throw 'Unexpected Zotero plugin id.'
 }
 
 $temporaryZip = Join-Path $resolvedOutput ('.zotero-' + [Guid]::NewGuid().ToString('N') + '.zip')
-$xpiPath = Join-Path $resolvedOutput 'InstantTranslate-Zotero-Selection.xpi'
+$xpiPath = Join-Path $resolvedOutput 'Yita-Zotero-Selection.xpi'
 try {
-    Compress-Archive -Path (Join-Path $resolvedSource '*') -DestinationPath $temporaryZip -CompressionLevel Optimal
+    $packagePaths = @(
+        (Join-Path $resolvedSource '*'),
+        (Join-Path $projectRoot 'LICENSE'),
+        (Join-Path $projectRoot 'NOTICE.md')
+    )
+    Compress-Archive -Path $packagePaths -DestinationPath $temporaryZip -CompressionLevel Optimal
     Move-Item -LiteralPath $temporaryZip -Destination $xpiPath -Force
 }
 finally {

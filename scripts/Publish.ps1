@@ -106,10 +106,10 @@ function Invoke-CodeSigning {
 }
 
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$solutionFile = Join-Path $projectRoot 'InstantTranslate.sln'
-$projectFile = Join-Path $projectRoot 'src\InstantTranslate.App\InstantTranslate.App.csproj'
+$solutionFile = Join-Path $projectRoot 'Yita.sln'
+$projectFile = Join-Path $projectRoot 'src\Yita.App\Yita.App.csproj'
 $artifactsRoot = Join-Path $projectRoot 'artifacts\release'
-$packageName = "InstantTranslate-v$Version-win-x64"
+$packageName = "Yita-v$Version-win-x64"
 $finalPackageDirectory = Join-Path $artifactsRoot $packageName
 $finalZipPath = Join-Path $artifactsRoot "$packageName.zip"
 $finalHashPath = "$finalZipPath.sha256"
@@ -172,7 +172,8 @@ try {
     Copy-Item -LiteralPath (Join-Path $projectRoot 'QUICK_START.txt') -Destination $stagingPackageDirectory
     Copy-Item -LiteralPath (Join-Path $projectRoot 'CHANGELOG.md') -Destination $stagingPackageDirectory
     Copy-Item -LiteralPath (Join-Path $projectRoot 'LICENSE') -Destination $stagingPackageDirectory
-    Copy-Item -LiteralPath (Join-Path $projectRoot 'src\InstantTranslate.App\Assets\AppLogo.png') -Destination $stagingPackageDirectory
+    Copy-Item -LiteralPath (Join-Path $projectRoot 'NOTICE.md') -Destination $stagingPackageDirectory
+    Copy-Item -LiteralPath (Join-Path $projectRoot 'src\Yita.App\Assets\AppLogo.png') -Destination $stagingPackageDirectory
 
     # Keep the packaged README's relative preview links usable offline.
     $previewImagesDirectory = Join-Path $stagingPackageDirectory 'docs\images'
@@ -187,10 +188,10 @@ try {
 
     $packagedReadme = Join-Path $stagingPackageDirectory 'README.md'
     $readmeText = Get-Content -Raw -Encoding UTF8 -LiteralPath $packagedReadme
-    $readmeText = $readmeText.Replace('src/InstantTranslate.App/Assets/AppLogo.png', 'AppLogo.png')
+    $readmeText = $readmeText.Replace('src/Yita.App/Assets/AppLogo.png', 'AppLogo.png')
     Set-Content -Encoding UTF8 -LiteralPath $packagedReadme -Value $readmeText
 
-    $publishedExecutable = Join-Path $stagingPackageDirectory 'InstantTranslate.exe'
+    $publishedExecutable = Join-Path $stagingPackageDirectory 'Yita.exe'
     if (-not (Test-Path -LiteralPath $publishedExecutable)) {
         throw 'Published executable was not created.'
     }

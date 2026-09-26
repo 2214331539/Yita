@@ -1,295 +1,244 @@
 <p align="center">
-  <img src="src/InstantTranslate.App/Assets/AppLogo.png" width="128" alt="InstantTranslate logo">
+  <img src="src/Yita.App/Assets/AppLogo.png" width="112" alt="Yita 译獭 Logo">
+</p>
+<h1 align="center">译獭 · Yita</h1>
+<p align="center">少一点打扰，多一点理解。<br>面向 Windows 的划词翻译工具，让译文停留在阅读发生的地方。</p>
+<p align="center">
+  <a href="https://github.com/2214331539/Yita/actions/workflows/build.yml"><img src="https://github.com/2214331539/Yita/actions/workflows/build.yml/badge.svg" alt="Build and test"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-24756B" alt="MIT License"></a>
+  <img src="https://img.shields.io/badge/platform-Windows_10%2F11-696158" alt="Windows 10/11">
+  <img src="https://img.shields.io/badge/.NET-8-696158" alt=".NET 8">
+</p>
+<p align="center">
+  <a href="#快速开始">快速开始</a> · <a href="#使用方式">使用方式</a> · <a href="#配置与数据隐私">配置与数据隐私</a> · <a href="#开发与构建">开发与构建</a> · <a href="#已知限制与排障">已知限制与排障</a>
 </p>
 
-<h1 align="center">InstantTranslate</h1>
+Yita 在支持文本选区读取的应用中检测鼠标拖选，通过 DeepSeek 流式返回译文，并在选区附近显示可固定、可调整大小的浮窗。它适合阅读英文网页、可选中文字的 PDF、Markdown 和编辑器中的文本。
 
-<p align="center">Windows 全局划词翻译 · DeepSeek 流式响应 · 安静、快速、默认不留记录</p>
+**当前状态：** Windows 桌面开发版本。仓库提供源码和构建脚本；本文不承诺已经提供可下载的安装包。当前没有 Setup 安装器、自动更新或 macOS/Linux 版本。在线翻译需要自行配置 API Key，调用费用由所用 API 服务计费。
 
-InstantTranslate 是一个个人自用、可开源的 Windows 划词翻译工具。在大多数可选择文字的应用中拖选文本，它会读取选区、调用 DeepSeek，并在鼠标附近显示不抢焦点的译文浮窗。
+## 界面预览
 
-## 效果预览
+<p align="center">
+  <img src="docs/images/yita-reading-preview.png" width="640" alt="Yita 阅读浮窗：原文与译文切换、固定和关闭">
+</p>
 
-v0.7.3：透明玻璃外层搭配柔和雾白色圆角正文底板。下面图片为实际 WPF 窗体渲染。
+<details>
+<summary>查看设置界面</summary>
+<p align="center">
+  <img src="docs/images/yita-settings-preview.png" width="560" alt="Yita 中文设置页与湖畔主题">
+</p>
+</details>
 
-### Bubble 3.0 · 彩色透明玻璃
+以上为当前 WPF 界面渲染的静态示例，使用演示文案，不包含用户文档或真实 API 请求结果。实际显示受系统缩放、字体和所选主题影响。
 
-![Bubble 3.0 彩色玻璃与雾白正文](docs/images/InstantTranslate-popup-bubble-v3-color-soft-white-preview.png)
+## 核心功能
 
-### Bubble 3.0 · 冰灰透明玻璃
+| 功能 | 当前行为 |
+| --- | --- |
+| 自动划词 | 鼠标拖选后检测选区；优先使用 UI Automation 和原生控件接口读取文字 |
+| 流式翻译 | 逐步显示服务返回的译文，支持取消、超时处理与请求并发控制 |
+| 原文 / 译文 | 顶部分段按钮切换阅读内容；查看原文时译文继续在后台接收 |
+| 轻量浮窗 | 顶部只显示原文、译文、固定和关闭；支持拖动、边缘缩放与长文滚动 |
+| 剪贴板翻译 | 用户主动复制后，按 `Ctrl+Shift+T` 翻译当前剪贴板 |
+| 阅读偏好 | 中英文字体、字号、翻译方向、表达风格、个人术语表及可选上下文 |
+| 后续提问 | 浮窗底部可围绕当前内容提问，或进入 DeepSeek 快速聊天 |
+| 托盘控制 | 启用 / 暂停划词、打开设置、翻译剪贴板、修复划词捕获和退出 |
+| 可选记录 | 手动保存记录；自动保存 AI 解释与问答默认关闭 |
+| 中英文界面 | 设置页可切换中文 / English |
 
-![Bubble 3.0 冰灰玻璃与雾白正文](docs/images/InstantTranslate-popup-bubble-v3-soft-white-preview.png)
+原有工具栏的翻译方向、解释、代码分析、复制和编辑按钮已隐藏。部分能力仍在内部逻辑、快捷键或正文交互中保留；顶部“原文 / 译文”用于切换显示，不是复制按钮。
 
-以上为实际 WPF 窗体渲染，后方色带是用于演示透明度的合成背景，不是桌面截图或背景模糊效果。
+### 以阅读为先的外观
 
-### Bubble 2.0
+默认主题 **「译獭 · 湖畔」** 来自水獭形象的奶油白、暖棕和湖水绿：
 
-![Bubble 2.0 翻译浮窗](docs/images/InstantTranslate-popup-bubble-v2-preview.png)
+- 阅读面使用接近白色的奶油白 `#FFFCF7`，正文为深暖灰 `#302D29`。
+- 湖水绿 `#24756B` 用于主操作，暖棕只承担少量内容强调。
+- 默认主题的正文对比度约 **13.4:1**，辅助文字约 **5.5:1**；自定义主题需自行评估对比度。
+- 默认字体为 Segoe UI 与 Microsoft YaHei UI；没有捆绑 Apple 的专有字体。
+- 窗口淡入、按钮按压、开关滑动和阅读切换采用短时过渡，并遵循 Windows 客户区动画与高对比度设置。
+- 玻璃样式的正文使用不透明阅读面，避免桌面细节穿透文字区域；外层透明效果不等于系统实时背景模糊。
 
-### AI Explain · 透明玻璃
+## 快速开始
 
-![AI Explain 雾白正文与透明玻璃](docs/images/InstantTranslate-popup-bubble-v3-explanation-soft-white-preview.png)
+### 环境要求
 
-## 15 秒开始使用
+| 使用方式 | 要求 |
+| --- | --- |
+| 从源码构建 | Windows 10/11、Git、[.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) |
+| 运行依赖运行时的构建 | Windows 10/11、.NET 8 **Desktop Runtime**，架构与程序一致 |
+| 运行自行生成的自包含包 | 发布脚本目标为 Windows x64，无需单独安装 .NET |
+| 使用在线翻译 | 网络连接、有效 API Key，以及服务支持的模型名称 |
 
-1. 下载并解压 `InstantTranslate-v0.7.3-win-x64.zip`。
-2. 运行 `InstantTranslate.exe`；首次启动会打开设置。
-3. 填写 DeepSeek API Key，点击“Test connection”（切换中文后为“测试连接”），成功后保存。
-4. 在记事本、浏览器或文档中用鼠标拖选文字。
+WPF 依赖 Windows。当前不支持把本项目直接编译为 macOS 或 Linux 桌面应用，也未验证 Windows ARM64 的兼容性。
 
-程序常驻系统托盘。再次双击 EXE 不会重复安装鼠标钩子，而会唤起已有实例的设置页。
+### 从源码运行
 
-## v0.7.1 Edge PDF 取词恢复
-
-- 改进滚动、缩放和渲染节点变化后的选区读取；失效节点不会直接中断后续安全读取。
-- 优先搜索鼠标附近的可见 PDF 文本节点，不再只尝试文档顺序中的前 8 个节点；搜索仍有固定上限。
-- Edge 可访问性激活增加按窗口限频的恢复机制；取词超时会同时取消底层读取，而非仅停止等待。
-- 性能诊断区分“未读到选区”和“翻译失败”，仅保留计数与耗时，不记录正文。
-- 默认仍不模拟按键、不改写剪贴板；本次不包含 Zotero 兼容修复。
-
-## v0.7.3：稳定性修复与柔和玻璃正文
-
-本版本修复流式结果中断却被视为成功、取消请求时的资源清理、设置刷新覆盖未保存译文，以及翻译记忆异常数据处理；对异常超长响应增加内部安全上限，正常功能和交互保持不变。包含此前的翻译规则回显防护，以及代码分析的缩写与命名说明改进。416 项自动化测试通过。
-
-两款气泡 3.0 的翻译、解释/代码分析和问答/DeepSeek 聊天正文使用**雾白色圆角底板**：冰灰版略带灰蓝，彩色版略带灰紫，使用很浅的渐变而非纯白。正文底板保持不透明以隔开后方画面，外层玻璃、尾巴和工具栏仍透明，彩色版保留粉蓝紫色染。正文和滚动条与圆角之间留有内边距，不再使用浅色字缘。其他样式保持不变。
-
-设置中的 `Popup style` 保留 v0.7.2 引入的两个独立选项：
-
-- `Bubble 3.0 · Glass / 气泡 3.0 · 液态玻璃`：真正可透出后方应用画面的透明底，配上冰灰色染和细薄高光。
-- `Bubble 3.0 · Color Glass / 气泡 3.0 · 彩色玻璃`：同样的透明底，保留气泡 2.0 的粉、蓝、紫配色作为轻微色染。
-
-两者都保留 2.0 的圆润轮廓和气泡尾巴，翻译正文、功能栏及问答窗使用配套材质。原有气泡 2.0 的颜色和其他样式、用户字体不变。
-
-外层背景使用真实的窗口透明混合，主底色只有约 20%–30% 不透明度，正文底板、文字和按钮内容不跟随整体变淡。解释打开时暂时隐藏下方译文的绘制，返回时恢复正文和选区，避免两个文本层透叠。
-
-这里的玻璃效果是透明色染与高光，不捕获或模糊其他应用的画面，不进行真实背景折射，也不添加持续动画。复杂或很暗的背景仍可能降低文字对比度；高对比度模式自动回到系统实色。新安装默认仍为极简样式，升级不会强制改变已保存的样式，请在设置中主动选择玻璃版本。
-
-## AI Explain
-
-- 译文完成后，功能栏中的 `Explain / 解释` 会用 DeepSeek 对本次原始划词内容作简洁中文讲解，按“释义、要点、语境”组织并流式显示。
-- 功能栏中的 `Code / 代码` 会把本次原始划词作为代码片段分析，自动判断最可能的语言（如 C、C++、C#、Python、JavaScript、SQL、Shell、配置或标记语言），并按“语言判断、常见用途、代码作用、关键逻辑、缩写与命名、替代与注意”流式说明；不需要预先指定语言。
-- 代码分析会逐项解释缩写的英文全称、中文含义、命名原因和使用习惯，包括复合名称中的缩写；同义重复名称只解释一次。无法确定的自定义名称会标注推测，无固定英文全称的惯用符号不会硬凑全称。使用分节、留白和短条目适配小窗阅读。代码分析输出上限为 3072 tokens，长片段可能需要继续追问，实际用量与耗时可能增加；其他功能的输出上限不变。
-- 在译文正文中选中一段文字，会在选区附近出现独立的 `Explain / 解释` 按钮；该操作只解释所选译文，不会再次触发全局划词翻译。
-- 解释显示在原浮窗正文上的浅雾灰覆盖层内，不新开窗口、不改变窗口大小。可复制、重试或返回原译文；按 `Esc` 也会优先返回。
-- 解释复用当前 DeepSeek Endpoint、Model 和 API Key，但不进入翻译记忆、设置正文或翻译缓存；只有主动开启 AI 记录后，完整成功的解释才会写入所选 Markdown 目录。关闭解释层、关闭浮窗、未置顶浮窗点击外部、重新翻译或发起新的解释都会取消未完成请求。
-
-## v0.7.0 AI 问答与可选归档
-
-- 译文或解释完成后，正文底部会出现紧凑问答栏；`Enter` 发送，`Shift+Enter` 换行。首次提问会在原浮窗旁打开独立问答窗，后续追问复用同一窗口并保留本次会话语境。
-- 每个划词浮窗右下角都有 `DeepSeek` 按钮，可打开一个独立、默认置顶的快速聊天小窗。它在不同划词浮窗之间复用同一段内存会话，适合直接询问简单问题；回答默认简短并跟随当前问题的语言。
-- 问答窗支持流式回答、停止、重试、复制、滚动、缩放、置顶和关闭。点击问答窗不会触发全局划词；未置顶问答窗随父浮窗关闭，置顶后可独立保留当时的原文、译文和解释语境。
-- 设置中的 `AI history / AI 记录` 默认关闭。开启前必须选择保存目录；同一次划词的原文、译文、已完成解释和多轮问答会原子更新到同一份 Markdown，取消、失败和未完成内容不会保存。
-- 完成的 AI 解释、关联问答和 DeepSeek 快速聊天窗均提供 `Record / 记录`。只有点击它才会把当前完整内容追加到当天的 `InstantTranslate Records/Daily Records/AI-Records-yyyy-MM-dd.md`；即使自动 AI 记录关闭，手动 Record 仍然有效。
-- 可按“今天、最近 7 天、全部”手动点击 `AI summary / AI 总结`。程序只读取带固定 InstantTranslate schema 的记录，调用当前 DeepSeek 配置进行分类总结，并在 `Summaries` 中新建一份带时间戳的 Markdown，不覆盖旧总结。
-- 记录是明文 Markdown，可能包含私密选词。自动历史只有主动开启后才会落盘，手动记录只有点击 `Record` 才会落盘；总结也只会在点击按钮时把选定自动历史发送给 DeepSeek。解释层和问答窗使用实际不透明、但更轻的雾面辅助表面，保证文字清晰。
-
-## v0.5.4 上边缘缩放
-
-- 上边缘及两个上角的缩放命中线现在位于灰色译文框顶部，不再位于外置功能按钮区顶部。
-
-## v0.5.3 浮窗交互
-
-- 未置顶浮窗在点击窗口之外时立即关闭；点击窗口本身、正文、按钮或缩放边缘不会误关。
-- 未置顶和置顶状态都可以从四边、四角直接拖动调整尺寸，命中区域更容易操作。
-- 首次显示会根据中英文字符宽度、换行、字体大小和屏幕可用区域自动扩展；超长内容保持在屏幕内并使用滚动条。
-
-## v0.5.2 稳定性修复
-
-- 鼠标钩子回调现在只投递轻量事件，耗时的命中测试与划词处理在有序工作线程中完成；登录、解锁、唤醒及长时间运行都会自动恢复输入捕获。
-- UI Automation 取词按目标进程隔离，对卡死的第三方 Provider 进行有界读取与 COM 取消，并继续尝试安全的 Win32 回退。
-- DeepSeek 在开机网络未就绪、VPN 切换、连接超时或首段内容前断流时会正确重试，不再被误判为用户取消。
-- 退出后立即重开、延迟读取凭据、相同请求合并、取消置顶与重译失败等生命周期竞态已修复。
-- 托盘新增“Repair input capture / 修复划词捕获”，无需退出程序即可重新绑定全局鼠标捕获。
-- “Copy performance diagnostics / 复制性能诊断”现在还包含输入、UIA 通道、浮窗数量与小型轮转生命周期记录，不包含原文、译文、API Key、Endpoint 或文件路径。
-
-## v0.5 亮点
-
-- 相同配置、相同文本的并发请求会自动合并：第一个窗口继续流式显示，后续窗口复用同一结果，减少重复 API 调用和费用。
-- DeepSeek 网络层增加有上限的退避重试；连续短暂故障会触发 6 秒冷却，避免断网或 VPN 切换时反复轰炸接口，恢复后自动继续。
-- 托盘新增“Copy performance diagnostics / 复制性能诊断”，仅输出最近 100 次请求的读取、排队、首段译文和总耗时统计，不包含原文、译文、API Key、Endpoint 或文件路径。
-- 浮窗新增“编辑并保存修正”：只有主动编辑并保存的译文才进入翻译记忆；文件使用 Windows DPAPI 为当前账户加密，精确相同文本可直接命中，最多 3 组相关示例可辅助后续翻译。
-- 设置页可查看加密修正数量并一键清空。默认翻译仍不写入磁盘，退出时普通内存缓存仍会清空。
-- 自动跟随 Windows 高对比度模式；浮窗支持 `Ctrl+E` 编辑、`Ctrl+Enter` 保存、`Esc` 取消、`Ctrl+P` 保留、`Ctrl++ / Ctrl+-` 调整字号，默认字号上限提升到 34。
-- 发布脚本支持可选 Authenticode 证书签名和时间戳校验；不提供证书时仍生成与以前一致的未签名 ZIP。
-
-## 现有体验
-
-- 新增 AI 重点高亮：DeepSeek 会在译文、AI Explain、代码分析和两类问答回答中仅标出 1–3 个真正关键的短语，并用三层颜色区分重点、术语和提醒；文字仍可正常框选、右键复制和追问，复制与 Record 得到的始终是不含标记的干净正文。
-- 设置中的 `Highlight palette / 重点高亮配色` 可独立切换清晰、莫兰迪、海洋、暖调和高对比方案，不改变窗口主色或浮窗样式；Windows 高对比度模式会自动使用系统可读颜色。
-- 程序界面默认使用英文；设置页右上角的“中文 / English”按钮可以即时切换，保存后同步应用到浮窗提示、托盘菜单和通知。
-- 非译文界面内嵌使用 Source Sans Pro，无需朋友的电脑另行安装字体。
-- 英文译文和中文译文可以分别选择字体；英文包含 Times New Roman、Arial、Source Sans Pro、Georgia、Calibri、Cambria，中文包含黑体、微软雅黑、宋体和楷体。
-- 可选“周围语境”：仅在主动开启后读取选区所在段落，帮助模型判断代词、一词多义和专业语境；默认关闭。
-- 新增快速、均衡、精确三种翻译模式，以及自然、正式、简洁、学术、技术五种表达风格。
-- 新增本机个人术语库，使用 `原词 => 指定译法` 的简单格式；请求时只发送当前选区实际命中的术语。
-
-- 自动判断方向：纯中文译为英文；中英混合、英文和其他文本优先译为简体中文。
-- DeepSeek OpenAI-compatible SSE 流式翻译；收到首段译文后才显示浮窗，不再先弹出旋转等待动画，后续文字会随网络内容平滑持续补全。
-- 完成结果使用内存 LRU 缓存；相同配置和文本再次翻译可直接显示，不再次请求 API。
-- 浮窗出现时不抢焦点，靠近选区并自动避让屏幕边缘；主动点击正文后可正常选字和复制。支持关闭、复制原文、复制译文、中英互换、保留、拖动、缩放和纵向滚动。
-- 译文可像普通文本一样框选，右键支持复制和全选；在本程序内框选不会触发新的翻译。
-- 英文译文默认使用 Times New Roman，中文默认使用黑体；两者均可在设置中独立修改。字号可在浮窗平滑调节，也可在设置中指定新窗口默认值。
-- 接近 Apple 内容优先原则的浅色、不透明、无边框圆角界面；字号控制按需展开，复制操作形成统一分组，设置页使用安静的中性色与固定保存栏。
-- 设置中的 `Popup style / 浮窗样式` 可保留默认 `Minimal / 极简`，或切换为 `Bubble / 气泡`、`Bubble 2.0 / 气泡 2.0`：气泡 2.0 使用更圆的轮廓、附着式柔和尾巴、白色高光与低饱和粉蓝紫渐变；高对比度模式会自动保持系统可读性。
-- 断网、鉴权、限流或超时不再让加载窗无故消失；错误会保留在原浮窗中，再次翻译失败时保留旧译文。
-- 单实例运行，避免重复托盘、重复钩子和重复 API 费用。
-- 自动取词默认不再改写系统剪贴板：先使用 UI Automation，再尝试标准 Win32/RichEdit/Scintilla 控件的窗口消息读取。只有在设置中主动打开“Compatibility clipboard fallback”时，才会为微信等自绘应用使用临时 `WM_COPY` 兼容回退。
-- 对 Edge/Chromium PDF，程序会读取更深层的可访问性树，并定向寻找 PDF `Document` 选区；鼠标松开后还会进行两次非剪贴板重试。这不会模拟按键或改写剪贴板。
-
-## Edge 与 Zotero PDF 阅读器
-
-- Edge 内置 PDF 阅读器无需额外安装组件。新版会在读取前短暂激活 Edge 默认休眠的可访问性树，随后立即恢复 Windows 原有的屏幕阅读器状态；不会修改 Edge 快捷方式、模拟按键或使用剪贴板。请确保 PDF 处于可选择文字状态，而不是手形拖动或扫描图片。
-- **Zotero 已知限制：** 内置 PDF 阅读器兼容问题尚未解决，Zotero 9.0.6 会拒绝当前旧桥接插件的安装；v0.7.3 未修改该插件，不应视为已支持 Zotero PDF 自动划词。相关排查已暂停。
-- 现有 Zotero 桥接的设计是仅通过 `127.0.0.1` 传送当前选区，不读取文献库、笔记、附件列表、账户或凭据，也不使用系统剪贴板；上述设计不代表当前安装包已经通过 Zotero 端到端验证。
-
-## 微信和自绘应用
-
-Windows 应用取词能力并不统一。InstantTranslate 按以下顺序尝试：
-
-1. UI Automation `TextPattern.GetSelection()`；
-2. 标准 Win32/RichEdit/Scintilla 控件的直接选区读取，不触碰剪贴板；
-3. 仅在设置中主动开启兼容模式后，才使用窗口级 `WM_COPY`；
-4. 用户主动复制后的手动翻译。
-
-默认的自动取词链路不会发送 `WM_COPY`、模拟键盘或修改剪贴板，也不会把 `c` 输入当前编辑框。兼容模式是有意关闭的最后手段，因为任何 `WM_COPY` 方案都无法保证对第三方剪贴板格式、历史记录和监听器完全无副作用。
-
-微信部分版本的消息区是自绘界面，既不公开 UI Automation 选区，也不响应标准 `WM_COPY`。这时使用稳定的手动方式：
-
-1. 在微信中选中文字并由你自己按 `Ctrl+C`；
-2. 按 `Ctrl+Shift+T`，或右键托盘图标选择“翻译剪贴板”。
-
-这个入口不会注入任何按键，也可以在关闭“启用鼠标划词翻译”后单独使用。
-
-## 浮窗操作
-
-- 左上角控制横栏：六个方框图标从左到右依次表示小、中、大、横向长方形、竖向长方形和正方形；字号滑杆紧接在最右侧，按住即可连续调节，无需先点击展开。翻译、解释、关联问答及 DeepSeek 快速聊天窗均只占用这一行外置控制，切换尺寸时保持当前位置并自动避让屏幕边缘，之后仍可继续拖动四边和四角微调。
-- “译为中文 / 译为英文”：把当前显示结果翻译为另一种语言，复用原窗口位置和尺寸。
-- “Explain / 解释”：解释本次原文；译文内选中部分文字后出现的“Explain / 解释”只解释该片段。解释始终输出中文，且使用当前设置的中文译文字体。
-- “Code / 代码”：把当前划词按代码而非普通文本分析。它会识别语言或说明不确定性，并解释用途、主要逻辑、常见替代方案和需要注意的行为；结果显示在同一解释覆盖层内，可复制、追问或 Record。
-- “Record / 记录”：在解释完成后保存本次原文、译文、解释对象和完整解释；在问答或 DeepSeek 快速聊天完成后保存当前完整对话。同一天的多次手动记录追加到同一份 Markdown。
-- 底部问答栏：对当前译文或已完成解释直接追问；问答语言跟随程序界面语言，多轮内容显示在关联的独立问答窗中。
-- Copy 分组中的“原文 / Source”：复制最初选中的文字。
-- Copy 分组中的“译文 / Translation”：优先复制你在译文中框选的部分，否则复制全部译文。
-- 字号滑杆：直接拖动即可即时调整当前正文；翻译与解释共用当前字号，关联问答和 DeepSeek 快速聊天分别保留各自窗口的字号。`Ctrl++ / Ctrl+-` 与问答窗中的 `Ctrl+滚轮` 仍然可用。
-- 图钉：保留窗口。保留后可拖动文字外区域，并从任意边缘或角落调整尺寸；继续划词会创建另一临时浮窗，正在生成的保留结果也不会被新选词截断。
-- 浮窗顶部译文框内的长横条是专用移动区；横条周围整块带悬停反馈的区域都可以拖动，不必精确点在线条上，也不会把正文变成拖动区域。左右边缘与四个角都有较宽的缩放命中区，并显示对应的横向、纵向或斜向调整光标。
-- ×：立即关闭当前浮窗。
-- 铅笔 / 对勾：编辑译文并主动保存修正；保存成功后，同方向的相同原文会直接使用修正版。
-
-键盘操作：`Ctrl+E` 编辑译文，`Ctrl+Enter` 保存修正，`Esc` 取消编辑，`Ctrl+P` 保留或释放窗口，`Ctrl++ / Ctrl+-` 调整字号，`Ctrl+C` 复制当前选区。
-
-译文显示后，无论是否保留，都可以从任意边缘或角落调整尺寸；长文本或大字号超出当前高度时会在正文内部滚动。取消保留不会立即关闭窗口；下一次点击其他区域才按临时窗口规则收起。
-
-## DeepSeek 设置
-
-默认配置：
-
-- Endpoint：`https://api.deepseek.com`
-- 速度优先模型：`deepseek-v4-flash`
-- 可选模型：`deepseek-v4-pro`
-- API：`POST /chat/completions`、`stream: true`、`thinking: disabled`
-
-远程 Endpoint 必须使用 HTTPS；只有 `localhost` 和回环地址允许 HTTP，避免 API Key 和选中文字被明文传输。模型与接口变化以 [DeepSeek 官方 API 文档](https://api-docs.deepseek.com/) 为准。
-
-API Key 由密码框录入并保存在 Windows 凭据管理器中，不写入设置 JSON。设置页可以在不保存的情况下测试连接，也可清空密钥后保存以删除凭据。
-
-## 托盘菜单
-
-- 当前版本与启用状态
-- 翻译剪贴板（`Ctrl+Shift+T`）
-- 启用或暂停自动划词
-- 设置
-- 修复划词捕获（无需退出程序）
-- 复制性能诊断（只含耗时与结果状态，不含任何翻译文本）
-- 关于与版本
-- 退出
-
-设置页还可控制登录 Windows 后自动启动。启动项只写入当前用户；移动 EXE 后请重新运行并保存一次设置，以更新路径。
-
-## 隐私与安全
-
-- 使用 DeepSeek Provider 时，原文会发送到你配置的 Endpoint；Mock Provider 完全离线。
-- “使用周围语境”默认关闭；开启后，选区所在段落会作为只读参考一并发送。个人术语库保存在本机设置中，请求时仅发送当前选区命中的术语对。
-- 默认不持久化原文、译文或运行日志。只有点击浮窗编辑按钮并保存的修正，才会进入翻译记忆。
-- AI Explain 会把待解释内容、当前原文与当前译文发送到已配置的 DeepSeek Endpoint 作为只读语境；解释结果不写入翻译记忆、缓存、设置正文或性能诊断。AI 记录关闭时仅保留在当前浮窗内存，开启后只保存完整成功的解释。
-- Code 分析会把所选代码发送到已配置的 DeepSeek Endpoint 进行只读语言识别和说明，不会执行代码。请勿选择包含 API Key、密码、私有地址或其他敏感凭据的代码；主动点击 Record 时，所选代码和分析结果会作为明文 Markdown 保存到你选择的目录。
-- AI 问答会把问题、当前原文、译文、可用解释和本会话历史发送到已配置的 DeepSeek Endpoint；所有这些字段都被提示词声明为不可信数据，而不是可执行指令。
-- 为了显示 AI 重点高亮，译文、解释和问答提示词允许模型附带仅用于界面渲染的短语标记。程序会在显示前解析并移除这些标记；它们不会进入复制内容、翻译记忆、Markdown 记录、后续问答上下文或运行日志。
-- DeepSeek 快速聊天只发送当前问题和该快速聊天窗的会话历史，不附带当前划词原文、译文或解释；会话默认只保存在内存中，只有主动点击 `Record` 才会写入当天的手动记录。
-- AI 记录默认关闭。选择保存目录后，程序会在其中创建 `InstantTranslate Records/Records`、`Daily Records` 与 `Summaries`；手动 Record 不要求开启自动历史。记录为明文 Markdown，程序只读取和改写自己生成且带固定 schema 标记的文件，运行日志不记录正文或目录。
-- 翻译记忆最多保存 200 条，使用 Windows DPAPI 绑定当前 Windows 账户加密。精确命中在本机直接返回；相关请求最多向 Provider 发送 3 组你主动保存的示例。设置页可永久清空。
-- 缓存只存在于当前进程内，默认最多 128 条、约 100 万字符预算、20 分钟有效；键中只保留原文指纹而非原文全文，退出即清空。
-  - 性能诊断只在内存保留最近 100 组数值和状态；输入捕获诊断仅记录钩子是否运行和最近一次物理鼠标按键时间，不采集原文、译文、凭据、Endpoint 或路径；仅在你选择托盘命令时复制到剪贴板。
-- API Key 保存在 Windows Credential Manager 的 `InstantTranslate/DeepSeekApiKey`。
-- 自动取词默认不注入键盘、不修改剪贴板；终端应用始终禁用自动剪贴板回退。若确实需要兼容自绘应用，可在设置中主动打开兼容模式。
-- 跨窗口或跨进程拖动会被拒绝；UI Automation 焦点候选通常必须属于鼠标命中的同一进程。浏览器嵌入的 PDF 渲染进程仅在能确认属于同一个目标窗口时例外。
-- UI Automation 密码元素和带 Windows 密码样式的原生输入框会被直接跳过。
-- 应用以普通用户权限运行，不请求管理员权限或 `uiAccess`。
-
-## 从源码运行
-
-要求 Windows 10/11 和 .NET 8 SDK：
+在 Windows PowerShell 中执行：
 
 ```powershell
-dotnet restore .\InstantTranslate.sln
-dotnet build .\InstantTranslate.sln --configuration Release --no-restore
-dotnet test .\InstantTranslate.sln --configuration Release --no-build --no-restore
-dotnet run --project .\src\InstantTranslate.App\InstantTranslate.App.csproj
+git clone https://github.com/2214331539/Yita.git
+cd Yita
+dotnet restore .\Yita.sln
+dotnet build .\Yita.sln --configuration Release --no-restore
+dotnet run --project .\src\Yita.App\Yita.App.csproj --configuration Release --no-build
 ```
 
-不调用 DeepSeek 的启动烟雾测试：
+已有 SSH 配置时，也可使用 `git@github.com:2214331539/Yita.git` 克隆。
+
+### 首次配置
+
+1. 退出其他正在运行的 Yita / 旧版翻译程序，避免划词监听与快捷键冲突。
+2. 打开设置，可在右上角切换中文界面。
+3. 选择 DeepSeek 服务，填写 API Key、服务地址及模型名称。默认服务地址为 `https://api.deepseek.com`；模型以你的服务账号实际支持的名称为准。
+4. 点击测试连接，成功后保存设置。API Key 不随源码提供。
+5. 先在记事本或普通网页中拖选一段英文，确认浮窗出现。
+
+Yita 自带用于开发的 Mock 翻译提供器，可在不调用在线服务的情况下检查取词与展示流程；其输出不是实际翻译。
+
+## 使用方式
+
+| 操作 | 方法 |
+| --- | --- |
+| 自动翻译 | 在支持的应用中用鼠标拖选文字 |
+| 翻译剪贴板 | 自己先按 `Ctrl+C`，再按全局快捷键 `Ctrl+Shift+T`，或使用托盘菜单 |
+| 切换阅读内容 | 点击浮窗顶部“原文 / 译文” |
+| 复制正文 | 点击正文后选中文字，使用 `Ctrl+C` 或右键菜单 |
+| 固定 / 取消固定 | 点击图钉；浮窗获得键盘焦点时也可按 `Ctrl+P` |
+| 移动 / 调整大小 | 拖动顶部短横条；拖动窗口边缘调整尺寸 |
+| 调整字号 | 在设置中修改默认字号；浮窗内也可按 `Ctrl` + `+` / `-` |
+| 关闭当前浮窗 | 点击 `×`；`Esc` 优先退出解释或编辑状态，再关闭窗口 |
+| 暂停自动划词 | 使用托盘菜单关闭划词功能 |
+| 完全退出 | 使用托盘菜单“退出”；关闭设置窗口不会退出后台程序 |
+
+**剪贴板快捷键不会替你模拟 `Ctrl+C`。** 它读取的是当时剪贴板中的内容。自动划词的“兼容性剪贴板回退”是另一项独立设置，默认关闭。
+
+## 配置与数据隐私
+
+Yita 是本地桌面客户端，默认 DeepSeek 提供器通过网络进行翻译；它不是离线翻译模型。
+
+| 数据 | 保存或发送方式 |
+| --- | --- |
+| API Key | 保存在当前 Windows 用户的凭据管理器中，标识为 `Yita/DeepSeekApiKey`；不写入普通设置 JSON |
+| 设置与偏好 | 保存在 `%LOCALAPPDATA%\Yita\settings.json`，包含服务地址、模型、界面与阅读偏好等 |
+| 当前选区 | 发给你配置的 API 服务用于翻译；服务端如何处理由该服务的政策决定 |
+| 周边上下文 | 默认不作为翻译上下文发送；启用相应选项后，可能将所在段落一并发送 |
+| 术语表与翻译记忆 | 请求可能附带命中的术语和相关修正，帮助保持翻译一致性 |
+| 普通翻译缓存 | 保存在进程内存中，退出后清空 |
+| 主动保存的修正 | 使用 Windows 当前用户的数据保护机制加密保存到本地翻译记忆，可在设置中清空 |
+| AI 记录 | 自动保存默认关闭；手动记录或启用自动保存后写入所选目录中的 Markdown，文件本身是明文 |
+| 运行诊断 | 用于记录运行健康状态与性能；分享诊断或截图前仍应检查是否包含个人信息 |
+
+启用“兼容性剪贴板回退”后，自动取词可能临时改变系统剪贴板。建议先保持关闭，仅对无法通过标准接口取词的软件按需开启。
+
+Yita 使用独立于上游软件的配置目录和凭据标识，不会自动导入旧软件的 API Key。早期 Yita 默认字体和蓝色主题会在升级时迁移到新的默认外观；已有的其他自定义主题和阅读字体按迁移规则保留，保存后仍可重新选择旧主题。
+
+## 开发与构建
+
+### 技术栈
+
+- C#、.NET 8、WPF：窗口、设置、文字呈现和动效。
+- Win32 与 UI Automation：鼠标手势、全局快捷键、应用选区读取及窗口定位。
+- HTTP / SSE：DeepSeek 流式响应、取消与超时处理。
+- Windows Credential Manager / DPAPI：API Key 与本地修正数据保护。
+- xUnit：自动化测试；GitHub Actions 在 Windows 上执行构建和测试。
+
+```mermaid
+flowchart LR
+    A[鼠标拖选] --> B[手势检测]
+    B --> C[UI Automation / 原生控件取词]
+    C --> D[翻译协调与请求管理]
+    E[主动复制 + Ctrl Shift T] --> D
+    D --> F[DeepSeek 流式 API]
+    F --> G[鼠标附近浮窗]
+    G --> H[原文 / 译文切换]
+```
+
+### 仓库结构
+
+```text
+Yita.sln                         解决方案
+src/Yita.App/
+  Hooks/                         鼠标与快捷键监听
+  Selection/                     选区读取与兼容处理
+  Translation/                   提供器、流式处理、缓存与修正
+  Services/                      翻译协调、托盘、记录与窗口服务
+  Settings/                      配置、主题、凭据与开机启动
+  Windows/                       WPF 窗口与界面组件
+  Assets/                        应用图标与字体
+tests/Yita.Tests/                自动化测试
+scripts/                        构建与打包脚本
+integrations/zotero/             实验性 Zotero 桥接代码
+assets/branding/yita/v1/         译獭形象、PNG 图标与多尺寸 ICO
+docs/images/                    当前界面示例与历史开发预览
+```
+
+### 构建与测试
 
 ```powershell
-dotnet run --project .\src\InstantTranslate.App\InstantTranslate.App.csproj --configuration Release --no-build -- --smoke-test
-dotnet run --project .\src\InstantTranslate.App\InstantTranslate.App.csproj --configuration Release --no-build -- --popup-smoke-test
-dotnet run --project .\src\InstantTranslate.App\InstantTranslate.App.csproj --configuration Release --no-build -- --popup-snapshot-test
-dotnet run --project .\src\InstantTranslate.App\InstantTranslate.App.csproj --configuration Release --no-build -- --settings-snapshot-test
+dotnet restore .\Yita.sln
+dotnet build .\Yita.sln --configuration Release --no-restore
+dotnet test .\Yita.sln --configuration Release --no-build --no-restore
 ```
 
-两个快照模式只渲染本应用自己的 WPF 窗口，用于检查浮窗选区、长文滚动和设置页布局，不读取桌面或其他应用画面。
+`global.json` 使用 .NET 8 SDK，允许在同一主版本内使用较新的稳定 feature band。项目不要求安装 Visual Studio，使用 SDK 命令行即可构建。
 
-使用已保存在 Windows 凭据管理器中的 DeepSeek 配置执行一次极小的问答与总结连通性验证（会产生少量 API 用量，不写入 AI 记录）：
+### 生成本地可运行目录
 
 ```powershell
-dotnet run --project .\src\InstantTranslate.App\InstantTranslate.App.csproj --configuration Release --no-build -- --ai-smoke-test
+.\scripts\Build-Local.ps1
+.\Start-Yita.cmd
 ```
 
-## 打包
+输出目录为 `artifacts/Yita-ui/`。此构建**依赖 .NET 8 Desktop Runtime**，不要将其中单独的 EXE 当成独立应用分发。使用自定义 SDK 路径时：
+
+```powershell
+.\scripts\Build-Local.ps1 -DotnetRoot 'D:\Tools\dotnet'
+```
+
+重新构建前请从托盘退出正在运行的程序，以免文件被占用。也可使用 `-OutputDirectory 'artifacts\another-build'` 输出到独立目录；根目录的启动脚本始终使用默认的 `artifacts/Yita-ui/`。
+
+也可直接调用 `dotnet publish`。许可证和第三方声明会由项目构建配置复制到输出目录。
+
+### 生成 Windows x64 自包含 ZIP
 
 ```powershell
 .\scripts\Publish.ps1 -Version 0.7.3
 ```
 
-脚本会依次恢复依赖、Release 构建、运行全部测试、发布自包含单文件程序、执行烟雾测试、生成 ZIP 和 SHA-256 校验文件。结果位于 `artifacts/release/`。
+该脚本会还原依赖、构建、运行测试、发布自包含程序、打包实验性 Zotero 插件，并执行应用启动 / 窗口冒烟检查。需要可交互的 Windows 会话和可用的 `dotnet` 命令。
 
-如已在 Windows 证书存储中安装带私钥的代码签名证书，可选签名并验证成品：
+成功后的输出位于 `artifacts/release/`，包括 `Yita-v<版本>-win-x64.zip` 和对应 `.sha256`。脚本支持可选 Authenticode 签名参数，详见 [Publish.ps1](scripts/Publish.ps1)。未提供证书时产物不带商业代码签名。ZIP 是便携包，**不是 Setup 安装包**。
 
-```powershell
-.\scripts\Publish.ps1 -Version 0.7.3 -CertificateThumbprint YOUR_CERTIFICATE_THUMBPRINT
-```
+当前程序集版本继承自上游 `0.7.3`；这不表示 Yita 已发布同名 GitHub Release。当前改动见 [CHANGELOG.md](CHANGELOG.md) 的 Unreleased 部分。
 
-也可使用 `-CertificateStoreLocation LocalMachine`、`-TimestampUrl` 或 `-SignToolPath` 指定企业环境。没有证书时成品仍为未签名程序，在部分电脑上首次运行可能出现 Windows SmartScreen“未知发布者”提示。Microsoft Store / MSIX 发布仍需要开发者账户及与该账户匹配的包身份，脚本不会伪造这些信息。
+## 已知限制与排障
 
-## 已知限制
+| 情况 | 说明与建议 |
+| --- | --- |
+| 某些应用划词无反应 | 取决于应用是否暴露文本选区；先在记事本验证，再尝试手动复制后翻译剪贴板 |
+| 扫描 PDF / 图片文字 | 不支持 OCR；PDF 必须有可选择的文本层 |
+| 双击选词、键盘扩选 | 当前自动触发主要针对鼠标拖选，不覆盖所有选中方式 |
+| Zotero 内置 PDF | 兼容性尚未解决；桥接插件为实验代码，不能视为已验证支持 |
+| `Ctrl+C` 复制异常 | 部分应用中的焦点 / 剪贴板兼容问题仍待排查；可先暂停自动划词、关闭剪贴板回退并回到原窗口复制 |
+| `Ctrl+Shift+T` 无效 | 可能与其他程序冲突；尝试托盘菜单“翻译剪贴板”，并检查是否启动了多个翻译工具 |
+| API 返回错误 | 检查 Key、余额、模型权限和服务地址；自定义兼容服务不保证支持全部流式行为 |
+| Windows 提示未知发布者 | 未签名构建可能出现此提示；确认来源和校验值，不建议关闭系统安全防护 |
+| 显示 / 取词差异 | 不同 DPI、显示器、应用版本和权限级别仍需实际验证；不承诺所有软件均兼容 |
 
-- 目前主要响应鼠标拖选；双击选词和纯键盘选区不会自动触发。
-- 自绘画布、部分 Electron/微信版本和高权限窗口可能无法通过无剪贴板方式自动读取；默认请使用复制后 `Ctrl+Shift+T`，或在设置中明确打开兼容性剪贴板回退。
-- 本项目聚焦即时划词，不提供 OCR 截图翻译或 PDF/DOCX 整篇文档翻译；当前也没有安装器、自动更新和 ARM64 包。
-- 个别精简版 Windows 可能没有黑体、宋体或楷体；WPF 会使用系统可用字体回退，Source Sans Pro 界面字体则已随程序内嵌。
+仓库包含自动化测试和静态界面示例，但它们不能替代真实 DeepSeek 请求、所有文档阅读器或各类系统环境的兼容性验证。
 
-## 第三方字体
+## 反馈与贡献
 
-界面字体 Source Sans Pro 来自 Adobe Source Sans 项目，依据 SIL Open Font License 1.1 随程序分发；完整字体许可包含在成品的 `Assets/Fonts/LICENSE-SourceSans.md`。
+欢迎通过 [Issues](https://github.com/2214331539/Yita/issues) 报告问题或提出改进建议。为便于复现，请提供 Windows 版本、目标应用及版本、复现步骤、预期与实际行为，以及经过脱敏的日志或截图。不要上传 API Key、私人文档或完整聊天记录。
 
-## 代码结构
+提交 Pull Request 前，请运行构建和测试。涉及取词、剪贴板或请求生命周期的改动应提供有意义的回归测试；涉及 UI 的改动请附中英文界面预览，并检查小窗口与高对比度模式。
 
-- `Hooks/`：全局鼠标钩子、窗口拖动抑制和全局快捷键。
-- `Selection/`：UI Automation、原生控件取词、可选剪贴板回退和文本规范化。
-- `Translation/`：DeepSeek 流式翻译、解释、问答与总结 Provider，语言方向、内存缓存、加密翻译记忆、并发合并与网络断路保护。
-- `Services/`：单实例、请求会话、可选 Markdown 归档与总结、无文本性能诊断、托盘和端到端协调。
-- `Settings/`：设置、主题、开机启动与 Windows 凭据存储。
-- `Windows/`：设置窗口和无焦点译文浮窗。
+## 品牌、上游与许可证
 
-## License
+Yita 的水獭形象与图标素材位于 [assets/branding/yita/v1](assets/branding/yita/v1)，包含透明 PNG、多种尺寸图标、Windows ICO、导出脚本和生成说明。形象由 AI 图像工具辅助生成，当前提供的是位图与 ICO，不是 SVG 矢量源文件。
 
-[MIT](LICENSE)
+本项目基于 Frank Lai 的 [InstantTranslate](https://github.com/franklai-rise/InstantTranslate) v0.7.3 开发。Yita 在其基础上调整了产品身份、品牌素材、界面、阅读切换、字体和配色；感谢上游对选区读取、流式翻译和桌面窗口交互的实现。
+
+代码采用 [MIT License](LICENSE)，允许在遵守许可条件的前提下使用、修改和分发，包括商业用途。分发时须保留原版权与许可文本。内置 Source Sans Pro 字体采用 SIL Open Font License 1.1，详情见 [NOTICE.md](NOTICE.md) 和[字体许可](src/Yita.App/Assets/Fonts/LICENSE-SourceSans.md)。历史变更记录中的上游版本不代表 Yita 的独立发布记录。

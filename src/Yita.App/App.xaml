@@ -1,0 +1,64 @@
+<Application x:Class="Yita.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:effects="clr-namespace:System.Windows.Media.Effects;assembly=PresentationCore"
+             xmlns:sys="clr-namespace:System;assembly=System.Runtime"
+             ShutdownMode="OnExplicitShutdown">
+    <Application.Resources>
+        <FontFamily x:Key="InterfaceFont">Segoe UI, Microsoft YaHei UI</FontFamily>
+        <FontFamily x:Key="BundledSourceSansFont">pack://application:,,,/Assets/Fonts/#Source Sans Pro</FontFamily>
+        <!-- Neutral semantic surfaces keep the UI restrained and consistent. -->
+        <SolidColorBrush x:Key="AppWindowBackgroundBrush" Color="#F5F2EC" />
+        <SolidColorBrush x:Key="AppCardBackgroundBrush" Color="#FFFCF7" />
+        <SolidColorBrush x:Key="AppCardBorderBrush" Color="#E3DCD0" />
+        <SolidColorBrush x:Key="AppFieldBackgroundBrush" Color="#F4F0E8" />
+        <SolidColorBrush x:Key="AppFieldBorderBrush" Color="#C7BDAE" />
+        <SolidColorBrush x:Key="AppTextBrush" Color="#302D29" />
+        <SolidColorBrush x:Key="AppMutedTextBrush" Color="#696158" />
+        <SolidColorBrush x:Key="AppHoverBrush" Color="#E8EEE7" />
+        <SolidColorBrush x:Key="AppPressedBrush" Color="#DCE7DE" />
+        <SolidColorBrush x:Key="SuccessBrush" Color="#24756B" />
+        <SolidColorBrush x:Key="DangerBrush" Color="#A43E32" />
+        <SolidColorBrush x:Key="AccentBrush" Color="#24756B" />
+        <SolidColorBrush x:Key="AccentLightBrush" Color="#1C625A" />
+        <SolidColorBrush x:Key="AccentTextBrush" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="SwitchKnobBrush" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="PopupBackgroundBrush" Color="#FFFCF7" />
+        <SolidColorBrush x:Key="PopupBorderBrush" Color="#DDD5C9" />
+        <SolidColorBrush x:Key="PopupButtonBrush" Color="#EFE9DF" />
+        <SolidColorBrush x:Key="PopupButtonHoverBrush" Color="#E3EDE7" />
+        <SolidColorBrush x:Key="PopupButtonBorderBrush" Color="#C7BDAE" />
+        <SolidColorBrush x:Key="PopupTextBrush" Color="#302D29" />
+        <SolidColorBrush x:Key="PopupMutedBrush" Color="#696158" />
+        <SolidColorBrush x:Key="PopupBadgeBrush" Color="#24756B" />
+        <SolidColorBrush x:Key="ContentHighlightPrimaryBrush" Color="#21675E" />
+        <SolidColorBrush x:Key="ContentHighlightPrimaryBackgroundBrush" Color="#E7F0E9" />
+        <SolidColorBrush x:Key="ContentHighlightSecondaryBrush" Color="#805233" />
+        <SolidColorBrush x:Key="ContentHighlightSecondaryBackgroundBrush" Color="#F4E9DB" />
+        <SolidColorBrush x:Key="ContentHighlightTertiaryBrush" Color="#605D35" />
+        <SolidColorBrush x:Key="ContentHighlightTertiaryBackgroundBrush" Color="#EFEDDC" />
+        <SolidColorBrush x:Key="PopupHighlightBrush" Color="#00FFFFFF" />
+        <sys:Boolean x:Key="PopupGlassEnabled">False</sys:Boolean>
+        <SolidColorBrush x:Key="PopupTextSurfaceBrush" Color="Transparent" />
+        <CornerRadius x:Key="PopupTextSurfaceCornerRadius">0</CornerRadius>
+        <Thickness x:Key="PopupTextSurfacePadding">0</Thickness>
+        <SolidColorBrush x:Key="PopupTailBrush" Color="#FFFCF7" />
+        <SolidColorBrush x:Key="PopupTailStrokeBrush" Color="#00FFFFFF" />
+        <CornerRadius x:Key="PopupSurfaceCornerRadius">12</CornerRadius>
+        <CornerRadius x:Key="PopupActionBarCornerRadius">11</CornerRadius>
+        <CornerRadius x:Key="PopupButtonCornerRadius">7</CornerRadius>
+        <effects:DropShadowEffect x:Key="PopupSurfaceShadowEffect"
+                                 BlurRadius="0"
+                                 ShadowDepth="0"
+                                 Opacity="0" />
+        <effects:DropShadowEffect x:Key="PopupActionBarShadowEffect"
+                                 BlurRadius="0"
+                                 ShadowDepth="0"
+                                 Opacity="0" />
+        <SolidColorBrush x:Key="ExplanationSurfaceBrush" Color="#FFFCF7" />
+        <SolidColorBrush x:Key="ExplanationHeaderBrush" Color="#EFE9DF" />
+        <SolidColorBrush x:Key="QuestionAnswerSurfaceBrush" Color="#FFFCF7" />
+        <SolidColorBrush x:Key="QuestionAnswerHeaderBrush" Color="#EFE9DF" />
+        <SolidColorBrush x:Key="QuestionInputBrush" Color="#F4F0E8" />
+    </Application.Resources>
+</Application>

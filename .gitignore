@@ -7,3 +7,15 @@ TestResults/
 artifacts/
 .work/
 *.log
+
+# Local credentials and editor/runtime state
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
+*.pem
+*.key
+
+# Reproducible archive; individual branding assets are versioned instead.
+assets/branding/yita/yita-brand-v1.zip

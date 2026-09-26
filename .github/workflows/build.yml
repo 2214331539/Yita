@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     runs-on: windows-latest
@@ -20,10 +23,10 @@ jobs:
           dotnet-version: 8.0.x
 
       - name: Restore
-        run: dotnet restore .\InstantTranslate.sln
+        run: dotnet restore .\Yita.sln
 
       - name: Build
-        run: dotnet build .\InstantTranslate.sln --configuration Release --no-restore
+        run: dotnet build .\Yita.sln --configuration Release --no-restore
 
       - name: Test
-        run: dotnet test .\InstantTranslate.sln --configuration Release --no-build
+        run: dotnet test .\Yita.sln --configuration Release --no-build

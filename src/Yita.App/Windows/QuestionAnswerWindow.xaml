@@ -1,0 +1,243 @@
+<Window x:Class="Yita.Windows.QuestionAnswerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:Yita.Windows"
+        x:ClassModifier="internal"
+        Width="520"
+        Height="360"
+        MinWidth="360"
+        MinHeight="240"
+        MaxWidth="860"
+        MaxHeight="720"
+        WindowStyle="None"
+        ResizeMode="CanResize"
+        ShowInTaskbar="False"
+        ShowActivated="False"
+        WindowStartupLocation="Manual"
+        Topmost="True"
+        AllowsTransparency="True"
+        Background="Transparent"
+        FontFamily="{DynamicResource InterfaceFont}"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        PreviewKeyDown="Window_PreviewKeyDown"
+        PreviewMouseWheel="Window_PreviewMouseWheel">
+    <Window.Resources>
+        <Style x:Key="QaButtonStyle" TargetType="Button">
+            <Setter Property="local:UiMotion.PressFeedback" Value="True" />
+            <Setter Property="MinWidth" Value="34" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Margin" Value="4,0,0,0" />
+            <Setter Property="Padding" Value="8,3" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource PopupTextBrush}" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{DynamicResource PopupButtonCornerRadius}">
+                            <ContentPresenter Margin="{TemplateBinding Padding}"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource PopupButtonHoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AccentLightBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+                            </Trigger>
+                            <Trigger Property="Tag" Value="Pinned">
+                                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AccentBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="{DynamicResource PopupMutedBrush}" />
+                                <Setter Property="Cursor" Value="Arrow" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="9">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <local:WindowSizePresetBar x:Name="SizePresetBar"
+                                   Grid.Row="0"
+                                   Margin="0,0,0,6"
+                                   HorizontalAlignment="Left"
+                                   VerticalAlignment="Top" />
+
+        <Border x:Name="Surface"
+                Grid.Row="1"
+                Background="{DynamicResource QuestionAnswerSurfaceBrush}"
+                CornerRadius="{DynamicResource PopupSurfaceCornerRadius}"
+                Effect="{DynamicResource PopupSurfaceShadowEffect}"
+                ClipToBounds="True"
+                SizeChanged="Surface_SizeChanged">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Border x:Name="Header"
+                        Padding="14,10"
+                        Background="{DynamicResource QuestionAnswerHeaderBrush}"
+                        MouseLeftButtonDown="Header_MouseLeftButtonDown">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="TitleText"
+                                   Grid.Column="0"
+                                   VerticalAlignment="Center"
+                                   FontSize="12.5"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource PopupTextBrush}"
+                                   Text="Ask AI" />
+                        <StackPanel Grid.Column="1"
+                                    HorizontalAlignment="Right"
+                                    Orientation="Horizontal">
+                            <Button x:Name="CopyButton"
+                                    Style="{StaticResource QaButtonStyle}"
+                                    Content="Copy"
+                                    Click="CopyButton_Click" />
+                            <Button x:Name="RecordButton"
+                                    Style="{StaticResource QaButtonStyle}"
+                                    Content="Record"
+                                    ToolTip="Save this conversation to today's Markdown record"
+                                    IsEnabled="False"
+                                    Click="RecordButton_Click" />
+                            <Button x:Name="StopButton"
+                                    Style="{StaticResource QaButtonStyle}"
+                                    Content="Stop"
+                                    Visibility="Collapsed"
+                                    Click="StopButton_Click" />
+                            <Button x:Name="RetryButton"
+                                    Style="{StaticResource QaButtonStyle}"
+                                    Content="Retry"
+                                    Visibility="Collapsed"
+                                    Click="RetryButton_Click" />
+                            <Button x:Name="PinButton"
+                                    Width="34"
+                                    Style="{StaticResource QaButtonStyle}"
+                                    ToolTip="Keep this answer"
+                                    Click="PinButton_Click">
+                                <TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE718;" />
+                            </Button>
+                            <Button x:Name="CloseButton"
+                                    Width="34"
+                                    Style="{StaticResource QaButtonStyle}"
+                                    ToolTip="Close"
+                                    Click="CloseButton_Click">
+                                <TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE711;" />
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <Border x:Name="TranscriptTextSurface"
+                        Grid.Row="1"
+                        Margin="16,12"
+                        Background="{DynamicResource PopupTextSurfaceBrush}"
+                        CornerRadius="{DynamicResource PopupTextSurfaceCornerRadius}"
+                        Padding="{DynamicResource PopupTextSurfacePadding}">
+                <Grid>
+                <TextBlock x:Name="EmptyStateText"
+                           Margin="12,16"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource PopupMutedBrush}"
+                           FontSize="13"
+                           TextAlignment="Center"
+                           TextWrapping="Wrap"
+                           IsHitTestVisible="False"
+                           Text="Ask a quick question." />
+
+                <RichTextBox x:Name="TranscriptBox"
+                             Margin="0"
+                             Padding="0"
+                             Background="Transparent"
+                             Foreground="{DynamicResource PopupTextBrush}"
+                             BorderThickness="0"
+                             FontFamily="{DynamicResource InterfaceFont}"
+                             FontSize="15.5"
+                             IsReadOnly="True"
+                             IsUndoEnabled="False"
+                             IsDocumentEnabled="False"
+                             IsInactiveSelectionHighlightEnabled="True"
+                             SelectionBrush="{DynamicResource AccentBrush}"
+                             SelectionTextBrush="{DynamicResource AccentTextBrush}"
+                             SelectionOpacity="1"
+                             VerticalScrollBarVisibility="Auto"
+                             HorizontalScrollBarVisibility="Disabled" />
+                </Grid>
+                </Border>
+
+                <Border Grid.Row="2"
+                        Margin="12,0,12,12"
+                        Padding="10,7"
+                        Background="{DynamicResource QuestionInputBrush}"
+                        CornerRadius="14">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid>
+                            <TextBox x:Name="QuestionInputTextBox"
+                                     MinHeight="24"
+                                     MaxHeight="86"
+                                     Padding="2"
+                                     Background="Transparent"
+                                     Foreground="{DynamicResource PopupTextBrush}"
+                                     BorderThickness="0"
+                                     AcceptsReturn="True"
+                                     TextWrapping="Wrap"
+                                     VerticalScrollBarVisibility="Auto"
+                                     TextChanged="QuestionInputTextBox_TextChanged"
+                                     PreviewKeyDown="QuestionInputTextBox_PreviewKeyDown" />
+                            <TextBlock x:Name="QuestionInputPlaceholder"
+                                       Margin="7,1,0,0"
+                                       VerticalAlignment="Top"
+                                       Foreground="{DynamicResource PopupMutedBrush}"
+                                       IsHitTestVisible="False"
+                                       Text="Ask a follow-up…" />
+                        </Grid>
+                        <Button x:Name="SendButton"
+                                Grid.Column="1"
+                                MinWidth="50"
+                                Margin="8,0,0,0"
+                                Style="{StaticResource QaButtonStyle}"
+                                Background="{DynamicResource AccentBrush}"
+                                Foreground="{DynamicResource AccentTextBrush}"
+                                Content="Ask"
+                                Click="SendButton_Click" />
+                    </Grid>
+                </Border>
+            </Grid>
+        </Border>
+        <local:LiquidGlassRim x:Name="GlassSurfaceRim"
+                             Grid.Row="1"
+                             CornerRadius="{DynamicResource PopupSurfaceCornerRadius}"
+                             IsGlassEnabled="{DynamicResource PopupGlassEnabled}" />
+    </Grid>
+</Window>

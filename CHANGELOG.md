@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Yita
+
+- Rename the application, executable, credentials and configuration identity to Yita; add the otter mascot and application icons.
+- Simplify the translation toolbar to source/translation switching, pin and close. Reading the source no longer interrupts incoming translated text.
+- Unify interface typography, spacing and controls; add short motion transitions that respect system animation preferences.
+- Introduce the Lakeside palette with ivory reading surfaces, dark warm text and teal controls. Upgrade legacy default fonts and colors while preserving other preferences.
+- Add regression coverage for reading-view switching and appearance migration. The local automated suite contains 419 passing tests; static previews do not claim live API or external-reader validation.
+- Document portable local builds, current limitations, data handling and upstream attribution for the public repository.
+
+The entries below are inherited upstream history, not independent Yita releases.
+
 ## 0.7.3 - 2026-09-09
 
 ### Fixed
@@ -72,7 +83,7 @@
 - Added a compact question bar below completed translations and explanations. Each translation popup owns an independent multi-turn AI conversation window with streamed answers, stop, retry, copy, resize, zoom, pin, and close controls.
 - Added a bottom-right DeepSeek quick-chat launcher to every translation popup. It opens one reusable, compact, topmost conversation window, streams concise answers in the question's language, and sends no translation context or AI-history records.
 - Added opt-in AI history. Completed explanations and answers for the same selection are atomically stored in one schema-marked Markdown file under a user-selected directory; disabled, cancelled, failed, and partial results write nothing.
-- Added on-demand AI summaries for today, the last seven days, or all schema-marked InstantTranslate records. Summaries are classified, streamed through the existing DeepSeek configuration, and written as new non-overwriting Markdown files.
+- Added on-demand AI summaries for today, the last seven days, or all schema-marked Yita records. Summaries are classified, streamed through the existing DeepSeek configuration, and written as new non-overwriting Markdown files.
 - Added a loopback-only Zotero selection bridge and companion Zotero 7–9 plugin. It reads only the current built-in PDF-reader selection and does not access the Zotero library or system clipboard.
 - Added a compact top-left size preset panel to translation, explanation, contextual Q&A, and DeepSeek quick-chat windows. It provides one-click small, medium, large, wide, tall, and square layouts while preserving manual edge resizing.
 - Added an always-visible, directly draggable text-size slider to every translation, explanation, contextual Q&A, and DeepSeek quick-chat window. Translation and explanation share a live size, while each conversation window controls its own transcript.

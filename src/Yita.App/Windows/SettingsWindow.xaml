@@ -1,0 +1,1253 @@
+<Window x:Class="Yita.Windows.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:ClassModifier="internal"
+        xmlns:local="clr-namespace:Yita.Windows"
+        xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
+        Title="Yita Settings"
+        Icon="/Assets/AppLogo.ico"
+        Width="700"
+        Height="800"
+        MinWidth="560"
+        MinHeight="500"
+        ResizeMode="CanResizeWithGrip"
+        WindowStartupLocation="CenterScreen"
+        ShowInTaskbar="True"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Display"
+        FontFamily="{DynamicResource InterfaceFont}"
+        FontSize="14"
+        Background="{DynamicResource AppWindowBackgroundBrush}"
+        Foreground="{DynamicResource AppTextBrush}">
+    <Window.Resources>
+        <Style x:Key="CardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource AppCardBackgroundBrush}" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="18" />
+            <Setter Property="Padding" Value="24" />
+        </Style>
+
+        <Style x:Key="SectionTitleStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
+        </Style>
+
+        <Style x:Key="FieldLabelStyle" TargetType="TextBlock">
+            <Setter Property="Margin" Value="0,0,0,7" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
+        </Style>
+
+        <Style x:Key="SupportingTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="LineHeight" Value="20" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Foreground" Value="{DynamicResource AppMutedTextBrush}" />
+        </Style>
+
+        <ControlTemplate x:Key="TextBoxTemplate" TargetType="TextBox">
+            <Border x:Name="Chrome"
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="10">
+                <ScrollViewer x:Name="PART_ContentHost"
+                              Margin="{TemplateBinding Padding}"
+                              VerticalAlignment="Stretch" />
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsKeyboardFocused" Value="True">
+                    <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                </Trigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AppMutedTextBrush}" />
+                </Trigger>
+                <MultiTrigger>
+                    <MultiTrigger.Conditions>
+                        <Condition Property="IsMouseOver" Value="True" />
+                        <Condition Property="IsKeyboardFocused" Value="True" />
+                    </MultiTrigger.Conditions>
+                    <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                </MultiTrigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter TargetName="Chrome" Property="Opacity" Value="0.52" />
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+
+        <Style TargetType="TextBox">
+            <Setter Property="MinHeight" Value="40" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Padding" Value="11,6" />
+            <Setter Property="Background" Value="{DynamicResource AppFieldBackgroundBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AppFieldBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
+            <Setter Property="CaretBrush" Value="{DynamicResource AppTextBrush}" />
+            <Setter Property="SelectionBrush" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="SelectionTextBrush" Value="{DynamicResource AccentTextBrush}" />
+            <Setter Property="SelectionOpacity" Value="1" />
+            <Setter Property="Template" Value="{StaticResource TextBoxTemplate}" />
+        </Style>
+
+        <ControlTemplate x:Key="PasswordBoxTemplate" TargetType="PasswordBox">
+            <Border x:Name="Chrome"
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="10">
+                <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}" />
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsKeyboardFocused" Value="True">
+                    <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                </Trigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AppMutedTextBrush}" />
+                </Trigger>
+                <MultiTrigger>
+                    <MultiTrigger.Conditions>
+                        <Condition Property="IsMouseOver" Value="True" />
+                        <Condition Property="IsKeyboardFocused" Value="True" />
+                    </MultiTrigger.Conditions>
+                    <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                </MultiTrigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter TargetName="Chrome" Property="Opacity" Value="0.52" />
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+
+        <Style TargetType="PasswordBox">
+            <Setter Property="MinHeight" Value="40" />
+            <Setter Property="Padding" Value="11,6" />
+            <Setter Property="Background" Value="{DynamicResource AppFieldBackgroundBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AppFieldBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
+            <Setter Property="CaretBrush" Value="{DynamicResource AppTextBrush}" />
+            <Setter Property="Template" Value="{StaticResource PasswordBoxTemplate}" />
+        </Style>
+
+        <ControlTemplate x:Key="EditableComboTextBoxTemplate" TargetType="TextBox">
+            <ScrollViewer x:Name="PART_ContentHost" Background="Transparent" />
+        </ControlTemplate>
+
+        <Style TargetType="ComboBoxItem">
+            <Setter Property="MinHeight" Value="32" />
+            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border x:Name="ItemChrome"
+                                Margin="3,1"
+                                Padding="{TemplateBinding Padding}"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="5">
+                            <ContentPresenter VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="ItemChrome" Property="Background" Value="{DynamicResource AppHoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="ItemChrome" Property="Background" Value="{DynamicResource AccentBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="ComboBox">
+            <Setter Property="MinHeight" Value="40" />
+            <Setter Property="Background" Value="{DynamicResource AppFieldBackgroundBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AppFieldBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
+            <Setter Property="Padding" Value="11,0,36,0" />
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton x:Name="DropDownToggle"
+                                          Focusable="False"
+                                          ClickMode="Press"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border x:Name="Chrome"
+                                                Background="{Binding Background, RelativeSource={RelativeSource AncestorType=ComboBox}}"
+                                                BorderBrush="{Binding BorderBrush, RelativeSource={RelativeSource AncestorType=ComboBox}}"
+                                                BorderThickness="{Binding BorderThickness, RelativeSource={RelativeSource AncestorType=ComboBox}}"
+                                                CornerRadius="10">
+                                            <Path Width="8"
+                                                  Height="5"
+                                                  Margin="0,0,13,0"
+                                                  HorizontalAlignment="Right"
+                                                  VerticalAlignment="Center"
+                                                  Data="M 0 0 L 4 4 L 8 0"
+                                                  Stroke="{DynamicResource AppMutedTextBrush}"
+                                                  StrokeThickness="1.4"
+                                                  StrokeStartLineCap="Round"
+                                                  StrokeEndLineCap="Round" />
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AppMutedTextBrush}" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <ContentPresenter x:Name="ContentSite"
+                                              Margin="{TemplateBinding Padding}"
+                                              HorizontalAlignment="Left"
+                                              VerticalAlignment="Center"
+                                              IsHitTestVisible="False"
+                                              Content="{TemplateBinding SelectionBoxItem}"
+                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                              ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}" />
+                            <TextBox x:Name="PART_EditableTextBox"
+                                     Margin="11,0,36,0"
+                                     HorizontalContentAlignment="Left"
+                                     VerticalContentAlignment="Center"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     Focusable="True"
+                                     IsReadOnly="{TemplateBinding IsReadOnly}"
+                                     Template="{StaticResource EditableComboTextBoxTemplate}"
+                                     Visibility="Hidden" />
+                            <Popup x:Name="PART_Popup"
+                                   AllowsTransparency="True"
+                                   Focusable="False"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   Placement="Bottom"
+                                   PopupAnimation="Fade">
+                                <Border Margin="0,4,0,0"
+                                        MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
+                                        MaxHeight="{TemplateBinding MaxDropDownHeight}"
+                                        Padding="2"
+                                        Background="{DynamicResource AppCardBackgroundBrush}"
+                                        BorderBrush="{DynamicResource AppCardBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="8">
+                                    <ScrollViewer CanContentScroll="True">
+                                        <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained" />
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsEditable" Value="True">
+                                <Setter TargetName="ContentSite" Property="Visibility" Value="Hidden" />
+                                <Setter TargetName="PART_EditableTextBox" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                <Setter TargetName="DropDownToggle" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.52" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SwitchStyle" TargetType="CheckBox">
+            <Setter Property="local:UiMotion.AnimateSwitch" Value="True" />
+            <Setter Property="Width" Value="46" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Border x:Name="Track"
+                                Width="46"
+                                Height="28"
+                                Background="{DynamicResource AppFieldBorderBrush}"
+                                CornerRadius="14">
+                            <Ellipse x:Name="Knob"
+                                     Width="22"
+                                     Height="22"
+                                     Margin="3"
+                                     HorizontalAlignment="Left"
+                                     Fill="{DynamicResource SwitchKnobBrush}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Track" Property="Background" Value="{DynamicResource AccentBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Track" Property="Opacity" Value="0.86" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Track" Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <ControlTemplate x:Key="ButtonTemplate" TargetType="Button">
+            <Border x:Name="Chrome"
+                    MinWidth="{TemplateBinding MinWidth}"
+                    MinHeight="{TemplateBinding MinHeight}"
+                    Padding="{TemplateBinding Padding}"
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="10">
+                <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                  VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                  RecognizesAccessKey="True" />
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AppHoverBrush}" />
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AppPressedBrush}" />
+                </Trigger>
+                <Trigger Property="IsKeyboardFocused" Value="True">
+                    <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter TargetName="Chrome" Property="Opacity" Value="0.46" />
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+
+        <Style x:Key="SecondaryButtonStyle" TargetType="Button">
+            <Setter Property="local:UiMotion.PressFeedback" Value="True" />
+            <Setter Property="MinWidth" Value="84" />
+            <Setter Property="MinHeight" Value="40" />
+            <Setter Property="Padding" Value="14,6" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Background" Value="{DynamicResource AppFieldBackgroundBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AppFieldBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template" Value="{StaticResource ButtonTemplate}" />
+        </Style>
+
+        <Style x:Key="PrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+            <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome"
+                                MinWidth="{TemplateBinding MinWidth}"
+                                MinHeight="{TemplateBinding MinHeight}"
+                                Padding="{TemplateBinding Padding}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="10">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AccentLightBrush}" />
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AccentLightBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Chrome" Property="Opacity" Value="0.82" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Chrome" Property="Opacity" Value="0.46" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <ControlTemplate x:Key="SliderDecreaseTemplate" TargetType="RepeatButton">
+            <Border Height="4" Background="{DynamicResource AccentBrush}" CornerRadius="2" />
+        </ControlTemplate>
+        <ControlTemplate x:Key="SliderIncreaseTemplate" TargetType="RepeatButton">
+            <Border Height="4" Background="{DynamicResource AppFieldBorderBrush}" CornerRadius="2" />
+        </ControlTemplate>
+        <ControlTemplate x:Key="SliderThumbTemplate" TargetType="Thumb">
+            <Border Width="16"
+                    Height="16"
+                    Background="{DynamicResource AppCardBackgroundBrush}"
+                    BorderBrush="{DynamicResource AccentBrush}"
+                    BorderThickness="2"
+                    CornerRadius="8" />
+        </ControlTemplate>
+        <Style x:Key="FontSizeSliderStyle" TargetType="Slider">
+            <Setter Property="Height" Value="30" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Grid>
+                            <Track x:Name="PART_Track" VerticalAlignment="Center">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static Slider.DecreaseLarge}"
+                                                  Template="{StaticResource SliderDecreaseTemplate}" />
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static Slider.IncreaseLarge}"
+                                                  Template="{StaticResource SliderIncreaseTemplate}" />
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Template="{StaticResource SliderThumbTemplate}" />
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="ScrollBar">
+            <Setter Property="Width" Value="9" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Grid Background="Transparent">
+                            <Track x:Name="PART_Track" IsDirectionReversed="True" Focusable="False">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.PageUpCommand}" Opacity="0" />
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.PageDownCommand}" Opacity="0" />
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb>
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Border Margin="2,1"
+                                                        Background="{DynamicResource AppFieldBorderBrush}"
+                                                        CornerRadius="3" />
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="Orientation" Value="Horizontal">
+                                <Setter Property="Height" Value="9" />
+                                <Setter Property="Width" Value="Auto" />
+                                <Setter TargetName="PART_Track" Property="IsDirectionReversed" Value="False" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Grid Background="Transparent">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <Border x:Name="CheckChrome" Width="18" Height="18" CornerRadius="5"
+                                    VerticalAlignment="Top" Margin="0,2,9,0"
+                                    Background="{DynamicResource AppFieldBackgroundBrush}"
+                                    BorderBrush="{DynamicResource AppFieldBorderBrush}" BorderThickness="1">
+                                <Path x:Name="CheckMark" Visibility="Collapsed" Data="M 3,8 L 6,11 L 12,4"
+                                      Stroke="{DynamicResource AccentTextBrush}" StrokeThickness="1.8"
+                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                            </Border>
+                            <ContentPresenter Grid.Column="1" VerticalAlignment="Center" RecognizesAccessKey="True" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="CheckChrome" Property="Background" Value="{DynamicResource AccentBrush}" />
+                                <Setter TargetName="CheckChrome" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                <Setter TargetName="CheckMark" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="CheckChrome" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                <Setter TargetName="CheckChrome" Property="BorderThickness" Value="2" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.5" /></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid x:Name="SettingsRoot" Background="{DynamicResource AppWindowBackgroundBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" Margin="28,24,28,18">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Border Width="42"
+                    Height="42"
+                    Margin="0,0,13,0"
+                    VerticalAlignment="Center"
+                    Background="Transparent"
+                    BorderThickness="0">
+                <Image Width="34" Height="34" Source="/Assets/AppLogo.png" />
+            </Border>
+            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                <TextBlock FontSize="24"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource AppTextBrush}"
+                           Tag="loc:HeaderTitle"
+                           Text="Settings" />
+                <TextBlock Margin="0,3,0,0"
+                           Style="{StaticResource SupportingTextStyle}"
+                           Tag="loc:HeaderSubtitle"
+                           Text="Translation behavior, appearance, and connection" />
+            </StackPanel>
+            <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                <TextBlock Margin="0,0,0,6"
+                           HorizontalAlignment="Right"
+                           Style="{StaticResource FieldLabelStyle}"
+                           Tag="loc:InterfaceLanguage"
+                           Text="Interface language" />
+                <Button x:Name="UiLanguageButton"
+                        MinWidth="94"
+                        Content="中文"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        Click="UiLanguageButton_Click" />
+            </StackPanel>
+        </Grid>
+
+        <ScrollViewer x:Name="SettingsScrollViewer"
+                      Grid.Row="1"
+                      Margin="0,0,7,0"
+                      Padding="28,0,21,24"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto"
+                      PanningMode="VerticalOnly">
+            <StackPanel>
+                <Border Style="{StaticResource CardStyle}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionTitleStyle}"
+                                   Tag="loc:GeneralTitle"
+                                   Text="General" />
+                        <TextBlock Margin="0,4,0,17"
+                                   Style="{StaticResource SupportingTextStyle}"
+                                   Tag="loc:GeneralDescription"
+                                   Text="Control availability and selection behavior." />
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock FontWeight="SemiBold"
+                                           Tag="loc:SelectionTranslation"
+                                           Text="Selection translation" />
+                                <TextBlock Margin="0,3,18,0"
+                                           Style="{StaticResource SupportingTextStyle}"
+                                           Tag="loc:SelectionTranslationDescription"
+                                           Text="Translate text automatically after you select it." />
+                            </StackPanel>
+                            <CheckBox x:Name="EnabledCheckBox"
+                                      Grid.Column="1"
+                                      VerticalAlignment="Center"
+                                      automation:AutomationProperties.Name="Enable selection translation"
+                                      Style="{StaticResource SwitchStyle}" />
+                        </Grid>
+
+                        <Border Height="1" Margin="0,14" Background="{DynamicResource AppCardBorderBrush}" />
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock FontWeight="SemiBold"
+                                           Tag="loc:StartWithWindows"
+                                           Text="Start with Windows" />
+                                <TextBlock Margin="0,3,18,0"
+                                           Style="{StaticResource SupportingTextStyle}"
+                                           Tag="loc:StartWithWindowsDescription"
+                                           Text="Stay ready in the background after sign-in." />
+                            </StackPanel>
+                            <CheckBox x:Name="StartWithWindowsCheckBox"
+                                      Grid.Column="1"
+                                      VerticalAlignment="Center"
+                                       automation:AutomationProperties.Name="Start with Windows"
+                                       Style="{StaticResource SwitchStyle}" />
+                        </Grid>
+
+                        <Border Height="1" Margin="0,14" Background="{DynamicResource AppCardBorderBrush}" />
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock FontWeight="SemiBold"
+                                           Tag="loc:ClipboardFallback"
+                                           Text="Compatibility clipboard fallback" />
+                                <TextBlock Margin="0,3,18,0"
+                                           Style="{StaticResource SupportingTextStyle}"
+                                           Tag="loc:ClipboardFallbackDescription"
+                                           Text="Only use this for apps that expose no accessibility text; it temporarily changes the system clipboard." />
+                            </StackPanel>
+                            <CheckBox x:Name="ClipboardFallbackCheckBox"
+                                      Grid.Column="1"
+                                      VerticalAlignment="Center"
+                                      automation:AutomationProperties.Name="Compatibility clipboard fallback"
+                                      Style="{StaticResource SwitchStyle}" />
+                        </Grid>
+
+                        <Grid Margin="0,20,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource FieldLabelStyle}"
+                                           Tag="loc:SelectionDelay"
+                                           Text="Trigger delay · ms" />
+                                <TextBox x:Name="SelectionDelayTextBox"
+                                         ToolTip="Prevents accidental triggers from window dragging or brief selections; range 0–1000"
+                                         Text="80" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Style="{StaticResource FieldLabelStyle}"
+                                           Tag="loc:MaximumSelection"
+                                           Text="Selection limit · characters" />
+                                <TextBox x:Name="MaximumSelectionTextBox"
+                                         ToolTip="Prevents accidental translation of an entire document; range 100–20000" />
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border Margin="0,14,0,0" Style="{StaticResource CardStyle}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionTitleStyle}"
+                                   Tag="loc:AiHistoryTitle"
+                                   Text="AI history" />
+                        <TextBlock Margin="0,4,0,17"
+                                    Style="{StaticResource SupportingTextStyle}"
+                                    TextWrapping="Wrap"
+                                    Tag="loc:AiHistoryDescription"
+                                    Text="Choose where manual Record entries are saved. Automatic history for every completed explanation and answer remains optional." />
+
+                        <CheckBox x:Name="AiHistoryEnabledCheckBox"
+                                  Content="Save AI explanations and Q&amp;A"
+                                  Tag="loc:EnableAiHistory"
+                                  Checked="AiHistoryEnabledCheckBox_Changed"
+                                  Unchecked="AiHistoryEnabledCheckBox_Changed" />
+                        <TextBlock Margin="28,4,0,0"
+                                    Style="{StaticResource SupportingTextStyle}"
+                                    TextWrapping="Wrap"
+                                    Tag="loc:AiHistoryPrivacy"
+                                    Text="Manual Record saves only when clicked. Files are readable Markdown and may contain private selected text." />
+
+                        <TextBlock Margin="0,17,0,0"
+                                   Style="{StaticResource FieldLabelStyle}"
+                                   Tag="loc:HistoryDirectory"
+                                   Text="Save folder" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="AiHistoryDirectoryTextBox"
+                                     VerticalContentAlignment="Center"
+                                     TextChanged="AiHistoryDirectoryTextBox_TextChanged" />
+                            <Button Grid.Column="1"
+                                    Margin="8,0,0,0"
+                                    Content="Browse"
+                                    Tag="loc:Browse"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Click="BrowseAiHistoryDirectoryButton_Click" />
+                            <Button x:Name="OpenAiHistoryDirectoryButton"
+                                    Grid.Column="2"
+                                    Margin="8,0,0,0"
+                                    Content="Open"
+                                    Tag="loc:OpenFolder"
+                                     Style="{StaticResource SecondaryButtonStyle}"
+                                     Click="OpenAiHistoryDirectoryButton_Click" />
+                        </Grid>
+                        <TextBlock Margin="0,7,0,0"
+                                   Style="{StaticResource SupportingTextStyle}"
+                                   TextWrapping="Wrap"
+                                   Tag="loc:ManualRecordDirectoryDescription"
+                                   Text="Manual Record works even when automatic history is off and appends to one Markdown file per day." />
+
+                        <Grid Margin="0,17,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource FieldLabelStyle}"
+                                           Tag="loc:SummaryRange"
+                                           Text="Summary range" />
+                                <ComboBox x:Name="AiSummaryRangeComboBox" SelectedValuePath="Tag">
+                                    <ComboBoxItem Content="Today" Tag="today" />
+                                    <ComboBoxItem Content="Last 7 days" Tag="last-7-days" />
+                                    <ComboBoxItem Content="All records" Tag="all" />
+                                </ComboBox>
+                            </StackPanel>
+                            <Button x:Name="GenerateAiSummaryButton"
+                                    Grid.Column="2"
+                                    MinWidth="126"
+                                    Margin="0,22,0,0"
+                                    Content="AI summary"
+                                    Tag="loc:GenerateSummary"
+                                    Style="{StaticResource PrimaryButtonStyle}"
+                                    Click="GenerateAiSummaryButton_Click" />
+                        </Grid>
+                        <TextBlock x:Name="AiHistoryStatusText"
+                                   Margin="0,12,0,0"
+                                   Foreground="{DynamicResource AppMutedTextBrush}"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+                <Border Margin="0,14,0,0" Style="{StaticResource CardStyle}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionTitleStyle}"
+                                   Tag="loc:TranslationAppearanceTitle"
+                                   Text="Translation &amp; appearance" />
+                        <TextBlock Margin="0,4,0,17"
+                                   Style="{StaticResource SupportingTextStyle}"
+                                   Tag="loc:TranslationAppearanceDescription"
+                                   Text="Choose the default language direction and reading experience." />
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource FieldLabelStyle}"
+                                           Tag="loc:SourceLanguage"
+                                           Text="Source language" />
+                                <ComboBox x:Name="SourceLanguageComboBox" IsEditable="False">
+                                    <ComboBoxItem Content="Auto detect" Tag="自动检测" />
+                                    <ComboBoxItem Content="English" Tag="英语" />
+                                    <ComboBoxItem Content="Simplified Chinese" Tag="简体中文" />
+                                </ComboBox>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Style="{StaticResource FieldLabelStyle}"
+                                           Tag="loc:TargetLanguage"
+                                           Text="Target language" />
+                                <ComboBox x:Name="TargetLanguageComboBox" IsEditable="False">
+                                    <ComboBoxItem Content="Choose automatically" Tag="自动判断" />
+                                    <ComboBoxItem Content="Simplified Chinese" Tag="简体中文" />
+                                    <ComboBoxItem Content="English" Tag="英语" />
+                                    <ComboBoxItem Content="Japanese" Tag="日语" />
+                                </ComboBox>
+                            </StackPanel>
+                        </Grid>
+
+                        <Border Height="1" Margin="0,17" Background="{DynamicResource AppCardBorderBrush}" />
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock FontWeight="SemiBold"
+                                           Tag="loc:UseSelectionContext"
+                                           Text="Use surrounding context" />
+                                <TextBlock Margin="0,3,18,0"
+                                           Style="{StaticResource SupportingTextStyle}"
+                                           Tag="loc:UseSelectionContextDescription"
+                                           Text="Use the surrounding paragraph to resolve ambiguity. Extra text is sent only when this is enabled." />
+                            </StackPanel>
+                            <CheckBox x:Name="UseSelectionContextCheckBox"
+                                      Grid.Column="1"
+                                      VerticalAlignment="Center"
+                                      automation:AutomationProperties.Name="Use surrounding context"
+                                      Style="{StaticResource SwitchStyle}" />
+                        </Grid>
+
+                        <Grid Margin="0,18,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource FieldLabelStyle}"
+                                           Tag="loc:TranslationMode"
+                                           Text="Translation mode" />
+                                <ComboBox x:Name="TranslationModeComboBox"
+                                          IsEditable="False"
+                                          SelectedValuePath="Tag">
+                                    <ComboBoxItem Content="Fast" Tag="fast" />
+                                    <ComboBoxItem Content="Balanced" Tag="balanced" />
+                                    <ComboBoxItem Content="Precise" Tag="precise" />
+                                </ComboBox>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Style="{StaticResource FieldLabelStyle}"
+                                           Tag="loc:TranslationTone"
+                                           Text="Writing style" />
+                                <ComboBox x:Name="TranslationToneComboBox"
+                                          IsEditable="False"
+                                          SelectedValuePath="Tag">
+                                    <ComboBoxItem Content="Natural" Tag="natural" />
+                                    <ComboBoxItem Content="Formal" Tag="formal" />
+                                    <ComboBoxItem Content="Concise" Tag="concise" />
+                                    <ComboBoxItem Content="Academic" Tag="academic" />
+                                    <ComboBoxItem Content="Technical" Tag="technical" />
+                                </ComboBox>
+                            </StackPanel>
+                        </Grid>
+
+                        <StackPanel Margin="0,18,0,0">
+                            <TextBlock Style="{StaticResource FieldLabelStyle}"
+                                       Tag="loc:PersonalGlossary"
+                                       Text="Personal glossary" />
+                            <TextBox x:Name="PersonalGlossaryTextBox"
+                                     MinHeight="94"
+                                     MaxLength="20000"
+                                     Padding="11,9"
+                                     AcceptsReturn="True"
+                                     TextWrapping="Wrap"
+                                     VerticalContentAlignment="Top"
+                                     VerticalScrollBarVisibility="Auto"
+                                     automation:AutomationProperties.Name="Personal glossary" />
+                            <TextBlock Margin="0,7,0,0"
+                                       Style="{StaticResource SupportingTextStyle}"
+                                       Tag="loc:PersonalGlossaryDescription"
+                                       Text="One term per line: source =&gt; preferred translation. Stored only on this device." />
+                            <Grid Margin="0,14,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource FieldLabelStyle}"
+                                               Tag="loc:TranslationMemory"
+                                               Text="Saved translation memory" />
+                                    <TextBlock x:Name="TranslationMemoryStatusText"
+                                               Margin="0,3,16,0"
+                                               Style="{StaticResource SupportingTextStyle}"
+                                               Text="No saved corrections" />
+                                </StackPanel>
+                                <Button x:Name="ClearTranslationMemoryButton"
+                                        Grid.Column="1"
+                                        VerticalAlignment="Center"
+                                        Content="Clear"
+                                        Tag="loc:ClearTranslationMemory"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Click="ClearTranslationMemoryButton_Click" />
+                            </Grid>
+                            <TextBlock Margin="0,7,0,0"
+                                       Style="{StaticResource SupportingTextStyle}"
+                                       Tag="loc:TranslationMemoryDescription"
+                                       Text="Only corrections you save from the popup are encrypted for this Windows account. Up to 3 relevant pairs may guide future requests."
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <Grid Margin="0,17,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource FieldLabelStyle}"
+                                           Tag="loc:EnglishTranslationFont"
+                                           Text="English translation font" />
+                                <ComboBox x:Name="EnglishTranslationFontComboBox" IsEditable="False">
+                                    <ComboBoxItem Content="Segoe UI" Tag="Segoe UI" />
+                                    <ComboBoxItem Content="Times New Roman" Tag="Times New Roman" />
+                                    <ComboBoxItem Content="Arial" Tag="Arial" />
+                                    <ComboBoxItem Content="Source Sans Pro" Tag="Source Sans Pro" />
+                                    <ComboBoxItem Content="Georgia" Tag="Georgia" />
+                                    <ComboBoxItem Content="Calibri" Tag="Calibri" />
+                                    <ComboBoxItem Content="Cambria" Tag="Cambria" />
+                                </ComboBox>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Style="{StaticResource FieldLabelStyle}"
+                                           Tag="loc:ChineseTranslationFont"
+                                           Text="Chinese translation font" />
+                                <ComboBox x:Name="ChineseTranslationFontComboBox" IsEditable="False">
+                                    <ComboBoxItem Content="SimHei (Heiti)" Tag="SimHei" />
+                                    <ComboBoxItem Content="Microsoft YaHei UI" Tag="Microsoft YaHei UI" />
+                                    <ComboBoxItem Content="SimSun (Songti)" Tag="SimSun" />
+                                    <ComboBoxItem Content="KaiTi" Tag="KaiTi" />
+                                </ComboBox>
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid Margin="0,17,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource FieldLabelStyle}"
+                                           Tag="loc:AccentColor"
+                                           Text="Accent color" />
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <ComboBox x:Name="ColorThemeComboBox"
+                                              SelectedValuePath="Tag"
+                                              SelectionChanged="ColorThemeComboBox_SelectionChanged">
+                                        <ComboBoxItem Content="Yita · Lakeside" Tag="yita" />
+                                        <ComboBoxItem Content="Ocean blue" Tag="ocean" />
+                                        <ComboBoxItem Content="Violet" Tag="violet" />
+                                        <ComboBoxItem Content="Emerald" Tag="emerald" />
+                                        <ComboBoxItem Content="Warm orange" Tag="sunset" />
+                                        <ComboBoxItem Content="Rose" Tag="rose" />
+                                        <ComboBoxItem Content="Custom" Tag="custom" />
+                                    </ComboBox>
+                                    <Border x:Name="ThemePreviewBorder"
+                                            Grid.Column="1"
+                                            Width="28"
+                                            Height="28"
+                                            Margin="9,0,0,0"
+                                            VerticalAlignment="Center"
+                                            BorderBrush="{DynamicResource AppFieldBorderBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="10" />
+                                </Grid>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Style="{StaticResource FieldLabelStyle}"
+                                           Tag="loc:CustomColor"
+                                           Text="Custom color" />
+                                <TextBox x:Name="CustomAccentColorTextBox"
+                                         ToolTip="Enter #RRGGBB, for example #24756B"
+                                         TextChanged="CustomAccentColorTextBox_TextChanged" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid Margin="0,17,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource FieldLabelStyle}"
+                                           Tag="loc:PopupVisualStyle"
+                                           Text="Popup style" />
+                                <ComboBox x:Name="PopupVisualStyleComboBox"
+                                          IsEditable="False"
+                                          SelectedValuePath="Tag"
+                                          SelectionChanged="PopupVisualStyleComboBox_SelectionChanged">
+                                    <ComboBoxItem Content="Minimal" Tag="minimal" />
+                                    <ComboBoxItem Content="Bubble" Tag="bubble" />
+                                    <ComboBoxItem Content="Bubble 2.0" Tag="bubble-v2" />
+                                    <ComboBoxItem Content="Bubble 3.0 · Glass" Tag="bubble-v3" />
+                                    <ComboBoxItem Content="Bubble 3.0 · Color Glass" Tag="bubble-v3-color" />
+                                </ComboBox>
+                                <TextBlock x:Name="PopupStyleGlassHint"
+                                           Margin="0,6,0,0"
+                                           FontSize="12"
+                                           Foreground="{DynamicResource AppMutedTextBrush}"
+                                           TextWrapping="Wrap"
+                                           Visibility="Collapsed"
+                                           Tag="loc:PopupStyleGlassHint"
+                                           Text="Liquid-glass edges with clear, readable text." />
+                            </StackPanel>
+                            <Grid Grid.Column="2"
+                                  Width="112"
+                                  Height="38"
+                                  Margin="0,20,0,0"
+                                  HorizontalAlignment="Right"
+                                  VerticalAlignment="Top">
+                                <Path x:Name="PopupStylePreviewTail"
+                                      Margin="0,13,0,0"
+                                      HorizontalAlignment="Left"
+                                      VerticalAlignment="Top"
+                                      Data="M0,0 L12,6 L0,12 Z"
+                                      Fill="{DynamicResource AppFieldBackgroundBrush}"
+                                      Visibility="Collapsed" />
+                                <Border x:Name="PopupStylePreviewSurface"
+                                        Margin="0,4,0,4"
+                                        Background="{DynamicResource AppFieldBackgroundBrush}"
+                                        BorderBrush="{DynamicResource AppFieldBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="10">
+                                    <Grid>
+                                    <Border x:Name="PopupStylePreviewTextSurface"
+                                            Margin="8,5"
+                                            Background="Transparent"
+                                            CornerRadius="9"
+                                            IsHitTestVisible="False" />
+                                    <StackPanel Margin="12,0"
+                                                VerticalAlignment="Center"
+                                                Orientation="Horizontal">
+                                        <Ellipse Width="5"
+                                                 Height="5"
+                                                 Margin="0,0,5,0"
+                                                 Fill="{DynamicResource AccentBrush}" />
+                                        <Border Width="38"
+                                                Height="4"
+                                                VerticalAlignment="Center"
+                                                Background="{DynamicResource AppCardBorderBrush}"
+                                                CornerRadius="2" />
+                                    </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </Grid>
+
+                        <Grid Margin="0,17,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource FieldLabelStyle}"
+                                           Tag="loc:HighlightPalette"
+                                           Text="Highlight palette" />
+                                <ComboBox x:Name="HighlightPaletteComboBox"
+                                          IsEditable="False"
+                                          SelectedValuePath="Tag"
+                                          SelectionChanged="HighlightPaletteComboBox_SelectionChanged">
+                                    <ComboBoxItem Content="Yita · Soft emphasis" Tag="yita" />
+                                    <ComboBoxItem Content="Clarity" Tag="clarity" />
+                                    <ComboBoxItem Content="Morandi" Tag="morandi" />
+                                    <ComboBoxItem Content="Ocean" Tag="ocean" />
+                                    <ComboBoxItem Content="Warm" Tag="warm" />
+                                    <ComboBoxItem Content="High contrast" Tag="contrast" />
+                                </ComboBox>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Style="{StaticResource FieldLabelStyle}"
+                                           Tag="loc:HighlightPalettePreview"
+                                           Text="AI emphasis preview" />
+                                <StackPanel Orientation="Horizontal"
+                                            Height="32"
+                                            VerticalAlignment="Center">
+                                    <Border x:Name="HighlightPrimaryPreviewBorder"
+                                            Width="58"
+                                            Height="25"
+                                            Margin="0,0,7,0"
+                                            CornerRadius="6">
+                                        <TextBlock x:Name="HighlightPrimaryPreviewText"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   FontSize="12"
+                                                   FontWeight="SemiBold"
+                                                   Text="Key" />
+                                    </Border>
+                                    <Border x:Name="HighlightSecondaryPreviewBorder"
+                                            Width="46"
+                                            Height="25"
+                                            Margin="0,0,7,0"
+                                            CornerRadius="6">
+                                        <TextBlock x:Name="HighlightSecondaryPreviewText"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   FontSize="12"
+                                                   FontWeight="SemiBold"
+                                                   Text="AI" />
+                                    </Border>
+                                    <Border x:Name="HighlightTertiaryPreviewBorder"
+                                            Width="46"
+                                            Height="25"
+                                            CornerRadius="6">
+                                        <TextBlock x:Name="HighlightTertiaryPreviewText"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   FontSize="12"
+                                                   FontWeight="SemiBold"
+                                                   Text="Note" />
+                                    </Border>
+                                </StackPanel>
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock Margin="0,7,0,0"
+                                   Style="{StaticResource SupportingTextStyle}"
+                                   Tag="loc:HighlightPaletteDescription"
+                                   Text="DeepSeek marks only the most useful generated phrases. Copy, history, and saved records keep normal text." />
+
+                        <Grid Margin="0,18,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Margin="0,0,18,0"
+                                       VerticalAlignment="Center"
+                                       Style="{StaticResource FieldLabelStyle}"
+                                       Tag="loc:DefaultTranslationFontSize"
+                                       Text="Default translation size" />
+                            <Slider x:Name="DefaultFontSizeSlider"
+                                    Grid.Column="1"
+                                    Minimum="12"
+                                    Maximum="34"
+                                    Value="16.5"
+                                    SmallChange="0.5"
+                                    LargeChange="2"
+                                    IsSnapToTickEnabled="False"
+                                    Style="{StaticResource FontSizeSliderStyle}"
+                                    ValueChanged="DefaultFontSizeSlider_ValueChanged" />
+                            <Border Grid.Column="2"
+                                    MinWidth="46"
+                                    Height="28"
+                                    Margin="13,0,0,0"
+                                    Background="{DynamicResource AppFieldBackgroundBrush}"
+                                    CornerRadius="6">
+                                <TextBlock x:Name="DefaultFontSizeValueText"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           FontWeight="SemiBold"
+                                           Text="16.5" />
+                            </Border>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border Margin="0,14,0,0" Style="{StaticResource CardStyle}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionTitleStyle}"
+                                   Tag="loc:TranslationServiceTitle"
+                                   Text="Translation service" />
+                        <TextBlock Margin="0,4,0,17"
+                                   Style="{StaticResource SupportingTextStyle}"
+                                   Tag="loc:TranslationServiceDescription"
+                                   Text="Your API key is stored only in Windows Credential Manager on this device." />
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource FieldLabelStyle}"
+                                           Tag="loc:Provider"
+                                           Text="Provider" />
+                                <ComboBox x:Name="ProviderComboBox"
+                                          SelectedValuePath="Tag"
+                                          SelectionChanged="ProviderComboBox_SelectionChanged">
+                                    <ComboBoxItem Content="DeepSeek API" Tag="deepseek" />
+                                    <ComboBoxItem Content="Mock · offline test" Tag="mock" />
+                                </ComboBox>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Style="{StaticResource FieldLabelStyle}"
+                                           Tag="loc:Model"
+                                           Text="Model" />
+                                <ComboBox x:Name="ModelComboBox" IsEditable="True">
+                                    <ComboBoxItem Content="deepseek-v4-flash" />
+                                    <ComboBoxItem Content="deepseek-v4-pro" />
+                                </ComboBox>
+                            </StackPanel>
+                        </Grid>
+
+                        <StackPanel Margin="0,17,0,0">
+                            <TextBlock Style="{StaticResource FieldLabelStyle}"
+                                       Tag="loc:ApiEndpoint"
+                                       Text="API endpoint" />
+                            <TextBox x:Name="EndpointTextBox" />
+                        </StackPanel>
+
+                        <StackPanel Margin="0,17,0,0">
+                            <TextBlock Style="{StaticResource FieldLabelStyle}"
+                                       Tag="loc:ApiKey"
+                                       Text="API key" />
+                            <PasswordBox x:Name="ApiKeyPasswordBox" />
+                        </StackPanel>
+
+                        <Grid Margin="0,13,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Button x:Name="TestConnectionButton"
+                                    Content="Test connection"
+                                    Tag="loc:TestConnection"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Click="TestConnectionButton_Click" />
+                            <Button Grid.Column="1"
+                                    Margin="8,0,0,0"
+                                    Content="Clear key"
+                                    Tag="loc:ClearKey"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Click="ClearApiKeyButton_Click" />
+                            <TextBlock x:Name="ConnectionStatusText"
+                                       Grid.Column="2"
+                                       Margin="12,0,0,0"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource AppMutedTextBrush}"
+                                       Text=""
+                                       TextAlignment="Right"
+                                       TextTrimming="CharacterEllipsis"
+                                       ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Border Grid.Row="2"
+                Padding="28,15"
+                Background="{DynamicResource AppCardBackgroundBrush}"
+                BorderBrush="{DynamicResource AppCardBorderBrush}"
+                BorderThickness="0,1,0,0">
+            <Grid>
+                <TextBlock VerticalAlignment="Center"
+                           Style="{StaticResource SupportingTextStyle}"
+                           Tag="loc:FooterHint"
+                           Text="Changes take effect immediately after saving" />
+                <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                    <Button Margin="0,0,8,0"
+                            Content="Cancel"
+                            Tag="loc:Cancel"
+                            IsCancel="True"
+                            Style="{StaticResource SecondaryButtonStyle}" />
+                    <Button Content="Save settings"
+                            Tag="loc:SaveSettings"
+                            IsDefault="True"
+                            Style="{StaticResource PrimaryButtonStyle}"
+                            Click="SaveButton_Click" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
