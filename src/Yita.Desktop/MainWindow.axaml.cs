@@ -89,7 +89,10 @@ public sealed partial class MainWindow : Window
             };
             await _settingsStore.SaveAsync(_settings);
             await _secretStore.SaveApiKeyAsync((_apiKeyField.Text ?? string.Empty).Trim());
-            SetStatus(ModelStatus, "设置已保存，API Key 已写入当前系统的安全凭据存储。", false);
+            var storage = _secretStore is WindowsCredentialSecretStore
+                ? "Windows 安全凭据存储"
+                : "当前进程内存（平台凭据适配器尚未接入）";
+            SetStatus(ModelStatus, $"设置已保存，API Key 使用{storage}。", false);
         }
         catch (Exception exception)
         {
