@@ -77,6 +77,7 @@ PermissionState   { accessibility, inputMonitoring, clipboardFallback }
 - [x] 阶段 3（WPS 复制回退）：增加 WPS PDF 识别、受控 Ctrl+C 重试、目标窗口校验和剪贴板所有权校验。
 - [ ] 阶段 3（WPS 完整诊断）：迁移 WPS 剪贴板健康事件和设置开关到 Core/桌面壳。
 - [x] 阶段 3（鼠标划词入口）：新增跨平台 `SelectionGesture` 契约和 Windows 低级鼠标钩子，自动读取同一外部窗口内的拖选文本。
+- [x] 阶段 1（Windows 凭据）：新 Avalonia 壳在 Windows 使用 Credential Manager 保存 API Key，设置保存失败不会退出主进程。
 - [ ] 阶段 1 完整迁移：将现有 WPF Core 实现和 455 项相关测试逐步改为引用 `Yita.Core`，接入系统凭据存储。
 - [ ] 阶段 2 完整迁移：翻译浮窗、拖拽、置顶、托盘和问答页面。
 - [ ] 阶段 3 完整迁移：把现有 UI Automation 隔离读取器、WPS PDF 专用路径、鼠标划词钩子、托盘和系统凭据接入 Avalonia。

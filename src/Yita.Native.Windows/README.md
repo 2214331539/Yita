@@ -6,6 +6,8 @@
 
 `WindowsMouseSelectionService` 在另一个原生线程安装低级鼠标钩子，只把鼠标按下/抬起的坐标放入有序处理链路；它会过滤普通点击、窗口移动和跨窗口拖动，然后向桌面壳发送 `SelectionGesture`。UIA/剪贴板读取发生在钩子回调之外，防止读取阻塞导致 Windows 移除鼠标钩子。
 
+`WindowsCredentialSecretStore` 使用 Windows Credential Manager 保存 DeepSeek API Key。`settings.json` 只保存普通配置，不包含密钥；非 Windows 平台暂时使用进程内存实现，后续由 macOS Keychain 适配器替换。
+
 下一阶段将把以下模块从 WPF 宿主移动到这里：
 
 - 独立 UIA Worker 的 `TextPattern` 取词和选区边界；

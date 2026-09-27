@@ -5,13 +5,14 @@ using Avalonia.Interactivity;
 using Yita.Core.Settings;
 using Yita.Core.Selection;
 using Yita.Core.Translation;
+using Yita.Native.Windows;
 
 namespace Yita.Desktop;
 
 public sealed partial class MainWindow : Window
 {
     private readonly JsonSettingsStore _settingsStore = new();
-    private readonly MemorySecretStore _secretStore = new();
+    private readonly ISecretStore _secretStore = SecretStoreFactory.CreateDefault();
     private readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(45) };
     private CancellationTokenSource? _translationCancellation;
     private CancellationTokenSource? _popupCancellation;
@@ -30,7 +31,16 @@ public sealed partial class MainWindow : Window
     private async void OnOpened(object? sender, EventArgs e)
     {
         _settings = await _settingsStore.LoadAsync();
-        var apiKey = await _secretStore.ReadApiKeyAsync();
+        string? apiKey;
+        try
+        {
+            apiKey = await _secretStore.ReadApiKeyAsync();
+        }
+        catch (Exception exception)
+        {
+            apiKey = null;
+            SetStatus(ModelStatus, $"无法读取系统凭据：{exception.Message}", true);
+        }
         EnabledCheckBox.IsChecked = _settings.IsEnabled;
         StartCheckBox.IsChecked = _settings.StartWithSystem;
         ClipboardCheckBox.IsChecked = _settings.UseClipboardFallback;
@@ -65,19 +75,26 @@ public sealed partial class MainWindow : Window
 
     private async void SaveSettingsClick(object? sender, RoutedEventArgs e)
     {
-        _settings = _settings with
+        try
         {
-            IsEnabled = EnabledCheckBox.IsChecked == true,
-            StartWithSystem = StartCheckBox.IsChecked == true,
-            UseClipboardFallback = ClipboardCheckBox.IsChecked == true,
-            AiHistoryEnabled = HistoryCheckBox.IsChecked == true,
-            TargetLanguage = SelectedTargetLanguage(),
-            DeepSeekEndpoint = (EndpointBox.Text ?? string.Empty).Trim(),
-            DeepSeekModel = (ModelBox.Text ?? string.Empty).Trim(),
-        };
-        await _settingsStore.SaveAsync(_settings);
-        await _secretStore.SaveApiKeyAsync((_apiKeyField.Text ?? string.Empty).Trim());
-        SetStatus(ModelStatus, "设置已保存。当前阶段 API Key 仅保存在当前进程；系统凭据适配器将在原生阶段接入。", false);
+            _settings = _settings with
+            {
+                IsEnabled = EnabledCheckBox.IsChecked == true,
+                StartWithSystem = StartCheckBox.IsChecked == true,
+                UseClipboardFallback = ClipboardCheckBox.IsChecked == true,
+                AiHistoryEnabled = HistoryCheckBox.IsChecked == true,
+                TargetLanguage = SelectedTargetLanguage(),
+                DeepSeekEndpoint = (EndpointBox.Text ?? string.Empty).Trim(),
+                DeepSeekModel = (ModelBox.Text ?? string.Empty).Trim(),
+            };
+            await _settingsStore.SaveAsync(_settings);
+            await _secretStore.SaveApiKeyAsync((_apiKeyField.Text ?? string.Empty).Trim());
+            SetStatus(ModelStatus, "设置已保存，API Key 已写入当前系统的安全凭据存储。", false);
+        }
+        catch (Exception exception)
+        {
+            SetStatus(ModelStatus, $"设置保存失败：{exception.Message}", true);
+        }
     }
 
     private async void TestConnectionClick(object? sender, RoutedEventArgs e)

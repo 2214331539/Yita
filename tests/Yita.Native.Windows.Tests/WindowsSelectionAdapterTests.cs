@@ -40,6 +40,17 @@ public sealed class WindowsSelectionAdapterTests
     }
 
     [Fact]
+    public void SecretStoreFactoryUsesTheNativeStoreOnWindows()
+    {
+        var store = SecretStoreFactory.CreateDefault();
+
+        if (OperatingSystem.IsWindows())
+            Assert.IsType<WindowsCredentialSecretStore>(store);
+        else
+            Assert.IsType<Yita.Core.Settings.MemorySecretStore>(store);
+    }
+
+    [Fact]
     public async Task NativeControlReaderFailsClosedOutsideWindows()
     {
         var reader = new WindowsNativeControlSelectionReader();
