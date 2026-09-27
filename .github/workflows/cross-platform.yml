@@ -10,6 +10,7 @@ on:
       - 'src/Yita.Core/**'
       - 'src/Yita.Desktop/**'
       - 'src/Yita.Native.Windows/**'
+      - 'src/Yita.Native.Windows.UIA.Worker/**'
       - 'src/Yita.Native.Mac/**'
       - 'tests/Yita.Core.Tests/**'
       - 'tests/Yita.Native.Windows.Tests/**'

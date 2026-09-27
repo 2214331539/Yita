@@ -10,6 +10,7 @@ public sealed class WindowsSelectionAdapter : ISelectionReader
 
     public WindowsSelectionAdapter() => _reader = new SelectionReaderPipeline(new ISelectionReader[]
     {
+        new WindowsUiAutomationSelectionReader(),
         new WindowsNativeControlSelectionReader(),
         new WindowsClipboardSelectionReader(),
     });
@@ -22,6 +23,11 @@ public sealed class WindowsSelectionAdapter : ISelectionReader
         SelectionRequest request,
         CancellationToken cancellationToken = default) =>
         _reader.ReadAsync(request, cancellationToken);
+
+    public void Dispose()
+    {
+        if (_reader is IDisposable disposable) disposable.Dispose();
+    }
 }
 
 internal sealed class DelegateSelectionReader(
@@ -296,6 +302,7 @@ public sealed class WindowsSelectionRuntime : IDisposable
     {
         _hotkey.TranslateRequested -= OnTranslateRequested;
         _hotkey.Dispose();
+        _reader.Dispose();
     }
 }
 

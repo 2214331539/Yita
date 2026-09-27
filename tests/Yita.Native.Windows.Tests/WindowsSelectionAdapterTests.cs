@@ -42,4 +42,46 @@ public sealed class WindowsSelectionAdapterTests
         if (!OperatingSystem.IsWindows())
             Assert.Equal(SelectionFailureKind.UnsupportedApplication, result.Failure);
     }
+
+    [Fact]
+    public async Task UiAutomationReaderUsesWorkerBeforeOtherReaders()
+    {
+        var worker = new StubUiAutomationWorker(new SelectionResult(
+            "来自 UI Automation",
+            SelectionSource.Accessibility,
+            new SelectionBounds(10, 20, 80, 18)));
+        var reader = new WindowsUiAutomationSelectionReader(worker);
+
+        var result = await reader.ReadAsync(new SelectionRequest(
+            SelectionTrigger.TranslateShortcut,
+            new ScreenPoint(10, 20)));
+
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.True(result.Succeeded);
+            Assert.Equal("来自 UI Automation", result.Text);
+        }
+        else
+        {
+            Assert.Equal(SelectionFailureKind.UnsupportedApplication, result.Failure);
+            Assert.Equal(0, worker.ReadCount);
+        }
+    }
+
+    private sealed class StubUiAutomationWorker(SelectionResult result) : IWindowsUiAutomationWorker
+    {
+        public int ReadCount { get; private set; }
+
+        public bool IsAvailable => true;
+
+        public Task<SelectionResult> ReadAsync(
+            SelectionRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            ReadCount++;
+            return Task.FromResult(result);
+        }
+
+        public void Dispose() { }
+    }
 }

@@ -19,4 +19,24 @@
     <ProjectReference Include="..\Yita.Native.Windows\Yita.Native.Windows.csproj" />
     <ProjectReference Include="..\Yita.Native.Mac\Yita.Native.Mac.csproj" />
   </ItemGroup>
+
+  <!--
+    UI Automation is deliberately compiled as a Windows-only helper process.
+    Building the desktop project on Windows builds and places the helper next
+    to Yita.Desktop.exe. The condition keeps macOS/Linux builds free of
+    WindowsDesktop dependencies.
+  -->
+  <Target Name="BuildAndCopyWindowsUiAutomationWorker"
+          BeforeTargets="Build"
+          Condition="'$(OS)' == 'Windows_NT'">
+    <MSBuild Projects="..\Yita.Native.Windows.UIA.Worker\Yita.Native.Windows.UIA.Worker.csproj"
+             Targets="Restore;Build"
+             Properties="Configuration=$(Configuration)" />
+    <ItemGroup>
+      <WindowsUiAutomationWorkerFiles Include="..\Yita.Native.Windows.UIA.Worker\bin\$(Configuration)\net8.0-windows\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(WindowsUiAutomationWorkerFiles)"
+          DestinationFiles="@(WindowsUiAutomationWorkerFiles->'$(TargetDir)%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
 </Project>
