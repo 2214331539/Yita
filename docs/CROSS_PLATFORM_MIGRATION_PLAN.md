@@ -81,6 +81,7 @@ PermissionState   { accessibility, inputMonitoring, clipboardFallback }
 - [x] 阶段 2（浮窗交互）：翻译浮窗支持拖拽、内容尺寸自适应，并按当前选区锚点保存相对位置。
 - [x] 阶段 3（Windows 生命周期）：单实例、开机启动注册、启用开关和 Avalonia 托盘入口已接入。
 - [x] 阶段 1（桌面缓存与记录）：Avalonia 壳复用 Core 翻译缓存，并在用户开启 AI 记录后写入 JSONL 历史。
+- [x] 阶段 1（macOS 凭据边界）：加入仅在 macOS 调用 Keychain 的 `MacKeychainSecretStore`，桌面壳按平台选择凭据实现。
 - [ ] 阶段 1 完整迁移：将现有 WPF Core 实现和 455 项相关测试逐步改为引用 `Yita.Core`，接入系统凭据存储。
 - [ ] 阶段 2 完整迁移：翻译浮窗、拖拽、置顶、托盘和问答页面。
 - [ ] 阶段 3 完整迁移：把现有 UI Automation 隔离读取器、WPS PDF 专用路径、鼠标划词钩子、托盘和系统凭据接入 Avalonia。

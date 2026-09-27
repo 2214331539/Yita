@@ -1,6 +1,6 @@
 # Yita.Native.Mac
 
-macOS 原生适配器的契约和占位实现。真实实现将在 macOS runner 上使用 Swift/Objective-C helper 完成，并通过受限的本地 IPC 返回结构化结果：
+macOS 原生适配器目前包含 Keychain 凭据存储和选区读取契约。Keychain 适配器只在 macOS 启动 `/usr/bin/security`，API Key 通过标准输入传递，不写入设置文件或进程参数。真实选区实现将在 macOS runner 上使用 Swift/Objective-C helper 完成，并通过受限的本地 IPC 返回结构化结果：
 
 1. AXUIElement 读取 `AXSelectedText` 和 `AXSelectedTextRange`；
 2. `AXBoundsForRange` 返回选区锚点；

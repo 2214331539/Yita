@@ -6,6 +6,7 @@ using Yita.Core.Placement;
 using Yita.Core.Settings;
 using Yita.Core.Selection;
 using Yita.Core.Translation;
+using Yita.Native.Mac;
 using Yita.Native.Windows;
 
 namespace Yita.Desktop;
@@ -13,7 +14,7 @@ namespace Yita.Desktop;
 public sealed partial class MainWindow : Window
 {
     private readonly JsonSettingsStore _settingsStore = new();
-    private readonly ISecretStore _secretStore = SecretStoreFactory.CreateDefault();
+    private readonly ISecretStore _secretStore = CreateSecretStore();
     private readonly MemoryTranslationCache _translationCache = new();
     private readonly JsonlTranslationHistoryStore _historyStore = new(
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Yita", "history.jsonl"));
@@ -119,6 +120,8 @@ public sealed partial class MainWindow : Window
             SettingsChanged?.Invoke(this, EventArgs.Empty);
             var storage = _secretStore is WindowsCredentialSecretStore
                 ? "Windows 安全凭据存储"
+                : _secretStore is MacKeychainSecretStore
+                    ? "macOS Keychain"
                 : "当前进程内存（平台凭据适配器尚未接入）";
             SetStatus(ModelStatus, $"设置已保存，API Key 使用{storage}。", false);
         }
@@ -274,6 +277,13 @@ public sealed partial class MainWindow : Window
         var key = (_apiKeyField.Text ?? string.Empty).Trim();
         return new DeepSeekStreamingTranslator(_httpClient, new TranslationProviderOptions(endpoint, model, key));
     }
+
+    private static ISecretStore CreateSecretStore() =>
+        OperatingSystem.IsWindows()
+            ? SecretStoreFactory.CreateDefault()
+            : OperatingSystem.IsMacOS()
+                ? new MacKeychainSecretStore()
+                : new MemorySecretStore();
 
     private TranslationCoordinator CreateCoordinator() =>
         new(
