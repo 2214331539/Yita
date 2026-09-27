@@ -237,7 +237,7 @@ dotnet test .\Yita.sln --configuration Release --no-build --no-restore
 
 成功后的输出位于 `artifacts/release/`，包括 `Yita-v<版本>-win-x64.zip` 和对应 `.sha256`。脚本支持可选 Authenticode 签名参数，详见 [Publish.ps1](scripts/Publish.ps1)。未提供证书时产物不带商业代码签名。ZIP 是便携包，**不是 Setup 安装包**。
 
-程序集及 Setup 版本为 `0.8.4`。变更见 [CHANGELOG.md](CHANGELOG.md)；构建脚本不会创建 Git 标签或上传 GitHub Release。
+程序集及 Setup 版本为 `0.8.4`。变更见 [CHANGELOG.md](CHANGELOG.md)。本地构建脚本不会创建 Git 标签或上传 Release；将版本提交推送到 `main` 后，再推送形如 `v0.8.4` 的标签，`.github/workflows/release.yml` 会在 GitHub 的 Windows runner 上重新构建 Setup，并自动创建 Release、上传 EXE、SHA256 与 payload 清单。
 
 ## 已知限制与排障
 
