@@ -30,4 +30,16 @@ public sealed class WindowsSelectionAdapterTests
         if (!OperatingSystem.IsWindows())
             Assert.Throws<PlatformNotSupportedException>(() => runtime.Start());
     }
+
+    [Fact]
+    public async Task NativeControlReaderFailsClosedOutsideWindows()
+    {
+        var reader = new WindowsNativeControlSelectionReader();
+        var result = await reader.ReadAsync(new SelectionRequest(
+            SelectionTrigger.TranslateShortcut,
+            new ScreenPoint(10, 20)));
+
+        if (!OperatingSystem.IsWindows())
+            Assert.Equal(SelectionFailureKind.UnsupportedApplication, result.Failure);
+    }
 }

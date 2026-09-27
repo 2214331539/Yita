@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace Yita.Native.Windows;
 
@@ -124,6 +125,28 @@ internal static class WindowsNativeMethods
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool GetCursorPos(out Point point);
+
+    [DllImport("user32.dll")]
+    internal static extern IntPtr WindowFromPoint(Point point);
+
+    [DllImport("user32.dll")]
+    internal static extern IntPtr GetParent(IntPtr window);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    internal static extern int GetClassName(IntPtr window, StringBuilder className, int maxCount);
+
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW", SetLastError = true)]
+    internal static extern IntPtr GetWindowLongPtr(IntPtr window, int index);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    internal static extern IntPtr SendMessageTimeout(
+        IntPtr window,
+        uint message,
+        UIntPtr wParam,
+        IntPtr lParam,
+        uint flags,
+        uint timeoutMilliseconds,
+        out UIntPtr result);
 
     internal static bool IsForegroundTargetReady() =>
         OperatingSystem.IsWindows() && GetForegroundWindow() != IntPtr.Zero;

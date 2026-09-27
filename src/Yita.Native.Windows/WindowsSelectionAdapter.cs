@@ -6,18 +6,29 @@ namespace Yita.Native.Windows;
 
 public sealed class WindowsSelectionAdapter : ISelectionReader
 {
-    private readonly WindowsClipboardSelectionReader _reader;
+    private readonly ISelectionReader _reader;
 
-    public WindowsSelectionAdapter() => _reader = new WindowsClipboardSelectionReader();
+    public WindowsSelectionAdapter() => _reader = new SelectionReaderPipeline(new ISelectionReader[]
+    {
+        new WindowsNativeControlSelectionReader(),
+        new WindowsClipboardSelectionReader(),
+    });
 
     public WindowsSelectionAdapter(
         Func<SelectionRequest, CancellationToken, Task<SelectionResult>> reader) =>
-        _reader = new WindowsClipboardSelectionReader(reader);
+        _reader = new DelegateSelectionReader(reader);
 
     public Task<SelectionResult> ReadAsync(
         SelectionRequest request,
         CancellationToken cancellationToken = default) =>
         _reader.ReadAsync(request, cancellationToken);
+}
+
+internal sealed class DelegateSelectionReader(
+    Func<SelectionRequest, CancellationToken, Task<SelectionResult>> reader) : ISelectionReader
+{
+    public Task<SelectionResult> ReadAsync(SelectionRequest request, CancellationToken cancellationToken = default) =>
+        reader(request, cancellationToken);
 }
 
 /// <summary>

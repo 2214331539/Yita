@@ -56,6 +56,22 @@ public sealed class CoreContractTests
     }
 
     [Fact]
+    public async Task SelectionPipelineFallsThroughReaderFailures()
+    {
+        var pipeline = new SelectionReaderPipeline(new ISelectionReader[]
+        {
+            new StubSelectionReader(SelectionResult.Failed(SelectionFailureKind.Empty, "empty")),
+            new StubSelectionReader(new SelectionResult("found", SelectionSource.Accessibility)),
+        });
+
+        var result = await pipeline.ReadAsync(new SelectionRequest(
+            SelectionTrigger.TranslateShortcut, new ScreenPoint(10, 20)));
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("found", result.Text);
+    }
+
+    [Fact]
     public void TranslationCacheSeparatesLanguagePairs()
     {
         var cache = new MemoryTranslationCache(2);
@@ -142,5 +158,11 @@ public sealed class CoreContractTests
             yield return new TranslationChunk(result);
             yield return new TranslationChunk(string.Empty, true);
         }
+    }
+
+    private sealed class StubSelectionReader(SelectionResult result) : ISelectionReader
+    {
+        public Task<SelectionResult> ReadAsync(SelectionRequest request, CancellationToken cancellationToken = default) =>
+            Task.FromResult(result);
     }
 }
