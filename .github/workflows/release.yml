@@ -1,0 +1,45 @@
+name: Release Windows Setup
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build self-contained Windows Setup
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          .\scripts\Build-Setup.ps1 -Version $version
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Yita ${{ github.ref_name }}
+          generate_release_notes: true
+          body: |
+            Yita ${{ github.ref_name }} Windows x64 安装包。
+
+            - 支持 Windows 10 1809 及以上与 Windows 11 x64
+            - 自包含 .NET 8，无需另行安装运行环境
+            - 安装后在设置中填写 DeepSeek API Key 并测试连接
+            - 安装包目前未进行代码签名，Windows SmartScreen 可能显示“未知发布者”
+          files: |
+            artifacts/release/Yita-Setup-*-win-x64.exe
+            artifacts/release/Yita-Setup-*-win-x64.exe.sha256
+            artifacts/release/Yita-*-payload.json
