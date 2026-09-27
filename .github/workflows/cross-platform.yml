@@ -1,0 +1,40 @@
+name: Cross-platform architecture
+
+on:
+  push:
+    branches:
+      - codex/cross-platform-migration
+  pull_request:
+    paths:
+      - 'Yita.CrossPlatform.sln'
+      - 'src/Yita.Core/**'
+      - 'src/Yita.Desktop/**'
+      - 'src/Yita.Native.Windows/**'
+      - 'src/Yita.Native.Mac/**'
+      - 'tests/Yita.Core.Tests/**'
+      - '.github/workflows/cross-platform.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build cross-platform solution
+        run: dotnet build Yita.CrossPlatform.sln --configuration Release
+
+      - name: Run Core tests
+        run: dotnet test Yita.CrossPlatform.sln --configuration Release --no-build --logger "console;verbosity=minimal"
