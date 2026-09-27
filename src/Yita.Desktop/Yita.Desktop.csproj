@@ -19,6 +19,9 @@
     <ProjectReference Include="..\Yita.Native.Windows\Yita.Native.Windows.csproj" />
     <ProjectReference Include="..\Yita.Native.Mac\Yita.Native.Mac.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="Assets\Yita.ico" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 
   <!--
     UI Automation is deliberately compiled as a Windows-only helper process.

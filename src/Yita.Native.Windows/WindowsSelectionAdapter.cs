@@ -6,27 +6,44 @@ namespace Yita.Native.Windows;
 
 public sealed class WindowsSelectionAdapter : ISelectionReader
 {
-    private readonly ISelectionReader _reader;
+    private readonly ISelectionReader _fullReader;
+    private readonly ISelectionReader _accessibleReader;
+    private readonly WindowsUiAutomationSelectionReader? _uiaReader = null;
+    private readonly Func<SelectionRequest, CancellationToken, Task<SelectionResult>>? _override = null;
 
-    public WindowsSelectionAdapter() => _reader = new SelectionReaderPipeline(new ISelectionReader[]
+    public bool UseClipboardFallback { get; set; } = true;
+
+    public WindowsSelectionAdapter()
     {
-        new WindowsUiAutomationSelectionReader(),
-        new WindowsNativeControlSelectionReader(),
-        new WindowsClipboardSelectionReader(),
-    });
+        _uiaReader = new WindowsUiAutomationSelectionReader();
+        var nativeReader = new WindowsNativeControlSelectionReader();
+        _accessibleReader = new SelectionReaderPipeline(new ISelectionReader[]
+        {
+            _uiaReader,
+            nativeReader,
+        });
+        _fullReader = new SelectionReaderPipeline(new ISelectionReader[]
+        {
+            _uiaReader,
+            nativeReader,
+            new WindowsClipboardSelectionReader(),
+        });
+    }
 
     public WindowsSelectionAdapter(
         Func<SelectionRequest, CancellationToken, Task<SelectionResult>> reader) =>
-        _reader = new DelegateSelectionReader(reader);
+        (_fullReader, _accessibleReader, _override) =
+        (new DelegateSelectionReader(reader), new DelegateSelectionReader(reader), reader);
 
     public Task<SelectionResult> ReadAsync(
         SelectionRequest request,
         CancellationToken cancellationToken = default) =>
-        _reader.ReadAsync(request, cancellationToken);
+        (_override is not null ? _fullReader : UseClipboardFallback ? _fullReader : _accessibleReader)
+            .ReadAsync(request, cancellationToken);
 
     public void Dispose()
     {
-        if (_reader is IDisposable disposable) disposable.Dispose();
+        _uiaReader?.Dispose();
     }
 }
 
@@ -355,10 +372,19 @@ public sealed class WindowsSelectionRuntime : IDisposable
     private readonly WindowsGlobalHotkeyService _hotkey = new();
     private readonly WindowsMouseSelectionService _mouse = new();
     private readonly WindowsSelectionAdapter _reader = new();
+    private volatile bool _isEnabled = true;
+    private volatile int _selectionDelayMilliseconds = 80;
 
     public event EventHandler<SelectionCapturedEventArgs>? SelectionCaptured;
 
     public bool IsRunning => _hotkey.IsRunning;
+
+    public void Configure(bool isEnabled, bool useClipboardFallback, int selectionDelayMilliseconds)
+    {
+        _isEnabled = isEnabled;
+        _selectionDelayMilliseconds = Math.Clamp(selectionDelayMilliseconds, 0, 2_000);
+        _reader.UseClipboardFallback = useClipboardFallback;
+    }
 
     public void Start()
     {
@@ -374,6 +400,7 @@ public sealed class WindowsSelectionRuntime : IDisposable
         try
         {
             if (!WindowsNativeMethods.GetCursorPos(out var point)) return;
+            if (!_isEnabled) return;
             if (!IsExternalPoint(new ScreenPoint(point.X, point.Y))) return;
             var request = new SelectionRequest(SelectionTrigger.TranslateShortcut, new ScreenPoint(point.X, point.Y));
             var result = await _reader.ReadAsync(request).ConfigureAwait(false);
@@ -387,11 +414,13 @@ public sealed class WindowsSelectionRuntime : IDisposable
         try
         {
             var gesture = args.Gesture;
+            if (!_isEnabled) return;
             if (!IsExternalGesture(gesture)) return;
 
             // Give the target application one short frame to commit its
             // selection before UIA or Ctrl+C reads it.
-            await Task.Delay(80).ConfigureAwait(false);
+            if (_selectionDelayMilliseconds > 0)
+                await Task.Delay(_selectionDelayMilliseconds).ConfigureAwait(false);
             var request = new SelectionRequest(
                 SelectionTrigger.MouseGesture,
                 gesture.End,

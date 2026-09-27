@@ -14,7 +14,7 @@ namespace Yita.Native.Windows;
 /// boundary here prevents a broken WPS/browser provider from terminating the
 /// Avalonia process. A missing or unhealthy worker is a normal fallback case.
 /// </summary>
-public sealed class WindowsUiAutomationSelectionReader : ISelectionReader
+public sealed class WindowsUiAutomationSelectionReader : ISelectionReader, IDisposable
 {
     private readonly IWindowsUiAutomationWorker _worker;
 
@@ -40,6 +40,8 @@ public sealed class WindowsUiAutomationSelectionReader : ISelectionReader
 
         return _worker.ReadAsync(request, cancellationToken);
     }
+
+    public void Dispose() => _worker.Dispose();
 }
 
 public interface IWindowsUiAutomationWorker : IDisposable

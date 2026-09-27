@@ -2,6 +2,7 @@ using System.Net.Http;
 using System.Text;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Yita.Core.Placement;
 using Yita.Core.Settings;
 using Yita.Core.Selection;
 using Yita.Core.Translation;
@@ -13,6 +14,7 @@ public sealed partial class MainWindow : Window
 {
     private readonly JsonSettingsStore _settingsStore = new();
     private readonly ISecretStore _secretStore = SecretStoreFactory.CreateDefault();
+    private readonly WindowsSelectionRuntime? _windowsRuntime;
     private readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(45) };
     private CancellationTokenSource? _translationCancellation;
     private CancellationTokenSource? _popupCancellation;
@@ -20,8 +22,14 @@ public sealed partial class MainWindow : Window
     private YitaSettings _settings = YitaSettings.Default;
     private TextBox _apiKeyField = null!;
 
-    public MainWindow()
+    public bool IsSelectionTranslationEnabled => _settings.IsEnabled;
+    public event EventHandler? SettingsChanged;
+
+    public MainWindow() : this(null) { }
+
+    public MainWindow(WindowsSelectionRuntime? windowsRuntime = null)
     {
+        _windowsRuntime = windowsRuntime;
         InitializeComponent();
         _apiKeyField = this.FindControl<TextBox>("ApiKeyField")
             ?? throw new InvalidOperationException("API key field is missing from the desktop view.");
@@ -31,6 +39,10 @@ public sealed partial class MainWindow : Window
     private async void OnOpened(object? sender, EventArgs e)
     {
         _settings = await _settingsStore.LoadAsync();
+        _windowsRuntime?.Configure(
+            _settings.IsEnabled,
+            _settings.UseClipboardFallback,
+            _settings.SelectionDelayMilliseconds);
         string? apiKey;
         try
         {
@@ -48,12 +60,18 @@ public sealed partial class MainWindow : Window
         EndpointBox.Text = _settings.DeepSeekEndpoint;
         ModelBox.Text = _settings.DeepSeekModel;
         _apiKeyField.Text = apiKey ?? string.Empty;
+        if (OperatingSystem.IsWindows())
+        {
+            try { WindowsStartupRegistration.Apply(_settings.StartWithSystem); }
+            catch (Exception exception) { SetStatus(GeneralStatus, $"开机启动设置同步失败：{exception.Message}", true); }
+        }
         TargetLanguageBox.SelectedIndex = _settings.TargetLanguage switch
         {
             "English" => 1,
             "日本語" => 2,
             _ => 0,
         };
+        SettingsChanged?.Invoke(this, EventArgs.Empty);
         SetStatus(GeneralStatus, "设置已从 Core 加载。", false);
     }
 
@@ -89,6 +107,13 @@ public sealed partial class MainWindow : Window
             };
             await _settingsStore.SaveAsync(_settings);
             await _secretStore.SaveApiKeyAsync((_apiKeyField.Text ?? string.Empty).Trim());
+            _windowsRuntime?.Configure(
+                _settings.IsEnabled,
+                _settings.UseClipboardFallback,
+                _settings.SelectionDelayMilliseconds);
+            if (OperatingSystem.IsWindows())
+                WindowsStartupRegistration.Apply(_settings.StartWithSystem);
+            SettingsChanged?.Invoke(this, EventArgs.Empty);
             var storage = _secretStore is WindowsCredentialSecretStore
                 ? "Windows 安全凭据存储"
                 : "当前进程内存（平台凭据适配器尚未接入）";
@@ -98,6 +123,18 @@ public sealed partial class MainWindow : Window
         {
             SetStatus(ModelStatus, $"设置保存失败：{exception.Message}", true);
         }
+    }
+
+    internal void ToggleEnabledFromTray()
+    {
+        _settings = _settings with { IsEnabled = !_settings.IsEnabled };
+        _windowsRuntime?.Configure(
+            _settings.IsEnabled,
+            _settings.UseClipboardFallback,
+            _settings.SelectionDelayMilliseconds);
+        EnabledCheckBox.IsChecked = _settings.IsEnabled;
+        SettingsChanged?.Invoke(this, EventArgs.Empty);
+        _ = PersistSettingsAsync(_settings);
     }
 
     private async void TestConnectionClick(object? sender, RoutedEventArgs e)
@@ -163,8 +200,13 @@ public sealed partial class MainWindow : Window
         _popupCancellation?.Cancel();
         _popupCancellation?.Dispose();
         _popupCancellation = new CancellationTokenSource();
-        _popup ??= new TranslationPopupWindow();
-        _popup.PlaceNear(request, result);
+        if (_popup is null)
+        {
+            _popup = new TranslationPopupWindow();
+            _popup.Moved += PopupMoved;
+            _popup.Dismissed += (_, _) => _popupCancellation?.Cancel();
+        }
+        _popup.PlaceNear(request, result, SavedPopupOffset());
         if (!_popup.IsVisible) _popup.Show();
         if (!result.Succeeded)
         {
@@ -199,6 +241,27 @@ public sealed partial class MainWindow : Window
         {
             _popup.SetError(exception.Message);
         }
+    }
+
+    private void PopupMoved(object? sender, PopupMovedEventArgs e)
+    {
+        _settings = _settings with
+        {
+            PopupOffsetX = e.Offset.X,
+            PopupOffsetY = e.Offset.Y,
+        };
+        _ = PersistSettingsAsync(_settings);
+    }
+
+    private PopupOffset? SavedPopupOffset() =>
+        _settings.PopupOffsetX is double x && _settings.PopupOffsetY is double y
+            ? new PopupOffset(x, y)
+            : null;
+
+    private async Task PersistSettingsAsync(YitaSettings settings)
+    {
+        try { await _settingsStore.SaveAsync(settings).ConfigureAwait(false); }
+        catch { /* A transient settings write must not break the popup. */ }
     }
 
     private DeepSeekStreamingTranslator CreateTranslator()

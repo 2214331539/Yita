@@ -6,7 +6,7 @@ public sealed record YitaSettings
 {
     public bool IsEnabled { get; init; } = true;
     public bool StartWithSystem { get; init; }
-    public bool UseClipboardFallback { get; init; }
+    public bool UseClipboardFallback { get; init; } = true;
     public bool UseSelectionContext { get; init; }
     public int SelectionDelayMilliseconds { get; init; } = 80;
     public int MaximumSelectionCharacters { get; init; } = 8000;
@@ -16,6 +16,8 @@ public sealed record YitaSettings
     public string TranslationTone { get; init; } = "neutral";
     public string ColorTheme { get; init; } = "yita-lakeside";
     public bool AiHistoryEnabled { get; init; }
+    public double? PopupOffsetX { get; init; }
+    public double? PopupOffsetY { get; init; }
     public string ProviderId { get; init; } = "deepseek";
     public string DeepSeekEndpoint { get; init; } = "https://api.deepseek.com";
     public string DeepSeekModel { get; init; } = "deepseek-v4-flash";

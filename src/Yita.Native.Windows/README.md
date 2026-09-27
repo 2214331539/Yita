@@ -8,10 +8,13 @@
 
 `WindowsCredentialSecretStore` 使用 Windows Credential Manager 保存 DeepSeek API Key。`settings.json` 只保存普通配置，不包含密钥；非 Windows 平台暂时使用进程内存实现，后续由 macOS Keychain 适配器替换。
 
-下一阶段将把以下模块从 WPF 宿主移动到这里：
+`WindowsSingleInstanceGuard` 防止多个 Yita 进程同时注册全局快捷键和鼠标钩子；`WindowsStartupRegistration` 只写入当前用户的 Run 项，不需要管理员权限。
 
-- 独立 UIA Worker 的 `TextPattern` 取词和选区边界；
-- 安全的 Ctrl+C 剪贴板事务与恢复；
-- RegisterHotKey、低级鼠标钩子和 DPI 坐标转换；
-- Windows 托盘、开机启动、单实例和权限边界；
-- 外部 UIA provider 隔离进程与 watchdog。
+已接入 Avalonia 壳的 Windows 生命周期控制：
+
+- `WindowsSingleInstanceGuard` 防止多个实例争抢快捷键和鼠标钩子；
+- `WindowsStartupRegistration` 管理当前用户的开机启动项；
+- 设置页和托盘菜单可以即时启用/暂停原生取词；
+- UIA Worker、原生控件和安全剪贴板回退继续保持独立的超时边界。
+
+后续会补充 WPS 剪贴板健康诊断、Windows 权限状态页和打包验收。

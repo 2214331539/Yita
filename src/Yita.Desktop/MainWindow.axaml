@@ -84,7 +84,7 @@
                 <TextBlock Text="Model" Grid.Row="1" VerticalAlignment="Center" />
                 <TextBox x:Name="ModelBox" Grid.Row="1" Grid.Column="1" Watermark="deepseek-v4-flash" />
                 <TextBlock Text="API Key" Grid.Row="2" VerticalAlignment="Center" />
-                <TextBox x:Name="ApiKeyField" Grid.Row="2" Grid.Column="1" PasswordChar="●" Watermark="仅保存在当前会话，系统凭据接入将在原生阶段完成" />
+                <TextBox x:Name="ApiKeyField" Grid.Row="2" Grid.Column="1" PasswordChar="●" Watermark="Windows 使用系统凭据保存，macOS 将接入 Keychain" />
               </Grid>
               <StackPanel Orientation="Horizontal" Spacing="10">
                 <Button Content="保存设置" Click="SaveSettingsClick" />

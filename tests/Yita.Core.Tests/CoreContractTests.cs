@@ -32,11 +32,19 @@ public sealed class CoreContractTests
         try
         {
             var store = new JsonSettingsStore(path);
-            await store.SaveAsync(YitaSettings.Default with { TargetLanguage = "English", AiHistoryEnabled = true });
+            await store.SaveAsync(YitaSettings.Default with
+            {
+                TargetLanguage = "English",
+                AiHistoryEnabled = true,
+                PopupOffsetX = -24.5,
+                PopupOffsetY = 36,
+            });
             var loaded = await store.LoadAsync();
 
             Assert.Equal("English", loaded.TargetLanguage);
             Assert.True(loaded.AiHistoryEnabled);
+            Assert.Equal(-24.5, loaded.PopupOffsetX);
+            Assert.Equal(36, loaded.PopupOffsetY);
         }
         finally
         {
