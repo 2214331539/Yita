@@ -65,6 +65,16 @@ PermissionState   { accessibility, inputMonitoring, clipboardFallback }
 6. 浮窗位置始终保存为相对当前选区锚点的 DIP/逻辑坐标，不能保存上一次桌面绝对坐标。
 7. 每个阶段都要能独立构建和回退；跨平台版本未达到验收标准前不替换 Windows 发布入口。
 
+## 实施状态
+
+- [x] 阶段 0：分支、Core/桌面/原生项目骨架、跨平台契约和 CI 矩阵。
+- [x] 阶段 1（垂直切片）：DeepSeek 流式翻译、取消和错误分类、设置 JSON 存储、内存缓存、JSONL 历史、浮窗定位和 Core 测试。
+- [x] 阶段 2（起始切片）：Avalonia 侧边设置页面、模型配置、当前会话 API Key、手动流式翻译和取消按钮。
+- [ ] 阶段 1 完整迁移：将现有 WPF Core 实现和 455 项相关测试逐步改为引用 `Yita.Core`，接入系统凭据存储。
+- [ ] 阶段 2 完整迁移：翻译浮窗、拖拽、置顶、托盘和问答页面。
+- [ ] 阶段 3：Windows 原生 UI Automation、剪贴板回退和全局钩子接入 Avalonia。
+- [ ] 阶段 4：macOS AXUIElement、NSPasteboard、权限、菜单栏和签名 helper。
+
 ## 开发阶段
 
 ### 阶段 0：基线与契约（当前阶段）

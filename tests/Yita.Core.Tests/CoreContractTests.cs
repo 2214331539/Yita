@@ -89,4 +89,58 @@ public sealed class CoreContractTests
             if (Directory.Exists(directory)) Directory.Delete(directory, true);
         }
     }
+
+    [Fact]
+    public async Task CoordinatorCachesCompletedTranslationAndWritesHistory()
+    {
+        var translator = new StubTranslator("你好");
+        var cache = new MemoryTranslationCache();
+        var historyPath = Path.Combine(Path.GetTempPath(), "yita-coordinator-" + Guid.NewGuid().ToString("N"), "history.jsonl");
+        var history = new JsonlTranslationHistoryStore(historyPath);
+        try
+        {
+            var coordinator = new TranslationCoordinator(translator, cache, history);
+            var first = await ReadAllAsync(coordinator.TranslateAsync(new TranslationRequest("  hello  ")));
+            var second = await ReadAllAsync(coordinator.TranslateAsync(new TranslationRequest("hello")));
+
+            Assert.Equal("你好", first);
+            Assert.Equal("你好", second);
+            Assert.Equal(1, translator.Calls);
+            Assert.Single(await ReadHistoryAsync(history));
+        }
+        finally
+        {
+            var directory = Path.GetDirectoryName(historyPath);
+            if (directory is not null && Directory.Exists(directory)) Directory.Delete(directory, true);
+        }
+    }
+
+    private static async Task<string> ReadAllAsync(IAsyncEnumerable<TranslationChunk> chunks)
+    {
+        var result = new System.Text.StringBuilder();
+        await foreach (var chunk in chunks) result.Append(chunk.TextDelta);
+        return result.ToString();
+    }
+
+    private static async Task<List<TranslationHistoryEntry>> ReadHistoryAsync(ITranslationHistory history)
+    {
+        var entries = new List<TranslationHistoryEntry>();
+        await foreach (var entry in history.ReadAsync()) entries.Add(entry);
+        return entries;
+    }
+
+    private sealed class StubTranslator(string result) : IStreamingTranslator
+    {
+        public int Calls { get; private set; }
+
+        public async IAsyncEnumerable<TranslationChunk> TranslateAsync(
+            TranslationRequest request,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            Calls++;
+            await Task.Yield();
+            yield return new TranslationChunk(result);
+            yield return new TranslationChunk(string.Empty, true);
+        }
+    }
 }

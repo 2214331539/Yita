@@ -36,6 +36,20 @@ public interface ISecretStore
     Task SaveApiKeyAsync(string value, CancellationToken cancellationToken = default);
 }
 
+public sealed class MemorySecretStore : ISecretStore
+{
+    private string? _apiKey;
+
+    public Task<string?> ReadApiKeyAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(_apiKey);
+
+    public Task SaveApiKeyAsync(string value, CancellationToken cancellationToken = default)
+    {
+        _apiKey = value?.Trim();
+        return Task.CompletedTask;
+    }
+}
+
 public sealed class JsonSettingsStore : ISettingsStore
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { WriteIndented = true };
