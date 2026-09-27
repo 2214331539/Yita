@@ -1,0 +1,29 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Yita.Desktop.MainWindow"
+        Width="760" Height="480"
+        Title="Yita · 译獭"
+        Background="#FFFDF8">
+  <Grid ColumnDefinitions="190,*">
+    <Border Background="#FFF4E8" Padding="22">
+      <StackPanel Spacing="14">
+        <TextBlock Text="Yita" FontSize="28" FontWeight="SemiBold" Foreground="#155E63" />
+        <TextBlock Text="译獭" FontSize="14" Foreground="#7B5E50" />
+        <Button Content="常规" HorizontalContentAlignment="Left" />
+        <Button Content="AI 记录" HorizontalContentAlignment="Left" />
+        <Button Content="翻译与外观" HorizontalContentAlignment="Left" />
+        <Button Content="模型配置" HorizontalContentAlignment="Left" />
+      </StackPanel>
+    </Border>
+    <StackPanel Grid.Column="1" Margin="36" Spacing="20">
+      <TextBlock Text="跨平台桌面壳" FontSize="26" Foreground="#173F43" />
+      <TextBlock Text="Yita.Core、Windows/macOS 原生取词适配器和 Avalonia UI 正在迁移。" TextWrapping="Wrap" />
+      <Border Background="#FFF4E8" CornerRadius="16" Padding="20">
+        <StackPanel Spacing="8">
+          <TextBlock Text="第一阶段" FontWeight="SemiBold" Foreground="#155E63" />
+          <TextBlock Text="共享翻译流、设置存储、浮窗定位与原生能力契约已经建立。" TextWrapping="Wrap" />
+        </StackPanel>
+      </Border>
+    </StackPanel>
+  </Grid>
+</Window>

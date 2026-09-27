@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>Yita.Desktop</AssemblyName>
+    <RootNamespace>Yita.Desktop</RootNamespace>
+    <ApplicationIcon>Assets\Yita.ico</ApplicationIcon>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.2.6" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.2.6" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.2.6" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Yita.Core\Yita.Core.csproj" />
+    <ProjectReference Include="..\Yita.Native.Windows\Yita.Native.Windows.csproj" />
+    <ProjectReference Include="..\Yita.Native.Mac\Yita.Native.Mac.csproj" />
+  </ItemGroup>
+</Project>
