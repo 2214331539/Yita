@@ -28,6 +28,11 @@ internal enum RuntimeHealthEvent
     DispatcherUnhandledException,
     ProcessUnhandledException,
     UnobservedTaskException,
+    PlacementSaveFailed,
+    PopupRenderFailed,
+    WpsCopyEmpty,
+    WpsCopySucceeded,
+    SelectionWorkerFailed,
     ServiceDisposeFailed,
     SettingsLifecycleCheck,
     PlainWindowLifecycleCheck,
@@ -39,8 +44,8 @@ internal enum RuntimeHealthEvent
 
 /// <summary>
 /// A small privacy-safe lifecycle journal for intermittent failures. It accepts
-/// only fixed event names, numeric codes, exception type names and HRESULTs;
-/// exception messages, stack traces, selected text, translations, endpoints,
+/// only fixed event names, numeric codes, exception types, HRESULTs and bounded
+/// application method names; exception messages, source paths, selected text, translations, endpoints,
 /// paths and credentials are deliberately never written.
 /// </summary>
 internal sealed class RuntimeHealthJournal
@@ -104,8 +109,8 @@ internal sealed class RuntimeHealthJournal
         }
 
         lines.Add(useChinese
-            ? "仅含生命周期事件、异常类型和数字状态；不含原文、译文、凭据、Endpoint 或文件路径。"
-            : "Contains lifecycle events, exception types, and numeric status only; no selected text, translations, credentials, endpoint, or file path.");
+            ? "仅含生命周期事件、异常类型、代码方法名和数字状态；不含原文、译文、凭据、Endpoint 或文件路径。"
+            : "Contains lifecycle events, exception types, application method names and numeric status; no selected text, translations, credentials, endpoint, or file path.");
         return string.Join(Environment.NewLine, lines);
     }
 
@@ -159,9 +164,28 @@ internal sealed class RuntimeHealthJournal
                 .Append(exception.GetType().FullName ?? exception.GetType().Name)
                 .Append(" hresult=")
                 .Append(exception.HResult.ToString(CultureInfo.InvariantCulture));
+            AppendFrames(builder, exception);
+            var inner = exception.InnerException;
+            for (var depth = 0; inner is not null && depth < 3; depth++, inner = inner.InnerException)
+            {
+                builder.Append(" inner=").Append(inner.GetType().FullName)
+                    .Append(":").Append(inner.HResult.ToString(CultureInfo.InvariantCulture));
+                AppendFrames(builder, inner);
+            }
         }
 
         return builder.ToString();
+    }
+
+    private static void AppendFrames(StringBuilder builder, Exception exception)
+    {
+        var frames = new System.Diagnostics.StackTrace(exception, false).GetFrames();
+        foreach (var method in frames.Select(frame => frame.GetMethod())
+                     .Where(method => method?.DeclaringType?.Assembly == typeof(RuntimeHealthJournal).Assembly)
+                     .Take(8))
+        {
+            builder.Append(" at=").Append(method!.DeclaringType!.FullName).Append('.').Append(method.Name);
+        }
     }
 
     private void RotateIfNeeded(int incomingCharacterCount)

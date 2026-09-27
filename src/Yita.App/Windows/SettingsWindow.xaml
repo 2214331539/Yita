@@ -626,6 +626,20 @@
                                       Style="{StaticResource SwitchStyle}" />
                         </Grid>
 
+                        <Grid Margin="0,16,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock FontWeight="SemiBold" Tag="loc:WpsPdfCompatibility" Text="WPS PDF compatibility" />
+                                <TextBlock Margin="0,3,18,0" Style="{StaticResource SupportingTextStyle}"
+                                           Tag="loc:WpsPdfCompatibilityDescription" Text="Use copy when WPS PDF does not expose selected text." />
+                            </StackPanel>
+                            <CheckBox x:Name="WpsPdfCompatibilityCheckBox" Grid.Column="1" VerticalAlignment="Center"
+                                      automation:AutomationProperties.Name="WPS PDF compatibility" Style="{StaticResource SwitchStyle}" />
+                        </Grid>
+
                         <Grid Margin="0,20,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />

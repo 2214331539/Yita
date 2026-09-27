@@ -9,11 +9,13 @@ internal sealed record AppSettings
     public bool StartWithWindows { get; init; }
 
     /// <summary>
-    /// Allows the last-resort WM_COPY reader for custom-rendered applications.
-    /// It is intentionally disabled by default because WM_COPY temporarily
+    /// Allows the last-resort WM_COPY / Ctrl+C reader for custom-rendered applications.
+    /// It is intentionally disabled by default because copying temporarily
     /// changes the system clipboard while an automatic selection is read.
     /// </summary>
     public bool UseClipboardFallback { get; init; }
+
+    public bool UseWpsPdfCompatibility { get; init; } = true;
 
     public int SelectionDelayMilliseconds { get; init; } = 80;
 

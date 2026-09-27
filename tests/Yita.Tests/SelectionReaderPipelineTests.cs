@@ -6,6 +6,52 @@ namespace Yita.Tests;
 public sealed class SelectionReaderPipelineTests
 {
     [Fact]
+    public async Task WpsCompatibilityUsesShortPrimaryBudgetAndCancelsSlowProvider()
+    {
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var clipboard = new StubSelectionReader("WPS selection");
+        var pipeline = new SelectionReaderPipeline(new BlockingSelectionReader(), new StubSelectionReader(null),
+            clipboard, () => false, allowTargetClipboardFallback: _ => true);
+        var result = await pipeline.TryReadSelectedTextAsync(new ScreenPoint(10, 20), CancellationToken.None);
+        Assert.Equal("WPS selection", result);
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromMilliseconds(650), $"Read took {stopwatch.ElapsedMilliseconds} ms");
+        Assert.Equal(1, clipboard.CallCount);
+    }
+
+    [Fact]
+    public async Task TargetLosingCompatibilityDuringPrimaryReadDoesNotCopy()
+    {
+        var checks = 0;
+        var clipboard = new StubSelectionReader("wrong target");
+        var pipeline = new SelectionReaderPipeline(new StubSelectionReader(null), new StubSelectionReader(null),
+            clipboard, () => false, allowTargetClipboardFallback: _ => ++checks == 1);
+        Assert.Null(await pipeline.TryReadSelectedTextAsync(new ScreenPoint(10, 20), CancellationToken.None));
+        Assert.Equal(0, clipboard.CallCount);
+    }
+
+    [Theory]
+    [InlineData(true, "PDF selection", 1)]
+    [InlineData(false, null, 0)]
+    public async Task TargetCompatibilityDoesNotEnableFallbackForOtherApps(bool targetAllowed, string? expected, int calls)
+    {
+        var clipboard = new StubSelectionReader("PDF selection");
+        var pipeline = new SelectionReaderPipeline(new StubSelectionReader(null), new StubSelectionReader(null),
+            clipboard, () => false, allowTargetClipboardFallback: _ => targetAllowed);
+        Assert.Equal(expected, await pipeline.TryReadSelectedTextAsync(new ScreenPoint(10, 20), CancellationToken.None));
+        Assert.Equal(calls, clipboard.CallCount);
+    }
+
+    [Fact]
+    public async Task AccessibleWpsSelectionDoesNotTouchClipboard()
+    {
+        var clipboard = new StubSelectionReader("clipboard");
+        var pipeline = new SelectionReaderPipeline(new StubSelectionReader("accessible"), new StubSelectionReader(null),
+            clipboard, () => false, allowTargetClipboardFallback: _ => true);
+        Assert.Equal("accessible", await pipeline.TryReadSelectedTextAsync(new ScreenPoint(10, 20), CancellationToken.None));
+        Assert.Equal(0, clipboard.CallCount);
+    }
+
+    [Fact]
     public async Task ReturnsUiaTextWithoutInvokingFallback()
     {
         var primary = new StubSelectionReader("来自 UI Automation");

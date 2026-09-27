@@ -9,6 +9,25 @@ namespace Yita.Tests;
 public sealed class PopupReadingViewTests
 {
     [Fact]
+    public void RenderingFailureClosesOnlyAffectedPopupAndIgnoresLateFrames()
+    {
+        RunSta(() =>
+        {
+            var popup = new PopupWindow(42);
+            var closed = 0;
+            popup.Closed += (_, _) => closed++;
+            Exception? reportedFailure = null;
+            popup.RenderingFailed += exception => reportedFailure = exception;
+            popup.RunRevealFrame(() => throw new InvalidOperationException("Test presentation failure"));
+            Assert.Equal(1, closed);
+            Assert.IsType<InvalidOperationException>(reportedFailure);
+            var lateFrameRan = false;
+            popup.RunRevealFrame(() => lateFrameRan = true);
+            Assert.False(lateFrameRan);
+        });
+    }
+
+    [Fact]
     public void SourceView_PreservesStreamingDocumentAndSelectionAcrossSwitches()
     {
         RunSta(() =>

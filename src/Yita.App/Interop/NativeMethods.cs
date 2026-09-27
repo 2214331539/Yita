@@ -6,6 +6,8 @@ namespace Yita.Interop;
 
 internal static class NativeMethods
 {
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    internal static extern int GetWindowText(IntPtr window, StringBuilder text, int length);
     internal const int WhMouseLl = 14;
     internal const int WmQuit = 0x0012;
     internal const int WmMouseActivate = 0x0021;

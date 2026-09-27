@@ -31,6 +31,11 @@ internal sealed class UiaSelectionReader : IContextualSelectionReader
     {
     }
 
+    internal UiaSelectionReader(bool activateAccessibility)
+        : this(activateAccessibility ? ReadSelection : ReadCurrentSelection, WindowProcessResolver.TryGetExternalProcessIdAt)
+    {
+    }
+
     internal UiaSelectionReader(
         Func<ScreenPoint, bool, CancellationToken, SelectionCapture?> readSelection,
         Func<ScreenPoint, uint?>? getTargetProcessId = null)

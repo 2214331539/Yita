@@ -24,7 +24,9 @@ internal partial class SettingsWindow : Window
             ["StartWithWindows"] = ("Start with Windows", "开机启动"),
             ["StartWithWindowsDescription"] = ("Stay ready in the background after sign-in.", "登录 Windows 后在后台就绪。"),
             ["ClipboardFallback"] = ("Compatibility clipboard fallback", "兼容性剪贴板回退"),
-            ["ClipboardFallbackDescription"] = ("Only use this for apps that expose no accessibility text; it temporarily changes the system clipboard.", "仅用于不提供无障碍文本的应用；启用后读取选区时会临时改变系统剪贴板。"),
+            ["WpsPdfCompatibility"] = ("WPS PDF compatibility", "WPS PDF 兼容取词"),
+            ["WpsPdfCompatibilityDescription"] = ("When WPS PDF exposes no selection, copy it and restore the clipboard where possible. Disable if copying is affected.", "WPS PDF 无法直接取词时自动复制，并尽量还原剪贴板；如影响复制可关闭。"),
+            ["ClipboardFallbackDescription"] = ("For other apps without accessible text: try copying the selection and restore the clipboard where possible.", "用于其他无法直接取词的软件：尝试复制选区，并尽量还原剪贴板；仅在需要时开启。"),
             ["SelectionDelay"] = ("Trigger delay · ms", "触发等待 · 毫秒"),
             ["MaximumSelection"] = ("Selection limit · characters", "最大选区 · 字符"),
             ["TranslationAppearanceTitle"] = ("Translation & appearance", "翻译与外观"),
@@ -144,6 +146,7 @@ internal partial class SettingsWindow : Window
         EnabledCheckBox.IsChecked = settings.IsEnabled;
         StartWithWindowsCheckBox.IsChecked = settings.StartWithWindows;
         ClipboardFallbackCheckBox.IsChecked = settings.UseClipboardFallback;
+        WpsPdfCompatibilityCheckBox.IsChecked = settings.UseWpsPdfCompatibility;
         SelectionDelayTextBox.Text = settings.SelectionDelayMilliseconds.ToString();
         MaximumSelectionTextBox.Text = settings.MaximumSelectionCharacters.ToString();
         UseSelectionContextCheckBox.IsChecked = settings.UseSelectionContext;
@@ -298,6 +301,7 @@ internal partial class SettingsWindow : Window
             IsEnabled = EnabledCheckBox.IsChecked == true,
             StartWithWindows = StartWithWindowsCheckBox.IsChecked == true,
             UseClipboardFallback = ClipboardFallbackCheckBox.IsChecked == true,
+            UseWpsPdfCompatibility = WpsPdfCompatibilityCheckBox.IsChecked == true,
             SelectionDelayMilliseconds = delay,
             MaximumSelectionCharacters = maximumSelectionCharacters,
             SourceLanguage = sourceLanguage,
@@ -389,6 +393,9 @@ internal partial class SettingsWindow : Window
         System.Windows.Automation.AutomationProperties.SetName(
             ClipboardFallbackCheckBox,
             L("ClipboardFallback"));
+        System.Windows.Automation.AutomationProperties.SetName(
+            WpsPdfCompatibilityCheckBox,
+            L("WpsPdfCompatibility"));
         System.Windows.Automation.AutomationProperties.SetName(
             UseSelectionContextCheckBox,
             L("UseSelectionContext"));

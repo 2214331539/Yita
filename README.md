@@ -15,7 +15,7 @@
 
 Yita 在支持文本选区读取的应用中检测鼠标拖选，通过 DeepSeek 流式返回译文，并在选区附近显示可固定、可调整大小的浮窗。它适合阅读英文网页、可选中文字的 PDF、Markdown 和编辑器中的文本。
 
-**当前状态：** Windows 桌面开发版本。仓库提供源码和构建脚本；本文不承诺已经提供可下载的安装包。当前没有 Setup 安装器、自动更新或 macOS/Linux 版本。在线翻译需要自行配置 API Key，调用费用由所用 API 服务计费。
+**当前版本：0.8.3。** 提供 Windows x64 Setup 构建脚本，安装包包含 .NET 8 运行环境，支持直接安装。GitHub 下载资产以 [Releases](https://github.com/2214331539/Yita/releases) 页面实际上传内容为准；本地生成安装包不会自动发布到 GitHub。当前没有自动更新或 macOS/Linux 版本。在线翻译需要自行配置 API Key，调用费用由所用 API 服务计费。
 
 ## 界面预览
 
@@ -66,12 +66,24 @@ Yita 在支持文本选区读取的应用中检测鼠标拖选，通过 DeepSeek
 
 | 使用方式 | 要求 |
 | --- | --- |
+| Setup 安装版 | Windows 10 1809 及以上 / Windows 11 x64，无需另装 .NET 或管理员权限 |
 | 从源码构建 | Windows 10/11、Git、[.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) |
 | 运行依赖运行时的构建 | Windows 10/11、.NET 8 **Desktop Runtime**，架构与程序一致 |
 | 运行自行生成的自包含包 | 发布脚本目标为 Windows x64，无需单独安装 .NET |
 | 使用在线翻译 | 网络连接、有效 API Key，以及服务支持的模型名称 |
 
 WPF 依赖 Windows。当前不支持把本项目直接编译为 macOS 或 Linux 桌面应用，也未验证 Windows ARM64 的兼容性。
+
+### 使用 Setup 安装
+
+1. 获取 `Yita-Setup-0.8.3-win-x64.exe` 和同名 `.sha256` 校验文件。
+2. 双击安装包，选择中文或英文，按向导选择安装位置和桌面快捷方式。
+3. 默认安装目录为 `%LOCALAPPDATA%\Programs\Yita`。安装仅对当前用户生效，运行组件已包含在包内，安装过程无需联网下载 .NET。
+4. 安装完成后从开始菜单打开 Yita，按下方“首次配置”连接翻译服务。在线翻译仍需要网络。
+
+安装向导沿用译獭形象、奶油白背景和湖水绿强调色。当前安装包未使用商业代码签名，Windows 可能显示未知发布者或 SmartScreen 提示；请核对来源和校验值，不要关闭系统安全防护。
+
+更新时运行新版 Setup，安装前从托盘退出 Yita；安装器会检测占用文件并提示关闭。可在 Windows“设置 → 应用”中卸载。卸载保留个人设置、凭据管理器中的 API Key 和用户记录，便于再次安装。
 
 ### 从源码运行
 
@@ -106,15 +118,17 @@ Yita 自带用于开发的 Mock 翻译提供器，可在不调用在线服务的
 | 切换阅读内容 | 点击浮窗顶部“原文 / 译文” |
 | 复制正文 | 点击正文后选中文字，使用 `Ctrl+C` 或右键菜单 |
 | 固定 / 取消固定 | 点击图钉；浮窗获得键盘焦点时也可按 `Ctrl+P` |
-| 移动 / 调整大小 | 拖动顶部短横条；拖动窗口边缘调整尺寸 |
+| 移动 / 调整大小 | 按住顶部整条拖动区域或工具栏空白处移动；下次按相对选词位置的偏移显示，重启后仍保留；拖动边缘调整尺寸 |
 | 调整字号 | 在设置中修改默认字号；浮窗内也可按 `Ctrl` + `+` / `-` |
 | 关闭当前浮窗 | 点击 `×`；`Esc` 优先退出解释或编辑状态，再关闭窗口 |
 | 暂停自动划词 | 使用托盘菜单关闭划词功能 |
 | 完全退出 | 使用托盘菜单“退出”；关闭设置窗口不会退出后台程序 |
 
-**剪贴板快捷键不会替你模拟 `Ctrl+C`。** 它读取的是当时剪贴板中的内容。自动划词的“兼容性剪贴板回退”是另一项独立设置，默认关闭。
+**剪贴板快捷键不会替你模拟 `Ctrl+C`。** 它读取的是当时剪贴板中的内容。自动划词的“兼容性剪贴板回退”是另一项独立设置，默认关闭。0.8.2 起另有默认启用的“WPS PDF 兼容取词”：WPS PDF 不公开选区时尝试复制，并尽量还原剪贴板。它只在原目标仍为前台且用户未按住鼠标或修饰键时发送复制快捷键；如影响复制可在设置中关闭。其他阅读器可按需开启通用回退。扫描 PDF 仍不支持。
 
 ## 配置与数据隐私
+
+0.8.3 将 UI Automation 取词放入独立子进程。子进程失败或超时后，针对当前目标临时启用安全复制回退（即使通用回退开关关闭）；普通空选区不会强制复制。复制仍要求目标保持前台，并尽可能恢复剪贴板。独立进程通过管道传递文本，不将文本写入日志或临时文件。详见 [兼容性排查](docs/TROUBLESHOOTING.md)。
 
 Yita 是本地桌面客户端，默认 DeepSeek 提供器通过网络进行翻译；它不是离线翻译模型。
 
@@ -122,6 +136,7 @@ Yita 是本地桌面客户端，默认 DeepSeek 提供器通过网络进行翻�
 | --- | --- |
 | API Key | 保存在当前 Windows 用户的凭据管理器中，标识为 `Yita/DeepSeekApiKey`；不写入普通设置 JSON |
 | 设置与偏好 | 保存在 `%LOCALAPPDATA%\Yita\settings.json`，包含服务地址、模型、界面与阅读偏好等 |
+| 浮窗位置 | 相对选区的偏移保存在 `%LOCALAPPDATA%\Yita\popup-placement.json`，不含文本；删除此文件并重启可恢复默认位置 |
 | 当前选区 | 发给你配置的 API 服务用于翻译；服务端如何处理由该服务的政策决定 |
 | 周边上下文 | 默认不作为翻译上下文发送；启用相应选项后，可能将所在段落一并发送 |
 | 术语表与翻译记忆 | 请求可能附带命中的术语和相关修正，帮助保持翻译一致性 |
@@ -169,6 +184,7 @@ src/Yita.App/
   Assets/                        应用图标与字体
 tests/Yita.Tests/                自动化测试
 scripts/                        构建与打包脚本
+packaging/windows/              Setup 安装器、语言文件与构建说明
 integrations/zotero/             实验性 Zotero 桥接代码
 assets/branding/yita/v1/         译獭形象、PNG 图标与多尺寸 ICO
 docs/images/                    当前界面示例与历史开发预览
@@ -182,7 +198,7 @@ dotnet build .\Yita.sln --configuration Release --no-restore
 dotnet test .\Yita.sln --configuration Release --no-build --no-restore
 ```
 
-`global.json` 使用 .NET 8 SDK，允许在同一主版本内使用较新的稳定 feature band。项目不要求安装 Visual Studio，使用 SDK 命令行即可构建。
+`global.json` 以已验证的 .NET 8.0.425 SDK 为最低基线，允许使用 .NET 8 内较新的稳定 feature band，不选用预览版本。它仅约束源码构建；Setup 用户无需安装 SDK。项目不要求安装 Visual Studio，使用 SDK 命令行即可构建。
 
 ### 生成本地可运行目录
 
@@ -201,17 +217,27 @@ dotnet test .\Yita.sln --configuration Release --no-build --no-restore
 
 也可直接调用 `dotnet publish`。许可证和第三方声明会由项目构建配置复制到输出目录。
 
+### 生成 Windows Setup 安装包
+
+```powershell
+.\scripts\Build-Setup.ps1 -Version 0.8.3
+```
+
+脚本执行测试、自包含发布、安装器编译和 SHA256 校验清单生成。首次构建会下载固定版本的便携 Inno Setup 编译器，校验下载包哈希和编译器签名，不安装系统软件。需要 Windows、.NET 8 SDK 和联网还原构建依赖。
+
+输出位于 `artifacts/release/`：`Yita-Setup-0.8.3-win-x64.exe`、同名 `.sha256` 和 `Yita-0.8.3-payload.json`。支持 `-DotnetRoot` 与 `-InnoCompiler` 指定本地工具。安装、重复安装和卸载验证使用 `scripts/Test-Setup.ps1`，请在未安装 Yita 的测试账号或虚拟机中运行。详见 [安装包构建说明](packaging/windows/README.md)。
+
 ### 生成 Windows x64 自包含 ZIP
 
 ```powershell
-.\scripts\Publish.ps1 -Version 0.7.3
+.\scripts\Publish.ps1 -Version 0.8.3
 ```
 
 该脚本会还原依赖、构建、运行测试、发布自包含程序、打包实验性 Zotero 插件，并执行应用启动 / 窗口冒烟检查。需要可交互的 Windows 会话和可用的 `dotnet` 命令。
 
 成功后的输出位于 `artifacts/release/`，包括 `Yita-v<版本>-win-x64.zip` 和对应 `.sha256`。脚本支持可选 Authenticode 签名参数，详见 [Publish.ps1](scripts/Publish.ps1)。未提供证书时产物不带商业代码签名。ZIP 是便携包，**不是 Setup 安装包**。
 
-当前程序集版本继承自上游 `0.7.3`；这不表示 Yita 已发布同名 GitHub Release。当前改动见 [CHANGELOG.md](CHANGELOG.md) 的 Unreleased 部分。
+程序集及 Setup 版本为 `0.8.3`。变更见 [CHANGELOG.md](CHANGELOG.md)；构建脚本不会创建 Git 标签或上传 GitHub Release。
 
 ## 已知限制与排障
 
@@ -221,7 +247,8 @@ dotnet test .\Yita.sln --configuration Release --no-build --no-restore
 | 扫描 PDF / 图片文字 | 不支持 OCR；PDF 必须有可选择的文本层 |
 | 双击选词、键盘扩选 | 当前自动触发主要针对鼠标拖选，不覆盖所有选中方式 |
 | Zotero 内置 PDF | 兼容性尚未解决；桥接插件为实验代码，不能视为已验证支持 |
-| `Ctrl+C` 复制异常 | 部分应用中的焦点 / 剪贴板兼容问题仍待排查；可先暂停自动划词、关闭剪贴板回退并回到原窗口复制 |
+| `Ctrl+C` 复制异常 | 先暂停自动划词、关闭通用剪贴板回退及 WPS PDF 兼容取词，并回到原窗口复制 |
+| 划词时退出或浮窗消失 | 提供发生时间和 `%LOCALAPPDATA%\Yita\runtime-health.log`（以及 `.previous`）；0.8.3 记录异常类型与代码方法名，不记录正文或密钥。单个渲染错误会关闭受影响浮窗；尚未确认所有外部闪退的原因 |
 | `Ctrl+Shift+T` 无效 | 可能与其他程序冲突；尝试托盘菜单“翻译剪贴板”，并检查是否启动了多个翻译工具 |
 | API 返回错误 | 检查 Key、余额、模型权限和服务地址；自定义兼容服务不保证支持全部流式行为 |
 | Windows 提示未知发布者 | 未签名构建可能出现此提示；确认来源和校验值，不建议关闭系统安全防护 |
@@ -241,4 +268,4 @@ Yita 的水獭形象与图标素材位于 [assets/branding/yita/v1](assets/brand
 
 本项目基于 Frank Lai 的 [InstantTranslate](https://github.com/franklai-rise/InstantTranslate) v0.7.3 开发。Yita 在其基础上调整了产品身份、品牌素材、界面、阅读切换、字体和配色；感谢上游对选区读取、流式翻译和桌面窗口交互的实现。
 
-代码采用 [MIT License](LICENSE)，允许在遵守许可条件的前提下使用、修改和分发，包括商业用途。分发时须保留原版权与许可文本。内置 Source Sans Pro 字体采用 SIL Open Font License 1.1，详情见 [NOTICE.md](NOTICE.md) 和[字体许可](src/Yita.App/Assets/Fonts/LICENSE-SourceSans.md)。历史变更记录中的上游版本不代表 Yita 的独立发布记录。
+Yita 自有修改采用根目录 [MIT License](LICENSE)，允许在遵守许可条件的前提下使用、修改和分发，包括商业用途。上游版权与完整许可见 [LICENSES/InstantTranslate-MIT.txt](LICENSES/InstantTranslate-MIT.txt)，构建和安装包均保留该文件。内置 Source Sans Pro 字体采用 SIL Open Font License 1.1，详情见 [NOTICE.md](NOTICE.md) 和[字体许可](src/Yita.App/Assets/Fonts/LICENSE-SourceSans.md)。历史变更记录中的上游版本不代表 Yita 的独立发布记录。

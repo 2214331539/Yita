@@ -6,6 +6,23 @@ namespace Yita.Tests;
 public sealed class RuntimeHealthJournalTests
 {
     [Fact]
+    public void InnerExceptionTypesAreRecordedWithoutPrivateMessagesOrPaths()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "Yita-health-" + Guid.NewGuid().ToString("N"));
+        var path = Path.Combine(directory, "health.log");
+        try
+        {
+            new RuntimeHealthJournal(path).Record(RuntimeHealthEvent.DispatcherUnhandledException,
+                new InvalidOperationException("private source text", new IOException("C:\\private\\document.pdf")));
+            var content = File.ReadAllText(path);
+            Assert.Contains("inner=System.IO.IOException", content);
+            Assert.DoesNotContain("private", content);
+            Assert.DoesNotContain("document.pdf", content);
+        }
+        finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+    }
+
+    [Fact]
     public void RecordNeverPersistsExceptionMessagesOrUserText()
     {
         var directory = Path.Combine(

@@ -1,9 +1,35 @@
 # Changelog
 
-## Unreleased
+## 0.8.3 - 2026-09-27
+
+- Anchor new popups to the lower-left of each mouse-drag region, independent of drag direction. Keep user offsets in DIP, reset the move lock when an unpinned window gets a new anchor, and preserve placement during streaming and pinning.
+- Run external UI Automation reads in a persistent, hidden helper process. A native provider crash or timeout terminates only the helper. Skip that target's UIA provider for 60 seconds and try native/guarded clipboard fallback, even when the general clipboard option is off. An ordinary empty UIA result does not override that preference.
+- Exchange selected text only through redirected pipes; the helper does not load settings or credentials, initialize the UI, or acquire the app's single-instance lock. Start it ahead of the first selection and terminate it when the parent exits.
+- Add regression coverage for process exit, timeouts, recovery, Unicode IPC, drag direction, relative offsets, pinning and screen-edge clamping. Reported native GetText crashes are addressed by isolation; the friend's exact environment still requires validation.
+
+## 0.8.2 - 2026-09-27
+
+- Reduce the primary UIA budget to 120 ms for enabled WPS PDF compatibility. WPS then tries Ctrl+C directly instead of waiting for WM_COPY; readable accessibility selections still avoid the clipboard entirely.
+- Retry keyboard copy once only when the first attempt made no clipboard change. Cancelled gestures, changed clipboard content and foreign foreground windows stop retries.
+- Resolve focus from the foreground GUI thread; recognize owned WPS windows and dedicated PDF renderer processes. Accept clipboard owners only from processes attached to the target window tree.
+- Handle delayed clipboard text rendering and multiple format writes by re-reading a stable sequence from the same owner. Never reuse unchanged clipboard text or restore over a foreign/newer owner.
+- Add privacy-safe WpsCopySucceeded/WpsCopyEmpty events with copy duration in milliseconds. These timings exclude the remote translation response.
+- Pass 445 automated tests, including delayed rendering, owner changes, stale clipboard and shortened WPS timeouts. Real WPS success rate and end-to-end speed still need user acceptance testing.
+
+## 0.8.1 - 2026-09-27
+
+- Add a default-enabled WPS PDF compatibility option. When UIA/native reads return no text, try WM_COPY followed by a guarded Ctrl+C transaction. Other applications require the existing clipboard fallback option. Reject focus changes, held modifier keys, password-style fields and clipboard content from another process.
+- Expand popup dragging to the full grab strip and empty header. Remember selection-relative offsets across restarts, scale them for DPI and clamp new popups to the current monitor. Streaming updates no longer reposition or resize a manually moved popup.
+- Stop late callbacks after popup closure and isolate recoverable streaming presentation failures to the affected popup. Record bounded application method names and inner exception types without text, credentials, messages or source paths. The reported external crash has not yet been reproduced; this is defensive hardening, not a confirmed root-cause claim.
+- Set the Yita SDK baseline to .NET 8.0.425. Rewrite the root MIT license for Yita modifications and retain the upstream MIT text in LICENSES/InstantTranslate-MIT.txt in both source and distribution.
+
+## 0.8.0 - 2026-09-27
 
 ### Yita
 
+- Add a per-user Windows x64 Setup with the Yita mascot, ivory surfaces, teal headings and Chinese/English installation flow.
+- Include the .NET 8 desktop runtime, runtime licenses and SHA256 manifests. Support reinstall, uninstall and a newer-version guard; preserve user settings, credentials and records on uninstall.
+- Add pinned portable Inno Setup acquisition, reproducible build instructions and an isolated installer lifecycle check. The installer is unsigned; building does not publish a GitHub Release.
 - Rename the application, executable, credentials and configuration identity to Yita; add the otter mascot and application icons.
 - Simplify the translation toolbar to source/translation switching, pin and close. Reading the source no longer interrupts incoming translated text.
 - Unify interface typography, spacing and controls; add short motion transitions that respect system animation preferences.

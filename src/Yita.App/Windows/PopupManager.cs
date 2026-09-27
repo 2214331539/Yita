@@ -15,6 +15,7 @@ internal sealed class PopupManager : IPopupPresenter, IDisposable
     private readonly Func<ManualAiRecordRequest, CancellationToken, Task<AiHistoryWriteResult>>? _manualRecordWriter;
     private long? _transientRequestId;
     private bool _disposing;
+    private readonly PopupPlacementStore _placementStore = new();
 
     public PopupManager(
         Func<double>? getDefaultFontSize = null,
@@ -308,6 +309,9 @@ internal sealed class PopupManager : IPopupPresenter, IDisposable
             appearance.ChineseFontFamily,
             appearance.UiLanguage,
             appearance.PopupVisualStyle);
+        window.PreferredPlacement = _placementStore.Load();
+        window.PlacementChanged += _placementStore.Save;
+        window.RenderingFailed += OnRenderingFailed;
         window.PinStateChanged += OnPinStateChanged;
         window.RetranslateRequested += OnRetranslateRequested;
         window.CorrectionSaveRequested += OnCorrectionSaveRequested;
@@ -333,6 +337,9 @@ internal sealed class PopupManager : IPopupPresenter, IDisposable
             existingWindow.Close();
         }
     }
+
+    private static void OnRenderingFailed(Exception exception) =>
+        new RuntimeHealthJournal().Record(RuntimeHealthEvent.PopupRenderFailed, exception);
 
     private void OnPinStateChanged(PopupWindow window, bool isPinned)
     {
@@ -687,6 +694,8 @@ internal sealed class PopupManager : IPopupPresenter, IDisposable
         }
 
         window.PinStateChanged -= OnPinStateChanged;
+        window.PlacementChanged -= _placementStore.Save;
+        window.RenderingFailed -= OnRenderingFailed;
         window.RetranslateRequested -= OnRetranslateRequested;
         window.CorrectionSaveRequested -= OnCorrectionSaveRequested;
         window.ExplanationRequested -= OnExplanationRequested;

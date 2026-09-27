@@ -56,7 +56,18 @@ internal partial class PopupWindow : Window
     private CompletedTranslation? _lastCompletedTranslation;
     private string _translationBeforeEdit = string.Empty;
     private string _targetLanguage = LanguageDirectionResolver.Chinese;
-    private ScreenPoint _anchorPoint;
+    private readonly PopupPlacementState _placementState = new();
+    private ScreenPoint _anchorPoint => _placementState.Anchor;
+    private bool _isUserMoving;
+    private bool _isClosed;
+    private bool _hasUserMoved => _placementState.UserMoved;
+    internal PopupPlacement? PreferredPlacement
+    {
+        get => _placementState.Preference;
+        set => _placementState.Preference = value;
+    }
+    internal event Action<PopupPlacement>? PlacementChanged;
+    internal event Action<Exception>? RenderingFailed;
     private bool _hasDisplayedTranslation;
     private Paragraph? _translationParagraph;
     private string _renderedTranslation = string.Empty;
@@ -650,7 +661,7 @@ internal partial class PopupWindow : Window
             SetActionBarVisibility(Visibility.Collapsed);
         }
 
-        _anchorPoint = anchorPoint;
+        _placementState.SetAnchor(anchorPoint, IsPinned && IsVisible);
         DirectionButton.IsEnabled = false;
         CopySourceButton.IsEnabled = false;
         CopyTranslationButton.IsEnabled = false;
@@ -690,7 +701,7 @@ internal partial class PopupWindow : Window
         _currentSourceLanguage = sourceLanguage;
         _translatedText = plainTranslation;
         _targetLanguage = targetLanguage;
-        _anchorPoint = anchorPoint;
+        var anchorChanged = _placementState.SetAnchor(anchorPoint, IsPinned && IsVisible);
         _replaceTranslationOnNextUpdate = false;
 
         var isFirstTranslationUpdate = !_hasDisplayedTranslation;
@@ -716,7 +727,7 @@ internal partial class PopupWindow : Window
         HideActionStatus();
         _hasDisplayedTranslation = true;
         ApplyAutomaticSize(_showingSource ? _displayedSourceText : plainTranslation, anchorPoint, force: isFirstTranslationUpdate);
-        if (isFirstTranslationUpdate || !IsVisible)
+        if (isFirstTranslationUpdate || !IsVisible || anchorChanged)
         {
             ShowAt(anchorPoint);
         }
@@ -967,6 +978,8 @@ internal partial class PopupWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        _isClosed = true;
+        _selectionActionVersion++;
         SourceInitialized -= OnSourceInitialized;
         StopTranslationReveal(clearTarget: true);
         StopExplanationReveal(clearTarget: true);
@@ -1029,7 +1042,7 @@ internal partial class PopupWindow : Window
             Dispatcher.BeginInvoke(
                 () =>
                 {
-                    if (IsVisible && !IsPinned)
+                    if (!_isClosed && IsVisible && !IsPinned)
                     {
                         PositionNear(_anchorPoint);
                     }
@@ -1738,7 +1751,7 @@ internal partial class PopupWindow : Window
         Dispatcher.BeginInvoke(
             () =>
             {
-                if (version == _selectionActionVersion)
+                if (!_isClosed && version == _selectionActionVersion)
                 {
                     PositionSelectionExplainButton();
                 }
@@ -1805,18 +1818,28 @@ internal partial class PopupWindow : Window
 
         try
         {
+            _isUserMoving = true;
+            NativeMethods.GetWindowRect(_windowHandle, out var previousBounds);
             if (!IsActive)
             {
                 Activate();
             }
 
             DragMove();
+            if (_windowHandle != IntPtr.Zero && NativeMethods.GetWindowRect(_windowHandle, out var bounds)
+                && (bounds.Left != previousBounds.Left || bounds.Top != previousBounds.Top))
+            {
+                var dpi = VisualTreeHelper.GetDpi(this);
+                _placementState.MovedTo(new System.Drawing.Point(bounds.Left, bounds.Top), dpi.DpiScaleX, dpi.DpiScaleY);
+                PlacementChanged?.Invoke(PreferredPlacement!);
+            }
             e.Handled = true;
         }
         catch (InvalidOperationException)
         {
             // The mouse button may have been released before WPF starts the move loop.
         }
+        finally { _isUserMoving = false; }
     }
 
     private void SizePresetBar_PresetSelected(
@@ -1894,7 +1917,7 @@ internal partial class PopupWindow : Window
 
     private void ApplyAutomaticSize(string text, ScreenPoint anchorPoint, bool force)
     {
-        if (!_isAutomaticSizing || IsPinned)
+        if (!_isAutomaticSizing || IsPinned || _isUserMoving || _hasUserMoved)
         {
             return;
         }
@@ -2114,6 +2137,9 @@ internal partial class PopupWindow : Window
     }
 
     private void TranslationRevealTimer_Tick(object? sender, EventArgs e)
+        => RunRevealFrame(AdvanceTranslationReveal);
+
+    private void AdvanceTranslationReveal()
     {
         if (_renderedTranslation.Length >= _translationRevealTarget.Length)
         {
@@ -2130,6 +2156,9 @@ internal partial class PopupWindow : Window
     }
 
     private void ExplanationRevealTimer_Tick(object? sender, EventArgs e)
+        => RunRevealFrame(AdvanceExplanationReveal);
+
+    private void AdvanceExplanationReveal()
     {
         if (_renderedExplanation.Length >= _explanationRevealTarget.Length)
         {
@@ -2151,6 +2180,22 @@ internal partial class PopupWindow : Window
             && !_translationRevealTimer.IsEnabled)
         {
             _translationRevealTimer.Start();
+        }
+    }
+
+    internal void RunRevealFrame(Action render)
+    {
+        if (_isClosed) return;
+        try { render(); }
+        catch (Exception exception) when (exception is InvalidOperationException or ArgumentException
+                                         or System.Runtime.InteropServices.ExternalException)
+        {
+            // DispatcherTimer frames run outside the coordinator's awaited request.
+            // Abandon this popup on a presentation failure instead of terminating the app.
+            _translationRevealTimer.Stop();
+            _explanationRevealTimer.Stop();
+            RenderingFailed?.Invoke(exception);
+            Close();
         }
     }
 
@@ -2485,7 +2530,7 @@ internal partial class PopupWindow : Window
             () =>
             {
                 _isRepositionPending = false;
-                if (IsVisible && !IsPinned)
+                if (!_isClosed && IsVisible && !IsPinned)
                 {
                     UpdateLayout();
                     PositionNear(_anchorPoint);
@@ -2496,6 +2541,7 @@ internal partial class PopupWindow : Window
 
     private void PositionNear(ScreenPoint anchorPoint)
     {
+        if (_isUserMoving || _hasUserMoved) return;
         if (_windowHandle == IntPtr.Zero)
         {
             _windowHandle = new WindowInteropHelper(this).EnsureHandle();
@@ -2513,29 +2559,15 @@ internal partial class PopupWindow : Window
             height = currentBounds.Height;
         }
 
-        const int offsetX = 10;
-        const int offsetY = 12;
         const int screenMargin = 8;
 
         width = Math.Min(width, Math.Max(1, screen.WorkingArea.Width - (screenMargin * 2)));
         height = Math.Min(height, Math.Max(1, screen.WorkingArea.Height - (screenMargin * 2)));
 
-        var x = anchorPoint.X + offsetX;
-        var y = anchorPoint.Y + offsetY;
-        if (x + width > screen.WorkingArea.Right - screenMargin)
-        {
-            x = anchorPoint.X - width - offsetX;
-        }
-
-        if (y + height > screen.WorkingArea.Bottom - screenMargin)
-        {
-            y = anchorPoint.Y - height - offsetY;
-        }
-
-        var minimumX = screen.WorkingArea.Left + screenMargin;
-        var minimumY = screen.WorkingArea.Top + screenMargin;
-        x = Math.Clamp(x, minimumX, Math.Max(minimumX, screen.WorkingArea.Right - width - screenMargin));
-        y = Math.Clamp(y, minimumY, Math.Max(minimumY, screen.WorkingArea.Bottom - height - screenMargin));
+        var position = PopupPlacement.Resolve(anchorPoint, new System.Drawing.Size(width, height),
+            screen.WorkingArea, dpi.DpiScaleX, dpi.DpiScaleY, PreferredPlacement);
+        var x = position.X;
+        var y = position.Y;
 
         UpdateBubbleTailDirection(windowIsLeftOfAnchor: x < anchorPoint.X);
 

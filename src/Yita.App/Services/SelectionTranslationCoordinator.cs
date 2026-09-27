@@ -225,7 +225,7 @@ internal sealed class SelectionTranslationCoordinator : IDisposable
                     capture?.Context,
                     settings.SourceLanguage,
                     targetLanguage,
-                    gesture.End,
+                    gesture.PopupAnchor,
                     settings,
                     lease.CancellationToken,
                     () => IsSelectionRequestActive(lease.Version),

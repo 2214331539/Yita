@@ -5,6 +5,17 @@ namespace Yita.Tests;
 public sealed class WindowProcessResolverTests
 {
     [Theory]
+    [InlineData("wps", "paper.pdf - WPS Office", true)]
+    [InlineData("WPS", "PAPER.PDF", true)]
+    [InlineData("wpspdf", "document", true)]
+    [InlineData("kpdf", "document", true)]
+    [InlineData("wps", "notes.docx - WPS", false)]
+    [InlineData("pwsh", "paper.pdf", false)]
+    [InlineData("chrome", "WPS paper.pdf", false)]
+    public void AutomaticCompatibilityOnlyTargetsWpsPdf(string process, string title, bool expected)
+        => Assert.Equal(expected, WindowProcessResolver.IsWpsPdfProcess(process, title));
+
+    [Theory]
     [InlineData("cmd")]
     [InlineData("PowerShell")]
     [InlineData("pwsh")]

@@ -29,7 +29,7 @@ public partial class App : System.Windows.Application
     private readonly RuntimeHealthJournal _healthJournal = new();
     private volatile AppSettings _settings = AppSettings.Default;
     private GlobalMouseHook? _mouseHook;
-    private UiaSelectionReader? _uiaSelectionReader;
+    private IsolatedUiaSelectionReader? _uiaSelectionReader;
     private GlobalHotkeyManager? _hotkeyManager;
     private SelectionTranslationCoordinator? _coordinator;
     private ZoteroSelectionBridge? _zoteroSelectionBridge;
@@ -148,7 +148,8 @@ public partial class App : System.Windows.Application
             _mouseHook.HookStoppedUnexpectedly += OnMouseHookStoppedUnexpectedly;
             _translationProviderFactory = new TranslationProviderFactory();
             _aiSummaryService = new AiSummaryService(_aiHistoryStore, _translationProviderFactory);
-            _uiaSelectionReader = new UiaSelectionReader();
+            _uiaSelectionReader = new IsolatedUiaSelectionReader();
+            _ = _uiaSelectionReader.WarmUpAsync();
             _coordinator = new SelectionTranslationCoordinator(
                 _mouseHook,
                 new SelectionReaderPipeline(
@@ -156,7 +157,10 @@ public partial class App : System.Windows.Application
                     new NativeSelectionReader(),
                     new ClipboardSelectionReader(Dispatcher, WindowProcessResolver.IsClipboardFallbackAllowedAt),
                     () => _settings.UseClipboardFallback,
-                    WindowProcessResolver.RequiresSelectionStabilizationAt),
+                    WindowProcessResolver.RequiresSelectionStabilizationAt,
+                    allowTargetClipboardFallback: point => (_settings.UseWpsPdfCompatibility
+                        && WindowProcessResolver.IsWpsPdfAt(point))
+                        || _uiaSelectionReader.RequiresCompatibilityAt(point)),
                 _translationProviderFactory,
                 _popupManager,
                 Dispatcher,
@@ -1840,6 +1844,7 @@ public partial class App : System.Windows.Application
             _coordinator = null;
         }
 
+        _uiaSelectionReader?.Dispose();
         _uiaSelectionReader = null;
 
         _translationProviderFactory?.Dispose();

@@ -121,6 +121,37 @@ internal static class WindowProcessResolver
         }
     }
 
+    public static bool IsWpsPdfAt(ScreenPoint point)
+    {
+        var hit = NativeMethods.WindowFromPoint(new NativeMethods.NativePoint { X = point.X, Y = point.Y });
+        if (!IsExternalClipboardTarget(hit)) return false;
+        var root = NativeMethods.GetAncestor(hit, NativeMethods.GaRootOwner);
+        if (root == IntPtr.Zero || !Yita.Selection.CopyShortcut.IsTargetCurrent(hit)) return false;
+        NativeMethods.GetWindowThreadProcessId(root, out var processId);
+        try
+        {
+            using var process = Process.GetProcessById((int)processId);
+            var title = new System.Text.StringBuilder(1024);
+            NativeMethods.GetWindowText(root, title, title.Capacity);
+            if (IsWpsPdfProcess(process.ProcessName, title.ToString())) return true;
+            // Some WPS frames omit the document extension, while their embedded
+            // PDF renderer is still identified by its dedicated executable.
+            NativeMethods.GetWindowThreadProcessId(hit, out var hitProcessId);
+            using var hitProcess = Process.GetProcessById((int)hitProcessId);
+            return IsWpsPdfProcess(hitProcess.ProcessName, title.ToString());
+        }
+        catch (Exception e) when (e is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            return false;
+        }
+    }
+
+    internal static bool IsWpsPdfProcess(string processName, string title) =>
+        processName.Equals("wpspdf", StringComparison.OrdinalIgnoreCase)
+        || processName.Equals("kpdf", StringComparison.OrdinalIgnoreCase)
+        || (processName.Equals("wps", StringComparison.OrdinalIgnoreCase)
+            && title.Contains(".pdf", StringComparison.OrdinalIgnoreCase));
+
     public static bool RequiresSelectionStabilizationAt(ScreenPoint point)
     {
         var windowHandle = NativeMethods.WindowFromPoint(new NativeMethods.NativePoint

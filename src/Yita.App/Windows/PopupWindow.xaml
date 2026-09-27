@@ -150,7 +150,8 @@
             <RowDefinition x:Name="ContentRow" Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Grid x:Name="HeaderBarGrid" Grid.Row="0">
+        <Grid x:Name="HeaderBarGrid" Grid.Row="0" Background="Transparent"
+              MouseLeftButtonDown="DragHandle_MouseLeftButtonDown">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="0" />
@@ -379,9 +380,8 @@
 
                 <Border x:Name="DragHandle"
                         Grid.Row="0"
-                        Width="168"
                         Height="28"
-                        HorizontalAlignment="Center"
+                        HorizontalAlignment="Stretch"
                         VerticalAlignment="Center"
                         Panel.ZIndex="60"
                         CornerRadius="14"

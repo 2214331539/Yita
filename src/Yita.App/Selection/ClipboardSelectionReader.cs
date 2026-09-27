@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Threading;
 using Yita.Interop;
 using Yita.Models;
+using Yita.Services;
 using WpfClipboard = System.Windows.Clipboard;
 using WpfDataObject = System.Windows.IDataObject;
 using WpfTextDataFormat = System.Windows.TextDataFormat;
@@ -14,7 +15,6 @@ internal sealed class ClipboardSelectionReader : ISelectionReader
     private static readonly SemaphoreSlim ClipboardTransactionGate = new(1, 1);
     private static readonly TimeSpan ClipboardCopyTimeout = TimeSpan.FromMilliseconds(400);
     private static readonly TimeSpan PerTargetCopyTimeout = TimeSpan.FromMilliseconds(180);
-    private static readonly TimeSpan ClipboardPollInterval = TimeSpan.FromMilliseconds(20);
 
     private readonly Dispatcher _dispatcher;
     private readonly Func<ScreenPoint, bool> _isFallbackAllowed;
@@ -52,7 +52,14 @@ internal sealed class ClipboardSelectionReader : ISelectionReader
         await ClipboardTransactionGate.WaitAsync(cancellationToken);
         try
         {
-            return await ReadClipboardSelectionTransactionAsync(point, cancellationToken);
+            var isWpsPdf = WindowProcessResolver.IsWpsPdfAt(point);
+            var started = System.Diagnostics.Stopwatch.StartNew();
+            var text = await ReadClipboardSelectionTransactionAsync(point, cancellationToken, isWpsPdf);
+            if (isWpsPdf)
+                new RuntimeHealthJournal().Record(string.IsNullOrWhiteSpace(text)
+                    ? RuntimeHealthEvent.WpsCopyEmpty : RuntimeHealthEvent.WpsCopySucceeded,
+                    numericCode: (int)started.ElapsedMilliseconds);
+            return text;
         }
         finally
         {
@@ -62,7 +69,8 @@ internal sealed class ClipboardSelectionReader : ISelectionReader
 
     private static async Task<string?> ReadClipboardSelectionTransactionAsync(
         ScreenPoint point,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool preferShortcut)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -90,12 +98,24 @@ internal sealed class ClipboardSelectionReader : ISelectionReader
         }
 
         uint? copiedClipboardSequence = null;
+        IntPtr copiedClipboardOwner = IntPtr.Zero;
         try
         {
             var copyTargets = ResolveCopyTargets(point);
-            if (copyTargets.Count == 0)
+            if (copyTargets.Count == 0 || !CopyShortcut.IsTargetCurrent(copyTargets[0]))
             {
                 return null;
+            }
+
+            // A WPS PDF canvas handles keyboard copy but often ignores WM_COPY.
+            // Avoid spending the message timeout on every selection. Retry once
+            // only if nothing was copied and the same target remains active.
+            if (preferShortcut)
+            {
+                var result = await ReadShortcutSelectionAsync(copyTargets, originalSequence, cancellationToken, retry: true);
+                copiedClipboardSequence = result.Sequence;
+                copiedClipboardOwner = result.Owner;
+                return result.Text;
             }
 
             var deadline = DateTime.UtcNow + ClipboardCopyTimeout;
@@ -109,6 +129,7 @@ internal sealed class ClipboardSelectionReader : ISelectionReader
                     return null;
                 }
 
+                if (!CopyShortcut.IsTargetCurrent(copyTargets[targetIndex])) return null;
                 if (!SendCopyMessage(copyTargets[targetIndex]))
                 {
                     continue;
@@ -124,13 +145,16 @@ internal sealed class ClipboardSelectionReader : ISelectionReader
                 var copyResult = await WaitForCopiedTextAsync(
                     sequenceBeforeCopy,
                     targetDeadline,
-                    CancellationToken.None);
+                    CancellationToken.None,
+                    copyTargets[0]);
 
                 if (copyResult.Sequence is not null)
                 {
                     copiedClipboardSequence = copyResult.Sequence;
+                    copiedClipboardOwner = copyResult.Owner;
                     return copyResult.Text;
                 }
+                if (copyResult.Changed) return null;
 
                 if (DateTime.UtcNow >= deadline)
                 {
@@ -138,7 +162,12 @@ internal sealed class ClipboardSelectionReader : ISelectionReader
                 }
             }
 
-            return null;
+            // Custom PDF canvases often handle Ctrl+C, but ignore WM_COPY.
+            // Keep this inside the same serialized clipboard transaction.
+            var shortcutResult = await ReadShortcutSelectionAsync(copyTargets, originalSequence, cancellationToken, retry: false);
+            copiedClipboardSequence = shortcutResult.Sequence;
+            copiedClipboardOwner = shortcutResult.Owner;
+            return shortcutResult.Text;
         }
         catch (ExternalException)
         {
@@ -150,13 +179,14 @@ internal sealed class ClipboardSelectionReader : ISelectionReader
         }
         finally
         {
-            if (previousClipboard is not null
-                && copiedClipboardSequence is { } expectedSequence
-                && NativeMethods.GetClipboardSequenceNumber() == expectedSequence)
+            if (copiedClipboardSequence is { } expectedSequence
+                && NativeMethods.GetClipboardSequenceNumber() == expectedSequence
+                && GetClipboardOwner() == copiedClipboardOwner)
             {
                 try
                 {
-                    WpfClipboard.SetDataObject(previousClipboard, true);
+                    if (previousClipboard is null) WpfClipboard.Clear();
+                    else WpfClipboard.SetDataObject(previousClipboard, true);
                 }
                 catch (ExternalException)
                 {
@@ -174,40 +204,53 @@ internal sealed class ClipboardSelectionReader : ISelectionReader
         }
     }
 
-    private static async Task<ClipboardCopyResult> WaitForCopiedTextAsync(
-        uint sequenceBeforeCopy,
-        DateTime deadline,
-        CancellationToken cancellationToken)
+    private static async Task<ClipboardCopyResult> ReadShortcutSelectionAsync(
+        IReadOnlyList<IntPtr> targets, uint sequence, CancellationToken cancellationToken, bool retry)
     {
-        uint? observedSequence = null;
-        while (DateTime.UtcNow < deadline)
+        for (var attempt = 0; attempt < (retry ? 2 : 1); attempt++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var currentSequence = NativeMethods.GetClipboardSequenceNumber();
-
-            if (observedSequence is null && currentSequence != sequenceBeforeCopy)
-            {
-                observedSequence = currentSequence;
-            }
-            else if (observedSequence is { } expectedSequence && currentSequence != expectedSequence)
-            {
-                // A second change cannot safely be attributed to our WM_COPY.
+            if (NativeMethods.GetClipboardSequenceNumber() != sequence || !CopyShortcut.IsTargetCurrent(targets[0]))
                 return default;
-            }
-
-            if (observedSequence is { } copiedSequence
-                && TryReadClipboardText(out var selectedText))
+            if (CopyShortcut.TrySend(targets[0]))
             {
-                return new ClipboardCopyResult(selectedText, copiedSequence);
+                // Once input was sent, finish its bounded transaction even if a
+                // newer gesture cancels the request, then restore where safe.
+                var budget = retry && attempt == 0 ? 250 : 650;
+                var result = await WaitForCopiedTextAsync(sequence,
+                    DateTime.UtcNow + TimeSpan.FromMilliseconds(budget), CancellationToken.None, targets[0]);
+                if (result.Changed) return result;
             }
-
-            await Task.Delay(ClipboardPollInterval, cancellationToken);
+            if (retry && attempt == 0) await Task.Delay(80, cancellationToken);
         }
-
-        return observedSequence is { } sequence
-            ? new ClipboardCopyResult(null, sequence)
-            : default;
+        return default;
     }
+
+    private static Task<ClipboardCopyResult> WaitForCopiedTextAsync(
+        uint sequenceBeforeCopy,
+        DateTime deadline,
+        CancellationToken cancellationToken,
+        IntPtr target)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        // Capture only processes attached to the original window tree. Do not
+        // accept arbitrary WPS processes, which may host a different document.
+        var processIds = new HashSet<uint>();
+        foreach (var window in new[] { target, NativeMethods.GetAncestor(target, NativeMethods.GaRootOwner), CopyShortcut.GetFocusedTarget(target) })
+            if (TryGetExternalProcessId(window, out var processId)) processIds.Add(processId);
+        return ClipboardCopyWaiter.WaitAsync(sequenceBeforeCopy, deadline - DateTime.UtcNow,
+            () =>
+            {
+                var sequence = NativeMethods.GetClipboardSequenceNumber();
+                var owner = GetClipboardOwner();
+                NativeMethods.GetWindowThreadProcessId(owner, out var ownerProcess);
+                return new ClipboardStamp(sequence, owner, processIds.Contains(ownerProcess));
+            },
+            () => TryReadClipboardText(out var text) ? text : null);
+    }
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetClipboardOwner();
 
     private static bool TryReadClipboardText(out string? selectedText)
     {
@@ -298,5 +341,4 @@ internal sealed class ClipboardSelectionReader : ISelectionReader
         return processId != 0;
     }
 
-    private readonly record struct ClipboardCopyResult(string? Text, uint? Sequence);
 }
