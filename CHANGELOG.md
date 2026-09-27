@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.4 - 2026-09-27
+
+- 根据译文内容自适应浮窗宽高，减少长文本被圆角边缘遮挡，并移除译文高亮背景与加粗样式。
+- 设置页改为左侧导航，分为常规、AI 记录、翻译与外观、模型配置四个入口，统一使用微软雅黑。
+- 托盘菜单同步使用 Yita 暖白色界面、字体和字号，保持与主界面一致。
+
 ## 0.8.3 - 2026-09-27
 
 - Anchor new popups to the lower-left of each mouse-drag region, independent of drag direction. Keep user offsets in DIP, reset the move lock when an unpinned window gets a new anchor, and preserve placement during streaming and pinning.

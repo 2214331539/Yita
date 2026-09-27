@@ -2,7 +2,7 @@
 ===================
 
 运行
-0. 安装版：双击 Yita-Setup-0.8.3-win-x64.exe，按照向导安装，再从开始菜单打开 Yita。
+0. 安装版：双击 Yita-Setup-0.8.4-win-x64.exe，按照向导安装，再从开始菜单打开 Yita。
    支持 Windows 10 1809 及以上 / Windows 11 x64。已包含 .NET，无需另装运行环境。
    默认安装到 %LOCALAPPDATA%\Programs\Yita，仅为当前用户安装，无需管理员权限。
 1. 源码用户先安装 .NET 8 SDK，在项目目录执行 scripts\Build-Local.ps1，再双击 Start-Yita.cmd。

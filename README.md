@@ -15,7 +15,7 @@
 
 Yita 在支持文本选区读取的应用中检测鼠标拖选，通过 DeepSeek 流式返回译文，并在选区附近显示可固定、可调整大小的浮窗。它适合阅读英文网页、可选中文字的 PDF、Markdown 和编辑器中的文本。
 
-**当前版本：0.8.3。** 提供 Windows x64 Setup 构建脚本，安装包包含 .NET 8 运行环境，支持直接安装。GitHub 下载资产以 [Releases](https://github.com/2214331539/Yita/releases) 页面实际上传内容为准；本地生成安装包不会自动发布到 GitHub。当前没有自动更新或 macOS/Linux 版本。在线翻译需要自行配置 API Key，调用费用由所用 API 服务计费。
+**当前版本：0.8.4。** 提供 Windows x64 Setup 构建脚本，安装包包含 .NET 8 运行环境，支持直接安装。GitHub 下载资产以 [Releases](https://github.com/2214331539/Yita/releases) 页面实际上传内容为准；本地生成安装包不会自动发布到 GitHub。当前没有自动更新或 macOS/Linux 版本。在线翻译需要自行配置 API Key，调用费用由所用 API 服务计费。
 
 ## 界面预览
 
@@ -76,7 +76,7 @@ WPF 依赖 Windows。当前不支持把本项目直接编译为 macOS 或 Linux 
 
 ### 使用 Setup 安装
 
-1. 获取 `Yita-Setup-0.8.3-win-x64.exe` 和同名 `.sha256` 校验文件。
+1. 获取 `Yita-Setup-0.8.4-win-x64.exe` 和同名 `.sha256` 校验文件。
 2. 双击安装包，选择中文或英文，按向导选择安装位置和桌面快捷方式。
 3. 默认安装目录为 `%LOCALAPPDATA%\Programs\Yita`。安装仅对当前用户生效，运行组件已包含在包内，安装过程无需联网下载 .NET。
 4. 安装完成后从开始菜单打开 Yita，按下方“首次配置”连接翻译服务。在线翻译仍需要网络。
@@ -220,24 +220,24 @@ dotnet test .\Yita.sln --configuration Release --no-build --no-restore
 ### 生成 Windows Setup 安装包
 
 ```powershell
-.\scripts\Build-Setup.ps1 -Version 0.8.3
+.\scripts\Build-Setup.ps1 -Version 0.8.4
 ```
 
 脚本执行测试、自包含发布、安装器编译和 SHA256 校验清单生成。首次构建会下载固定版本的便携 Inno Setup 编译器，校验下载包哈希和编译器签名，不安装系统软件。需要 Windows、.NET 8 SDK 和联网还原构建依赖。
 
-输出位于 `artifacts/release/`：`Yita-Setup-0.8.3-win-x64.exe`、同名 `.sha256` 和 `Yita-0.8.3-payload.json`。支持 `-DotnetRoot` 与 `-InnoCompiler` 指定本地工具。安装、重复安装和卸载验证使用 `scripts/Test-Setup.ps1`，请在未安装 Yita 的测试账号或虚拟机中运行。详见 [安装包构建说明](packaging/windows/README.md)。
+输出位于 `artifacts/release/`：`Yita-Setup-0.8.4-win-x64.exe`、同名 `.sha256` 和 `Yita-0.8.4-payload.json`。支持 `-DotnetRoot` 与 `-InnoCompiler` 指定本地工具。安装、重复安装和卸载验证使用 `scripts/Test-Setup.ps1`，请在未安装 Yita 的测试账号或虚拟机中运行。详见 [安装包构建说明](packaging/windows/README.md)。
 
 ### 生成 Windows x64 自包含 ZIP
 
 ```powershell
-.\scripts\Publish.ps1 -Version 0.8.3
+.\scripts\Publish.ps1 -Version 0.8.4
 ```
 
 该脚本会还原依赖、构建、运行测试、发布自包含程序、打包实验性 Zotero 插件，并执行应用启动 / 窗口冒烟检查。需要可交互的 Windows 会话和可用的 `dotnet` 命令。
 
 成功后的输出位于 `artifacts/release/`，包括 `Yita-v<版本>-win-x64.zip` 和对应 `.sha256`。脚本支持可选 Authenticode 签名参数，详见 [Publish.ps1](scripts/Publish.ps1)。未提供证书时产物不带商业代码签名。ZIP 是便携包，**不是 Setup 安装包**。
 
-程序集及 Setup 版本为 `0.8.3`。变更见 [CHANGELOG.md](CHANGELOG.md)；构建脚本不会创建 Git 标签或上传 GitHub Release。
+程序集及 Setup 版本为 `0.8.4`。变更见 [CHANGELOG.md](CHANGELOG.md)；构建脚本不会创建 Git 标签或上传 GitHub Release。
 
 ## 已知限制与排障
 

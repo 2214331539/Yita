@@ -1,13 +1,13 @@
 # Windows Setup
 
-Yita 0.8.3 使用 Inno Setup 6.7.3 打包自包含 .NET 8 win-x64 程序。支持 Windows 10 1809 及以上与 Windows 11 x64。安装程序仅为当前用户安装，默认目录为 `%LOCALAPPDATA%\Programs\Yita`，无需管理员权限或额外下载 .NET。
+Yita 0.8.4 使用 Inno Setup 6.7.3 打包自包含 .NET 8 win-x64 程序。支持 Windows 10 1809 及以上与 Windows 11 x64。安装程序仅为当前用户安装，默认目录为 `%LOCALAPPDATA%\Programs\Yita`，无需管理员权限或额外下载 .NET。
 
 ## 构建
 
 在仓库根目录执行：
 
 ```powershell
-.\scripts\Build-Setup.ps1 -Version 0.8.3
+.\scripts\Build-Setup.ps1 -Version 0.8.4
 # 使用自定义工具路径：
 .\scripts\Build-Setup.ps1 -DotnetRoot 'F:\DevTools\dotnet' -InnoCompiler 'F:\DevTools\InnoSetupPortable\tools\ISCC.exe'
 ```
@@ -29,8 +29,8 @@ Yita 0.8.3 使用 Inno Setup 6.7.3 打包自包含 .NET 8 win-x64 程序。支�
 在未安装 Yita 的测试账号或干净虚拟机执行：
 
 ```powershell
-.\scripts\Test-Setup.ps1 -Version 0.8.3
-Get-FileHash .\artifacts\release\Yita-Setup-0.8.3-win-x64.exe -Algorithm SHA256
+.\scripts\Test-Setup.ps1 -Version 0.8.4
+Get-FileHash .\artifacts\release\Yita-Setup-0.8.4-win-x64.exe -Algorithm SHA256
 ```
 
 验证脚本在独立临时路径安装，禁用快捷方式和安装后启动，逐项核对安装内容、卸载注册、重复安装、卸载和用户文件保留。发现当前账号已有安装注册时直接停止。日志保留在 `.work/install-test-*`。该检查不会启动应用或调用翻译服务，不能替代无 .NET 环境中的首次启动和真实 API 验证。

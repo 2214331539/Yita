@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$Version = '0.8.3')
+param([string]$Version = '0.8.4')
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
