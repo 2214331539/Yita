@@ -1,0 +1,23 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Yita.Desktop.TranslationPopupWindow"
+        Width="380" Height="220"
+        MinWidth="280" MinHeight="120"
+        SizeToContent="Manual"
+        CanResize="True"
+        Topmost="True"
+        ShowInTaskbar="False"
+        SystemDecorations="None"
+        Background="Transparent">
+  <Border Background="#FFFFFC" BorderBrush="#CFE3DF" BorderThickness="1" CornerRadius="18" Padding="18">
+    <Grid RowDefinitions="Auto,*">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Text="Yita · 译文" FontSize="14" FontWeight="SemiBold" Foreground="#155E63" VerticalAlignment="Center" />
+        <Button Grid.Column="1" Content="×" Width="28" Height="28" Click="CloseClick" />
+      </Grid>
+      <ScrollViewer Grid.Row="1" Margin="0,14,0,0">
+        <TextBlock x:Name="TranslationText" Text="正在读取选区…" TextWrapping="Wrap" FontSize="16" Foreground="#173F43" />
+      </ScrollViewer>
+    </Grid>
+  </Border>
+</Window>

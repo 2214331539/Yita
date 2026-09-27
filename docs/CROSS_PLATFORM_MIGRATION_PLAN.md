@@ -70,9 +70,10 @@ PermissionState   { accessibility, inputMonitoring, clipboardFallback }
 - [x] 阶段 0：分支、Core/桌面/原生项目骨架、跨平台契约和 CI 矩阵。
 - [x] 阶段 1（垂直切片）：DeepSeek 流式翻译、取消和错误分类、设置 JSON 存储、内存缓存、JSONL 历史、浮窗定位和 Core 测试。
 - [x] 阶段 2（起始切片）：Avalonia 侧边设置页面、模型配置、当前会话 API Key、手动流式翻译和取消按钮。
+- [x] 阶段 3（第一条 Windows 链路）：Avalonia 壳注册 `Ctrl+Shift+T`，通过独立 Windows 原生层执行受控 Ctrl+C、读取剪贴板并打开选区翻译浮窗。
 - [ ] 阶段 1 完整迁移：将现有 WPF Core 实现和 455 项相关测试逐步改为引用 `Yita.Core`，接入系统凭据存储。
 - [ ] 阶段 2 完整迁移：翻译浮窗、拖拽、置顶、托盘和问答页面。
-- [ ] 阶段 3：Windows 原生 UI Automation、剪贴板回退和全局钩子接入 Avalonia。
+- [ ] 阶段 3 完整迁移：把现有 UI Automation 隔离读取器、WPS PDF 专用路径、鼠标划词钩子、托盘和系统凭据接入 Avalonia。
 - [ ] 阶段 4：macOS AXUIElement、NSPasteboard、权限、菜单栏和签名 helper。
 
 ## 开发阶段

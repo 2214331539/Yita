@@ -3,6 +3,7 @@ using System.Text;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Yita.Core.Settings;
+using Yita.Core.Selection;
 using Yita.Core.Translation;
 
 namespace Yita.Desktop;
@@ -13,6 +14,8 @@ public sealed partial class MainWindow : Window
     private readonly MemorySecretStore _secretStore = new();
     private readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(45) };
     private CancellationTokenSource? _translationCancellation;
+    private CancellationTokenSource? _popupCancellation;
+    private TranslationPopupWindow? _popup;
     private YitaSettings _settings = YitaSettings.Default;
     private TextBox _apiKeyField = null!;
 
@@ -132,6 +135,49 @@ public sealed partial class MainWindow : Window
     }
 
     private void CancelClick(object? sender, RoutedEventArgs e) => _translationCancellation?.Cancel();
+
+    internal async Task ShowSelectionTranslationAsync(SelectionRequest request, SelectionResult result)
+    {
+        _popupCancellation?.Cancel();
+        _popupCancellation?.Dispose();
+        _popupCancellation = new CancellationTokenSource();
+        _popup ??= new TranslationPopupWindow();
+        _popup.PlaceNear(request, result);
+        if (!_popup.IsVisible) _popup.Show();
+        if (!result.Succeeded)
+        {
+            _popup.SetError(result.Failure switch
+            {
+                SelectionFailureKind.PermissionDenied => "需要开启系统辅助功能权限后才能读取选区。",
+                SelectionFailureKind.Empty => "没有读取到选中文字，请保持选区后重试。",
+                SelectionFailureKind.UnsupportedApplication => "当前应用不允许通过快捷键读取选区。",
+                _ => "无法读取当前选区。",
+            });
+            return;
+        }
+
+        try
+        {
+            var coordinator = new TranslationCoordinator(CreateTranslator(), new MemoryTranslationCache());
+            var output = new StringBuilder();
+            _popup.SetText(string.Empty);
+            await foreach (var chunk in coordinator.TranslateAsync(
+                               new TranslationRequest(result.Text!, TargetLanguage: SelectedTargetLanguage()),
+                               _popupCancellation.Token))
+            {
+                output.Append(chunk.TextDelta);
+                _popup.SetText(output.ToString());
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            if (!_popupCancellation.IsCancellationRequested) _popup.SetError("翻译已取消。");
+        }
+        catch (Exception exception)
+        {
+            _popup.SetError(exception.Message);
+        }
+    }
 
     private DeepSeekStreamingTranslator CreateTranslator()
     {

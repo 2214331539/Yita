@@ -12,6 +12,7 @@ on:
       - 'src/Yita.Native.Windows/**'
       - 'src/Yita.Native.Mac/**'
       - 'tests/Yita.Core.Tests/**'
+      - 'tests/Yita.Native.Windows.Tests/**'
       - '.github/workflows/cross-platform.yml'
 
 permissions:
