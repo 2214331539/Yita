@@ -353,6 +353,7 @@ public sealed class WindowsGlobalHotkeyService : IWindowsHotkeyService
 public sealed class WindowsSelectionRuntime : IDisposable
 {
     private readonly WindowsGlobalHotkeyService _hotkey = new();
+    private readonly WindowsMouseSelectionService _mouse = new();
     private readonly WindowsSelectionAdapter _reader = new();
 
     public event EventHandler<SelectionCapturedEventArgs>? SelectionCaptured;
@@ -363,7 +364,9 @@ public sealed class WindowsSelectionRuntime : IDisposable
     {
         if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("Windows selection is unavailable.");
         _hotkey.TranslateRequested += OnTranslateRequested;
+        _mouse.SelectionGestureCompleted += OnSelectionGestureCompleted;
         _hotkey.Start();
+        _mouse.Start();
     }
 
     private async void OnTranslateRequested(object? sender, EventArgs e)
@@ -371,6 +374,7 @@ public sealed class WindowsSelectionRuntime : IDisposable
         try
         {
             if (!WindowsNativeMethods.GetCursorPos(out var point)) return;
+            if (!IsExternalPoint(new ScreenPoint(point.X, point.Y))) return;
             var request = new SelectionRequest(SelectionTrigger.TranslateShortcut, new ScreenPoint(point.X, point.Y));
             var result = await _reader.ReadAsync(request).ConfigureAwait(false);
             SelectionCaptured?.Invoke(this, new SelectionCapturedEventArgs(request, result));
@@ -378,10 +382,89 @@ public sealed class WindowsSelectionRuntime : IDisposable
         catch { }
     }
 
+    private async void OnSelectionGestureCompleted(object? sender, SelectionGestureEventArgs args)
+    {
+        try
+        {
+            var gesture = args.Gesture;
+            if (!IsExternalGesture(gesture)) return;
+
+            // Give the target application one short frame to commit its
+            // selection before UIA or Ctrl+C reads it.
+            await Task.Delay(80).ConfigureAwait(false);
+            var request = new SelectionRequest(
+                SelectionTrigger.MouseGesture,
+                gesture.End,
+                GetProcessNameAt(gesture.End),
+                gesture.Bounds);
+            var result = await _reader.ReadAsync(request).ConfigureAwait(false);
+            SelectionCaptured?.Invoke(this, new SelectionCapturedEventArgs(request, result));
+        }
+        catch
+        {
+            // A hook subscriber or native reader must never terminate the
+            // low-level mouse loop.
+        }
+    }
+
+    private static bool IsExternalGesture(SelectionGesture gesture)
+    {
+        var startRoot = RootWindowAt(gesture.Start);
+        var endRoot = RootWindowAt(gesture.End);
+        if (startRoot == IntPtr.Zero || startRoot != endRoot) return false;
+
+        WindowsNativeMethods.GetWindowThreadProcessId(endRoot, out var processId);
+        return processId != 0 && processId != (uint)Environment.ProcessId;
+    }
+
+    private static bool IsExternalPoint(ScreenPoint point)
+    {
+        var root = RootWindowAt(point);
+        if (root == IntPtr.Zero) return false;
+        WindowsNativeMethods.GetWindowThreadProcessId(root, out var processId);
+        return processId != 0 && processId != (uint)Environment.ProcessId;
+    }
+
+    private static IntPtr RootWindowAt(ScreenPoint point)
+    {
+        var window = WindowsNativeMethods.WindowFromPoint(new WindowsNativeMethods.Point
+        {
+            X = (int)Math.Round(point.X),
+            Y = (int)Math.Round(point.Y),
+        });
+        if (window == IntPtr.Zero) return IntPtr.Zero;
+        var root = WindowsNativeMethods.GetAncestor(window, WindowsNativeMethods.GaRootOwner);
+        return root != IntPtr.Zero
+            ? root
+            : WindowsNativeMethods.GetAncestor(window, WindowsNativeMethods.GaRoot);
+    }
+
+    private static string? GetProcessNameAt(ScreenPoint point)
+    {
+        var root = RootWindowAt(point);
+        if (root == IntPtr.Zero) return null;
+        WindowsNativeMethods.GetWindowThreadProcessId(root, out var processId);
+        if (processId == 0) return null;
+        try
+        {
+            using var process = System.Diagnostics.Process.GetProcessById(checked((int)processId));
+            return process.ProcessName;
+        }
+        catch (Exception exception) when (exception is ArgumentException
+            or InvalidOperationException
+            or System.ComponentModel.Win32Exception
+            or OverflowException)
+        {
+            return null;
+        }
+    }
+
     public void Dispose()
     {
         _hotkey.TranslateRequested -= OnTranslateRequested;
+        _mouse.SelectionGestureCompleted -= OnSelectionGestureCompleted;
         _hotkey.Dispose();
+        _mouse.Dispose();
         _reader.Dispose();
     }
 }

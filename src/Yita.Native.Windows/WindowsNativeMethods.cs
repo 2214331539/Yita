@@ -1,13 +1,17 @@
 using System.Runtime.InteropServices;
 using System.Text;
+using Yita.Core.Selection;
 
 namespace Yita.Native.Windows;
 
 internal static class WindowsNativeMethods
 {
+    internal const int WhMouseLl = 14;
     internal const uint PmNoRemove = 0;
     internal const int WmQuit = 0x12;
     internal const int WmHotKey = 0x312;
+    internal const int WmLButtonDown = 0x201;
+    internal const int WmLButtonUp = 0x202;
     internal const uint ModControl = 0x2;
     internal const uint ModShift = 0x4;
     internal const uint ModNoRepeat = 0x4000;
@@ -18,6 +22,9 @@ internal static class WindowsNativeMethods
     internal const uint GmemMoveable = 0x2;
     internal const uint GaRoot = 2;
     internal const uint GaRootOwner = 3;
+    internal const uint LlMhfInjected = 0x1;
+    internal const int SmCxDrag = 68;
+    internal const int SmCyDrag = 69;
 
     [StructLayout(LayoutKind.Sequential)]
     internal struct Message
@@ -32,7 +39,22 @@ internal static class WindowsNativeMethods
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    internal struct Point { internal int X; internal int Y; }
+    internal struct Point
+    {
+        internal int X;
+        internal int Y;
+
+        internal readonly ScreenPoint ToScreenPoint() => new(X, Y);
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct NativeRect
+    {
+        internal int Left;
+        internal int Top;
+        internal int Right;
+        internal int Bottom;
+    }
 
     [StructLayout(LayoutKind.Sequential)]
     internal struct Input { internal uint Type; internal InputData Data; }
@@ -59,6 +81,18 @@ internal static class WindowsNativeMethods
         Data = new InputData { Keyboard = new KeyboardInput { VirtualKey = key, Flags = up ? 2u : 0u } },
     };
 
+    internal delegate IntPtr LowLevelMouseProc(int code, IntPtr wParam, IntPtr lParam);
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct MouseHookData
+    {
+        internal Point Point;
+        internal uint MouseData;
+        internal uint Flags;
+        internal uint Time;
+        internal UIntPtr ExtraInfo;
+    }
+
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool RegisterHotKey(IntPtr windowHandle, int id, uint modifiers, ushort virtualKey);
@@ -78,8 +112,25 @@ internal static class WindowsNativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool PostThreadMessage(uint threadId, uint message, UIntPtr wParam, IntPtr lParam);
 
+    [DllImport("user32.dll", SetLastError = true)]
+    internal static extern IntPtr SetWindowsHookEx(
+        int hookId,
+        LowLevelMouseProc callback,
+        IntPtr moduleHandle,
+        uint threadId);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool UnhookWindowsHookEx(IntPtr hookHandle);
+
+    [DllImport("user32.dll")]
+    internal static extern IntPtr CallNextHookEx(IntPtr hookHandle, int code, IntPtr wParam, IntPtr lParam);
+
     [DllImport("kernel32.dll")]
     internal static extern uint GetCurrentThreadId();
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    internal static extern IntPtr GetModuleHandle(string? moduleName);
 
     [DllImport("user32.dll")]
     internal static extern uint GetClipboardSequenceNumber();
@@ -139,6 +190,13 @@ internal static class WindowsNativeMethods
 
     [DllImport("user32.dll")]
     internal static extern IntPtr GetParent(IntPtr window);
+
+    [DllImport("user32.dll")]
+    internal static extern int GetSystemMetrics(int index);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool GetWindowRect(IntPtr window, out NativeRect rectangle);
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     internal static extern int GetClassName(IntPtr window, StringBuilder className, int maxCount);

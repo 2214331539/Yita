@@ -138,6 +138,8 @@ public sealed partial class MainWindow : Window
 
     internal async Task ShowSelectionTranslationAsync(SelectionRequest request, SelectionResult result)
     {
+        if (!_settings.IsEnabled) return;
+
         _popupCancellation?.Cancel();
         _popupCancellation?.Dispose();
         _popupCancellation = new CancellationTokenSource();

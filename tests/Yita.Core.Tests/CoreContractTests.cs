@@ -56,6 +56,34 @@ public sealed class CoreContractTests
     }
 
     [Fact]
+    public void SelectionGestureDetectorIgnoresClicksAndReportsDragBounds()
+    {
+        var detector = new SelectionGestureDetector(4, 4);
+        detector.Press(new ScreenPoint(140, 280));
+
+        Assert.Null(detector.Release(new ScreenPoint(142, 282), DateTimeOffset.UtcNow));
+
+        detector.Press(new ScreenPoint(140, 280));
+        var gesture = detector.Release(new ScreenPoint(60, 220), DateTimeOffset.UtcNow);
+
+        Assert.True(gesture.HasValue);
+        Assert.Equal(new SelectionBounds(60, 220, 80, 60), gesture.Value.Bounds);
+        Assert.Equal(new ScreenPoint(60, 280), gesture.Value.PopupAnchor);
+    }
+
+    [Fact]
+    public void SelectionRequestCarriesGestureBoundsForPopupPlacement()
+    {
+        var bounds = new SelectionBounds(20, 40, 100, 18);
+        var request = new SelectionRequest(
+            SelectionTrigger.MouseGesture,
+            new ScreenPoint(120, 58),
+            GestureBounds: bounds);
+
+        Assert.Equal(bounds, request.GestureBounds);
+    }
+
+    [Fact]
     public async Task SelectionPipelineFallsThroughReaderFailures()
     {
         var pipeline = new SelectionReaderPipeline(new ISelectionReader[]

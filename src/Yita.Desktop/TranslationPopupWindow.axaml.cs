@@ -18,7 +18,9 @@ public sealed partial class TranslationPopupWindow : Window
 
     public void PlaceNear(SelectionRequest request, SelectionResult result)
     {
-        var anchor = result.Bounds?.LowerLeft ?? request.Pointer;
+        var anchor = request.GestureBounds?.LowerLeft
+            ?? result.Bounds?.LowerLeft
+            ?? request.Pointer;
         if (!anchor.IsFinite) return;
         Position = new PixelPoint((int)Math.Round(anchor.X + 12), (int)Math.Round(anchor.Y + 12));
     }

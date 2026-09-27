@@ -32,6 +32,14 @@ public sealed class WindowsSelectionAdapterTests
     }
 
     [Fact]
+    public void MouseSelectionRequiresWindowsBeforeStartingNativeHooks()
+    {
+        using var service = new WindowsMouseSelectionService();
+        if (!OperatingSystem.IsWindows())
+            Assert.Throws<PlatformNotSupportedException>(() => service.Start());
+    }
+
+    [Fact]
     public async Task NativeControlReaderFailsClosedOutsideWindows()
     {
         var reader = new WindowsNativeControlSelectionReader();
