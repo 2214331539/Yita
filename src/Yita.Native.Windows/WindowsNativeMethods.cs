@@ -16,6 +16,8 @@ internal static class WindowsNativeMethods
     internal const ushort VirtualKeyControl = 0x11;
     internal const uint CfUnicodeText = 13;
     internal const uint GmemMoveable = 0x2;
+    internal const uint GaRoot = 2;
+    internal const uint GaRootOwner = 3;
 
     [StructLayout(LayoutKind.Sequential)]
     internal struct Message
@@ -123,6 +125,12 @@ internal static class WindowsNativeMethods
     internal static extern IntPtr GetForegroundWindow();
 
     [DllImport("user32.dll")]
+    internal static extern IntPtr GetAncestor(IntPtr window, uint flags);
+
+    [DllImport("user32.dll")]
+    internal static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
+
+    [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool GetCursorPos(out Point point);
 
@@ -134,6 +142,9 @@ internal static class WindowsNativeMethods
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     internal static extern int GetClassName(IntPtr window, StringBuilder className, int maxCount);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    internal static extern int GetWindowText(IntPtr window, StringBuilder text, int maxCount);
 
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW", SetLastError = true)]
     internal static extern IntPtr GetWindowLongPtr(IntPtr window, int index);

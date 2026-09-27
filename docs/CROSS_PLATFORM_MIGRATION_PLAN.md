@@ -73,7 +73,9 @@ PermissionState   { accessibility, inputMonitoring, clipboardFallback }
 - [x] 阶段 3（第一条 Windows 链路）：Avalonia 壳注册 `Ctrl+Shift+T`，通过独立 Windows 原生层执行受控 Ctrl+C、读取剪贴板并打开选区翻译浮窗。
 - [x] 阶段 3（读取流水线）：平台无关流水线支持优先读取原生 Edit/RichEdit/Scintilla 控件，再执行安全剪贴板回退。
 - [x] 阶段 3（UIA 隔离链路）：新增独立 `Yita.UIA.Worker.exe`、JSON-lines 超时协议和 Worker 崩溃后的读取回退。
-- [ ] 阶段 3（UIA 完整兼容）：迁移浏览器/PDF 文档候选搜索、WPS 专用路径和 Edge 可访问性激活。
+- [x] 阶段 3（UIA 文档读取）：增加浏览器/PDF 可见文档树候选搜索、WPS PDF 窗口识别和 Edge 可访问性短脉冲激活。
+- [x] 阶段 3（WPS 复制回退）：增加 WPS PDF 识别、受控 Ctrl+C 重试、目标窗口校验和剪贴板所有权校验。
+- [ ] 阶段 3（WPS 完整诊断）：迁移 WPS 剪贴板健康事件和设置开关到 Core/桌面壳。
 - [ ] 阶段 1 完整迁移：将现有 WPF Core 实现和 455 项相关测试逐步改为引用 `Yita.Core`，接入系统凭据存储。
 - [ ] 阶段 2 完整迁移：翻译浮窗、拖拽、置顶、托盘和问答页面。
 - [ ] 阶段 3 完整迁移：把现有 UI Automation 隔离读取器、WPS PDF 专用路径、鼠标划词钩子、托盘和系统凭据接入 Avalonia。

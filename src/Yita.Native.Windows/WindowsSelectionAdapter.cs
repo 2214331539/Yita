@@ -46,6 +46,7 @@ public sealed class WindowsClipboardSelectionReader : ISelectionReader
 {
     private static readonly SemaphoreSlim Gate = new(1, 1);
     private static readonly TimeSpan Timeout = TimeSpan.FromMilliseconds(700);
+    private static readonly TimeSpan WpsTimeout = TimeSpan.FromMilliseconds(1_000);
     private readonly Func<SelectionRequest, CancellationToken, Task<SelectionResult>>? _override;
 
     public WindowsClipboardSelectionReader() { }
@@ -71,34 +72,55 @@ public sealed class WindowsClipboardSelectionReader : ISelectionReader
         SelectionRequest request,
         CancellationToken cancellationToken)
     {
+        var target = ResolveTarget(request.Pointer);
+        if (target is null)
+            return SelectionResult.Failed(SelectionFailureKind.UnsupportedApplication, "target-unavailable");
+
+        var isWpsPdf = IsWpsPdfProcess(target.Value.ProcessId, target.Value.RootWindow);
         var originalSequence = WindowsNativeMethods.GetClipboardSequenceNumber();
         var originalText = TryReadText();
         if (originalSequence == 0)
             return SelectionResult.Failed(SelectionFailureKind.ClipboardUnavailable, "sequence-unavailable");
-        if (!TrySendCopy())
-            return SelectionResult.Failed(SelectionFailureKind.UnsupportedApplication, "copy-not-sent");
 
-        var deadline = DateTime.UtcNow + Timeout;
         string? selectedText = null;
         uint copiedSequence = originalSequence;
         IntPtr copiedOwner = IntPtr.Zero;
-        while (DateTime.UtcNow < deadline)
+        var attempts = isWpsPdf ? 2 : 1;
+        for (var attempt = 0; attempt < attempts && selectedText is null; attempt++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var sequence = WindowsNativeMethods.GetClipboardSequenceNumber();
-            if (sequence != originalSequence)
+            if (!TrySendCopy(target.Value))
             {
-                var owner = WindowsNativeMethods.GetClipboardOwner();
-                var text = TryReadText();
-                if (owner != IntPtr.Zero && !string.IsNullOrWhiteSpace(text))
+                if (!isWpsPdf || attempt + 1 >= attempts)
+                    return SelectionResult.Failed(SelectionFailureKind.UnsupportedApplication, "copy-not-sent");
+            }
+            else
+            {
+                var deadline = DateTime.UtcNow + (isWpsPdf ? WpsTimeout : Timeout);
+                while (DateTime.UtcNow < deadline)
                 {
-                    selectedText = text.Trim();
-                    copiedSequence = WindowsNativeMethods.GetClipboardSequenceNumber();
-                    copiedOwner = owner;
-                    break;
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var sequence = WindowsNativeMethods.GetClipboardSequenceNumber();
+                    if (sequence != originalSequence)
+                    {
+                        var owner = WindowsNativeMethods.GetClipboardOwner();
+                        var text = TryReadText();
+                        if (owner != IntPtr.Zero
+                            && IsClipboardOwnerFromTarget(owner, target.Value)
+                            && !string.IsNullOrWhiteSpace(text))
+                        {
+                            selectedText = text.Trim();
+                            copiedSequence = WindowsNativeMethods.GetClipboardSequenceNumber();
+                            copiedOwner = owner;
+                            break;
+                        }
+                    }
+                    await Task.Delay(20, cancellationToken).ConfigureAwait(false);
                 }
             }
-            await Task.Delay(20, cancellationToken).ConfigureAwait(false);
+
+            if (selectedText is null && attempt + 1 < attempts)
+                await Task.Delay(80, cancellationToken).ConfigureAwait(false);
         }
 
         if (selectedText is null)
@@ -117,12 +139,19 @@ public sealed class WindowsClipboardSelectionReader : ISelectionReader
             SelectionSource.ClipboardFallback,
             new SelectionBounds(request.Pointer.X, request.Pointer.Y, 0, 0),
             SelectionFailureKind.None,
-            "ctrl-c");
+            isWpsPdf ? "wps-ctrl-c" : "ctrl-c");
     }
 
-    private static bool TrySendCopy()
+    private static bool TrySendCopy(SelectionTarget target)
     {
         if (!WindowsNativeMethods.IsForegroundTargetReady()) return false;
+        var foreground = WindowsNativeMethods.GetForegroundWindow();
+        var foregroundRoot = foreground == IntPtr.Zero
+            ? IntPtr.Zero
+            : WindowsNativeMethods.GetAncestor(foreground, WindowsNativeMethods.GaRootOwner);
+        if (foregroundRoot == IntPtr.Zero) foregroundRoot = foreground;
+        if (foregroundRoot != target.RootWindow) return false;
+
         var inputs = new[]
         {
             WindowsNativeMethods.KeyInput(WindowsNativeMethods.VirtualKeyControl),
@@ -133,6 +162,57 @@ public sealed class WindowsClipboardSelectionReader : ISelectionReader
         return WindowsNativeMethods.SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<WindowsNativeMethods.Input>())
             == inputs.Length;
     }
+
+    private static SelectionTarget? ResolveTarget(ScreenPoint point)
+    {
+        var hit = WindowsNativeMethods.WindowFromPoint(new WindowsNativeMethods.Point
+        {
+            X = (int)Math.Round(point.X),
+            Y = (int)Math.Round(point.Y),
+        });
+        if (hit == IntPtr.Zero) return null;
+
+        var root = WindowsNativeMethods.GetAncestor(hit, WindowsNativeMethods.GaRootOwner);
+        if (root == IntPtr.Zero) root = WindowsNativeMethods.GetAncestor(hit, WindowsNativeMethods.GaRoot);
+        if (root == IntPtr.Zero) return null;
+
+        WindowsNativeMethods.GetWindowThreadProcessId(root, out var processId);
+        return processId == 0 || processId == (uint)Environment.ProcessId
+            ? null
+            : new SelectionTarget(root, processId);
+    }
+
+    private static bool IsWpsPdfProcess(uint processId, IntPtr rootWindow)
+    {
+        try
+        {
+            using var process = System.Diagnostics.Process.GetProcessById(checked((int)processId));
+            if (process.ProcessName.Equals("wpspdf", StringComparison.OrdinalIgnoreCase)) return true;
+            if (!process.ProcessName.Equals("wps", StringComparison.OrdinalIgnoreCase)) return false;
+
+            var title = new StringBuilder(512);
+            return WindowsNativeMethods.GetWindowText(rootWindow, title, title.Capacity) > 0
+                && title.ToString().Contains("pdf", StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception exception) when (exception is ArgumentException
+            or InvalidOperationException
+            or System.ComponentModel.Win32Exception
+            or OverflowException)
+        {
+            return false;
+        }
+    }
+
+    private static bool IsClipboardOwnerFromTarget(IntPtr owner, SelectionTarget target)
+    {
+        WindowsNativeMethods.GetWindowThreadProcessId(owner, out var ownerProcessId);
+        if (ownerProcessId == target.ProcessId) return true;
+
+        var ownerRoot = WindowsNativeMethods.GetAncestor(owner, WindowsNativeMethods.GaRootOwner);
+        return ownerRoot != IntPtr.Zero && ownerRoot == target.RootWindow;
+    }
+
+    private readonly record struct SelectionTarget(IntPtr RootWindow, uint ProcessId);
 
     private static string? TryReadText()
     {
