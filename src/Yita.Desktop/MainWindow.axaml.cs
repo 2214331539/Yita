@@ -14,6 +14,9 @@ public sealed partial class MainWindow : Window
 {
     private readonly JsonSettingsStore _settingsStore = new();
     private readonly ISecretStore _secretStore = SecretStoreFactory.CreateDefault();
+    private readonly MemoryTranslationCache _translationCache = new();
+    private readonly JsonlTranslationHistoryStore _historyStore = new(
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Yita", "history.jsonl"));
     private readonly WindowsSelectionRuntime? _windowsRuntime;
     private readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(45) };
     private CancellationTokenSource? _translationCancellation;
@@ -168,7 +171,7 @@ public sealed partial class MainWindow : Window
                 SetStatus(TranslationStatus, "请先输入待翻译文本。", true);
                 return;
             }
-            var coordinator = new TranslationCoordinator(CreateTranslator(), new MemoryTranslationCache());
+            var coordinator = CreateCoordinator();
             var output = new StringBuilder();
             TranslationText.Text = string.Empty;
             SetStatus(TranslationStatus, "正在流式翻译…", false);
@@ -222,7 +225,7 @@ public sealed partial class MainWindow : Window
 
         try
         {
-            var coordinator = new TranslationCoordinator(CreateTranslator(), new MemoryTranslationCache());
+            var coordinator = CreateCoordinator();
             var output = new StringBuilder();
             _popup.SetText(string.Empty);
             await foreach (var chunk in coordinator.TranslateAsync(
@@ -271,6 +274,12 @@ public sealed partial class MainWindow : Window
         var key = (_apiKeyField.Text ?? string.Empty).Trim();
         return new DeepSeekStreamingTranslator(_httpClient, new TranslationProviderOptions(endpoint, model, key));
     }
+
+    private TranslationCoordinator CreateCoordinator() =>
+        new(
+            CreateTranslator(),
+            _translationCache,
+            _settings.AiHistoryEnabled ? _historyStore : null);
 
     private string SelectedTargetLanguage() =>
         (TargetLanguageBox.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "简体中文";
