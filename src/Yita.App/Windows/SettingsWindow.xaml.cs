@@ -1,10 +1,18 @@
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
 using Yita.Services;
 using Yita.Settings;
 using Yita.Translation;
 using WpfMessageBox = System.Windows.MessageBox;
+using WpfListBox = System.Windows.Controls.ListBox;
+using WpfListBoxItem = System.Windows.Controls.ListBoxItem;
+using WpfSelectionChangedEventArgs = System.Windows.Controls.SelectionChangedEventArgs;
+using WpfContentControl = System.Windows.Controls.ContentControl;
+using WpfBrush = System.Windows.Media.Brush;
+using WpfBrushes = System.Windows.Media.Brushes;
 
 namespace Yita.Windows;
 
@@ -19,6 +27,10 @@ internal partial class SettingsWindow : Window
             ["InterfaceLanguage"] = ("Interface language", "界面语言"),
             ["GeneralTitle"] = ("General", "常规"),
             ["GeneralDescription"] = ("Control availability and selection behavior.", "控制应用状态与划词触发范围。"),
+            ["NavigationGeneral"] = ("General", "常规"),
+            ["NavigationAiHistory"] = ("AI history", "AI 记录"),
+            ["NavigationTranslationAppearance"] = ("Translation & appearance", "翻译与外观"),
+            ["NavigationModel"] = ("Model configuration", "模型配置"),
             ["SelectionTranslation"] = ("Selection translation", "划词翻译"),
             ["SelectionTranslationDescription"] = ("Translate text automatically after you select it.", "选中文字后自动读取并显示译文。"),
             ["StartWithWindows"] = ("Start with Windows", "开机启动"),
@@ -130,6 +142,9 @@ internal partial class SettingsWindow : Window
     private CancellationTokenSource? _summaryCancellation;
     private bool _isClosed;
     private bool _apiKeyClearRequested;
+    private WpfListBox? _settingsNavigation;
+    private WpfContentControl? _settingsPageHost;
+    private readonly Dictionary<string, UIElement> _settingsPages = new(StringComparer.Ordinal);
 
     public SettingsWindow(
         AppSettings settings,
@@ -142,6 +157,7 @@ internal partial class SettingsWindow : Window
         _clearTranslationMemory = clearTranslationMemory;
         _generateSummary = generateSummary;
         InitializeComponent();
+        BuildSettingsNavigation();
 
         EnabledCheckBox.IsChecked = settings.IsEnabled;
         StartWithWindowsCheckBox.IsChecked = settings.StartWithWindows;
@@ -378,6 +394,7 @@ internal partial class SettingsWindow : Window
     private void ApplyUiLanguage(string? language)
     {
         _uiLanguage = NormalizeUiLanguage(language);
+        UpdateSettingsNavigationLabels();
         UiLanguageButton.Content = _uiLanguage == UiLanguageCatalog.SimplifiedChineseLanguageId
             ? "English"
             : "中文";
@@ -472,6 +489,101 @@ internal partial class SettingsWindow : Window
 
         UpdateTranslationMemoryStatus();
         UpdateAiHistoryControls();
+    }
+
+    private void BuildSettingsNavigation()
+    {
+        if (SettingsScrollViewer.Content is not StackPanel source)
+        {
+            return;
+        }
+
+        var cards = source.Children.OfType<UIElement>().ToArray();
+        if (cards.Length < 4)
+        {
+            return;
+        }
+
+        source.Children.Clear();
+        var categories = new[] { "general", "ai-history", "translation-appearance", "model" };
+        for (var index = 0; index < categories.Length; index++)
+        {
+            var page = new StackPanel { Margin = new Thickness(0, 0, 0, 10) };
+            page.Children.Add(cards[index]);
+            _settingsPages[categories[index]] = page;
+        }
+
+        var shell = new Grid { MinWidth = 680 };
+        shell.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(178) });
+        shell.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        var navigationSurface = new Border
+        {
+            Margin = new Thickness(0, 0, 18, 0),
+            Padding = new Thickness(7),
+            Background = (WpfBrush)FindResource("AppCardBackgroundBrush"),
+            CornerRadius = new CornerRadius(16),
+            VerticalAlignment = VerticalAlignment.Top,
+        };
+        _settingsNavigation = new WpfListBox
+        {
+            BorderThickness = new Thickness(0),
+            Background = WpfBrushes.Transparent,
+            ItemContainerStyle = (Style)FindResource("SettingsNavigationItemStyle"),
+            SelectionMode = System.Windows.Controls.SelectionMode.Single,
+        };
+        foreach (var category in categories)
+        {
+            _settingsNavigation.Items.Add(new WpfListBoxItem { Tag = category });
+        }
+        _settingsNavigation.SelectionChanged += SettingsNavigation_SelectionChanged;
+        navigationSurface.Child = _settingsNavigation;
+        shell.Children.Add(navigationSurface);
+
+        _settingsPageHost = new WpfContentControl
+        {
+            Margin = new Thickness(0),
+            HorizontalContentAlignment = System.Windows.HorizontalAlignment.Stretch,
+            VerticalContentAlignment = System.Windows.VerticalAlignment.Top,
+        };
+        Grid.SetColumn(_settingsPageHost, 1);
+        shell.Children.Add(_settingsPageHost);
+        SettingsScrollViewer.Content = shell;
+        _settingsNavigation.SelectedIndex = 0;
+    }
+
+    private void SettingsNavigation_SelectionChanged(object sender, WpfSelectionChangedEventArgs e)
+    {
+        if (_settingsNavigation?.SelectedItem is not WpfListBoxItem item
+            || item.Tag is not string category
+            || _settingsPageHost is null
+            || !_settingsPages.TryGetValue(category, out var page))
+        {
+            return;
+        }
+
+        _settingsPageHost.Content = page;
+        SettingsScrollViewer.ScrollToTop();
+    }
+
+    private void UpdateSettingsNavigationLabels()
+    {
+        if (_settingsNavigation is null)
+        {
+            return;
+        }
+
+        foreach (var item in _settingsNavigation.Items.OfType<WpfListBoxItem>())
+        {
+            item.Content = (item.Tag as string) switch
+            {
+                "general" => L("NavigationGeneral"),
+                "ai-history" => L("NavigationAiHistory"),
+                "translation-appearance" => L("NavigationTranslationAppearance"),
+                "model" => L("NavigationModel"),
+                _ => item.Tag?.ToString() ?? string.Empty,
+            };
+        }
     }
 
     private void SelectSummaryRange(SummaryRange range)

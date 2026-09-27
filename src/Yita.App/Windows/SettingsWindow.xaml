@@ -6,9 +6,9 @@
         xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
         Title="Yita Settings"
         Icon="/Assets/AppLogo.ico"
-        Width="700"
-        Height="800"
-        MinWidth="560"
+        Width="980"
+        Height="760"
+        MinWidth="760"
         MinHeight="500"
         ResizeMode="CanResizeWithGrip"
         WindowStartupLocation="CenterScreen"
@@ -16,7 +16,7 @@
         UseLayoutRounding="True"
         SnapsToDevicePixels="True"
         TextOptions.TextFormattingMode="Display"
-        FontFamily="{DynamicResource InterfaceFont}"
+        FontFamily="Microsoft YaHei"
         FontSize="14"
         Background="{DynamicResource AppWindowBackgroundBrush}"
         Foreground="{DynamicResource AppTextBrush}">
@@ -488,6 +488,37 @@
                                 <Setter TargetName="CheckChrome" Property="BorderThickness" Value="2" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.5" /></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SettingsNavigationItemStyle" TargetType="ListBoxItem">
+            <Setter Property="Padding" Value="14,11" />
+            <Setter Property="Margin" Value="6,3" />
+            <Setter Property="FontFamily" Value="Microsoft YaHei" />
+            <Setter Property="FontSize" Value="13.5" />
+            <Setter Property="Foreground" Value="{DynamicResource AppMutedTextBrush}" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="NavigationChrome"
+                                Padding="{TemplateBinding Padding}"
+                                Background="Transparent"
+                                CornerRadius="9">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="NavigationChrome" Property="Background" Value="{DynamicResource AppHoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="NavigationChrome" Property="Background" Value="{DynamicResource AccentBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+                                <Setter Property="FontWeight" Value="SemiBold" />
+                            </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -1046,8 +1077,8 @@
                             </Grid>
                         </Grid>
 
-                        <Grid Margin="0,17,0,0">
-                            <Grid.ColumnDefinitions>
+                        <Grid Margin="0,17,0,0" Visibility="Collapsed">
+                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="16" />
                                 <ColumnDefinition Width="*" />
@@ -1116,7 +1147,7 @@
                         <TextBlock Margin="0,7,0,0"
                                    Style="{StaticResource SupportingTextStyle}"
                                    Tag="loc:HighlightPaletteDescription"
-                                   Text="DeepSeek marks only the most useful generated phrases. Copy, history, and saved records keep normal text." />
+                                   Text="DeepSeek marks only the most useful generated phrases. Copy, history, and saved records keep normal text." Visibility="Collapsed" />
 
                         <Grid Margin="0,18,0,0">
                             <Grid.ColumnDefinitions>

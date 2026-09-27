@@ -1943,10 +1943,10 @@ internal partial class PopupWindow : Window
             TranslationTextSurface.Padding.Left + TranslationTextSurface.Padding.Right,
             TranslationTextSurface.Padding.Top + TranslationTextSurface.Padding.Bottom);
 
-        var currentWidth = IsVisible && ActualWidth > 0 ? ActualWidth : 0;
-        var currentHeight = IsVisible && ActualHeight > 0 ? ActualHeight : 0;
-        var targetWidth = Math.Max(currentWidth, targetSize.Width + PopupSurfaceHorizontalInset);
-        var targetHeight = Math.Max(currentHeight, targetSize.Height + PopupSurfaceVerticalInset);
+        var targetWidth = targetSize.Width + PopupSurfaceHorizontalInset;
+        // Automatic mode owns the size. Recompute both directions as streaming
+        // text grows or the view switches; manual resize/move exits this mode.
+        var targetHeight = targetSize.Height + PopupSurfaceVerticalInset;
         var sizeChanged = Math.Abs(Width - targetWidth) > 0.5
                           || Math.Abs(Height - targetHeight) > 0.5;
         Width = targetWidth;

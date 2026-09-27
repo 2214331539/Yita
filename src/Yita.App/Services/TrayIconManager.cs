@@ -54,7 +54,12 @@ internal sealed class TrayIconManager : IDisposable
         _exitMenuItem = new Forms.ToolStripMenuItem();
         _exitMenuItem.Click += (_, _) => ExitRequested?.Invoke();
 
-        var contextMenu = new Forms.ContextMenuStrip();
+        var contextMenu = new Forms.ContextMenuStrip
+        {
+            Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Regular),
+            BackColor = Color.FromArgb(255, 252, 247),
+            ForeColor = Color.FromArgb(48, 45, 41),
+        };
         contextMenu.Items.Add(_statusMenuItem);
         contextMenu.Items.Add(new Forms.ToolStripSeparator());
         contextMenu.Items.Add(_translateClipboardMenuItem);

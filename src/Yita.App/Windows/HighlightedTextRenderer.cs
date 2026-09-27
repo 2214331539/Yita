@@ -27,7 +27,7 @@ internal static class HighlightedTextRenderer
                     paragraph,
                     typographySegment.Text,
                     typographySegment.UsesChineseFont ? chineseFont : englishFont,
-                    highlightedSegment.Kind);
+                    HighlightKind.None);
             }
         }
     }
@@ -39,7 +39,7 @@ internal static class HighlightedTextRenderer
     {
         foreach (var segment in text.Segments)
         {
-            AppendRun(paragraph, segment.Text, fontFamily, segment.Kind);
+            AppendRun(paragraph, segment.Text, fontFamily, HighlightKind.None);
         }
     }
 
@@ -61,44 +61,17 @@ internal static class HighlightedTextRenderer
             return;
         }
 
+        // Provider emphasis markup is retained for safe plain-text copying, but
+        // Yita deliberately renders one calm reading color. Colored fragments
+        // made long translations look like annotations and reduced contrast.
         var run = new Run(text)
         {
             FontFamily = fontFamily,
-            Tag = kind,
+            Tag = HighlightKind.None,
         };
-        if (kind != HighlightKind.None)
-        {
-            run.FontWeight = FontWeights.SemiBold;
-            run.SetResourceReference(
-                TextElement.ForegroundProperty,
-                GetForegroundResourceKey(kind));
-            run.SetResourceReference(
-                TextElement.BackgroundProperty,
-                GetBackgroundResourceKey(kind));
-        }
+        run.SetResourceReference(TextElement.ForegroundProperty, "PopupTextBrush");
 
         paragraph.Inlines.Add(run);
     }
 
-    private static string GetForegroundResourceKey(HighlightKind kind)
-    {
-        return kind switch
-        {
-            HighlightKind.Primary => "ContentHighlightPrimaryBrush",
-            HighlightKind.Secondary => "ContentHighlightSecondaryBrush",
-            HighlightKind.Tertiary => "ContentHighlightTertiaryBrush",
-            _ => "PopupTextBrush",
-        };
-    }
-
-    private static string GetBackgroundResourceKey(HighlightKind kind)
-    {
-        return kind switch
-        {
-            HighlightKind.Primary => "ContentHighlightPrimaryBackgroundBrush",
-            HighlightKind.Secondary => "ContentHighlightSecondaryBackgroundBrush",
-            HighlightKind.Tertiary => "ContentHighlightTertiaryBackgroundBrush",
-            _ => "PopupBackgroundBrush",
-        };
-    }
 }

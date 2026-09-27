@@ -14,7 +14,9 @@ internal static class PopupAutoSizeCalculator
     private const double HorizontalChrome = 44;
     // Includes the single-row external controls, surface padding, and the
     // compact Q&A composer shown after translation.
-    private const double VerticalChrome = 140;
+    // Header, reading surface padding, action row and Q&A composer. Keep a
+    // little breathing room so the last line never sits behind the rounded rim.
+    private const double VerticalChrome = 174;
 
     internal static PopupAutoSize Calculate(
         string? text,
@@ -59,7 +61,7 @@ internal static class PopupAutoSizeCalculator
         var contentWidth = Math.Max(160, desiredWidth - horizontalChrome);
         var unitsPerLine = Math.Max(8, contentWidth / (safeFontSize * 0.52));
         var wrappedLineCount = lines.Sum(lineUnits => Math.Max(1, (int)Math.Ceiling(lineUnits / unitsPerLine)));
-        var estimatedWindowHeight = verticalChrome + (wrappedLineCount * safeFontSize * 1.55);
+        var estimatedWindowHeight = verticalChrome + (wrappedLineCount * safeFontSize * 1.68);
         var desiredHeight = Math.Clamp(estimatedWindowHeight, minimumHeight, maximumHeight);
 
         return new PopupAutoSize(
