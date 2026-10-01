@@ -57,7 +57,16 @@ public sealed class App : Application
             {
                 _windowsRuntime.SelectionCaptured += (_, args) =>
                     Avalonia.Threading.Dispatcher.UIThread.Post(
-                        async () => await mainWindow.ShowSelectionTranslationAsync(args.Request, args.Result));
+                        async () =>
+                        {
+                            try { await mainWindow.ShowSelectionTranslationAsync(args.Request, args.Result); }
+                            catch (Exception exception)
+                            {
+                                // Native events enter through async void; presentation failures
+                                // must not escape onto the UI dispatcher or log selected text.
+                                System.Diagnostics.Trace.TraceError("Selection presentation failed: {0}", exception.GetType().Name);
+                            }
+                        });
             }
             try
             {
@@ -79,9 +88,11 @@ public sealed class App : Application
             {
                 // A desktop environment may not provide a tray host. The
                 // main window and native selection layer remain usable.
+                desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
             }
             desktop.Exit += (_, _) =>
             {
+                mainWindow.ShutdownServices();
                 _tray?.Dispose();
                 _tray = null;
                 _windowsRuntime?.Dispose();

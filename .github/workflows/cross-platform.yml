@@ -14,6 +14,7 @@ on:
       - 'src/Yita.Native.Mac/**'
       - 'tests/Yita.Core.Tests/**'
       - 'tests/Yita.Native.Windows.Tests/**'
+      - 'tests/Yita.Desktop.Tests/**'
       - '.github/workflows/cross-platform.yml'
 
 permissions:
@@ -38,5 +39,5 @@ jobs:
       - name: Build cross-platform solution
         run: dotnet build Yita.CrossPlatform.sln --configuration Release
 
-      - name: Run Core tests
+      - name: Run Core, native adapter and desktop interaction tests
         run: dotnet test Yita.CrossPlatform.sln --configuration Release --no-build --logger "console;verbosity=minimal"

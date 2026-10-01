@@ -1,12 +1,13 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:Yita.Desktop"
         x:Class="Yita.Desktop.MainWindow"
         Width="960" Height="650"
         MinWidth="820" MinHeight="540"
         Title="Yita · 译獭"
-        Background="#FFFDF8">
+        Background="#F7F9F8">
   <Grid ColumnDefinitions="210,*">
-    <Border Background="#FFF4E8" Padding="22">
+    <Border Background="#EBF2EF" Padding="22">
       <StackPanel Spacing="14">
         <TextBlock Text="Yita" FontSize="28" FontWeight="SemiBold" Foreground="#155E63" />
         <TextBlock Text="译獭 · 跨平台预览" FontSize="13" Foreground="#7B5E50" Margin="0,0,0,16" />
@@ -14,41 +15,69 @@
         <Button x:Name="HistoryNav" Tag="History" Content="AI 记录" Click="NavigateClick" HorizontalContentAlignment="Left" />
         <Button x:Name="AppearanceNav" Tag="Appearance" Content="翻译与外观" Click="NavigateClick" HorizontalContentAlignment="Left" />
         <Button x:Name="ModelNav" Tag="Model" Content="模型配置" Click="NavigateClick" HorizontalContentAlignment="Left" />
-        <Border Height="1" Background="#E8D7C8" Margin="0,12,0,0" />
-        <TextBlock Text="Core vertical slice" FontSize="11" Foreground="#8B766A" />
-        <TextBlock Text="共享翻译流、缓存、历史和设置已经接入 Avalonia 壳。" TextWrapping="Wrap" FontSize="12" Foreground="#8B766A" />
+        <Border Height="1" Background="#D5E3DE" Margin="0,12,0,0" />
       </StackPanel>
     </Border>
 
-    <Grid Grid.Column="1" Margin="34,28,34,28" RowDefinitions="Auto,*">
+    <Grid Grid.Column="1" Margin="34,28,34,28" RowDefinitions="Auto,*,Auto">
       <StackPanel Spacing="5">
         <TextBlock x:Name="PageTitle" Text="常规" FontSize="27" FontWeight="SemiBold" Foreground="#173F43" />
-        <TextBlock x:Name="PageDescription" Text="控制 Yita 的运行状态和跨平台取词入口。" Foreground="#7B6A60" />
+        <TextBlock x:Name="PageDescription" Text="运行设置" Foreground="#64746F" />
       </StackPanel>
 
       <ScrollViewer Grid.Row="1" Margin="0,24,0,0" HorizontalScrollBarVisibility="Disabled">
         <Grid>
-          <Border x:Name="GeneralPage" Background="#FFFFFC" CornerRadius="18" Padding="24">
+          <Border x:Name="GeneralPage" Padding="0,4">
             <StackPanel Spacing="18">
               <TextBlock Text="运行开关" FontSize="18" FontWeight="SemiBold" Foreground="#155E63" />
               <CheckBox x:Name="EnabledCheckBox" Content="启用划词翻译" />
               <CheckBox x:Name="StartCheckBox" Content="随系统启动" />
               <CheckBox x:Name="ClipboardCheckBox" Content="允许剪贴板回退取词" />
-              <TextBlock Text="原生适配器接入后，这些开关会控制 Windows UI Automation 和 macOS Accessibility 的读取策略。" TextWrapping="Wrap" Foreground="#7B6A60" />
+              <Grid ColumnDefinitions="150,*" RowDefinitions="Auto,Auto">
+                <TextBlock Text="划词等待（毫秒）" VerticalAlignment="Center" />
+                <NumericUpDown x:Name="SelectionDelayBox" Grid.Column="1" Minimum="0" Maximum="2000" Increment="20" Value="80" />
+                <TextBlock Grid.Row="1" Text="最大选区字符数" VerticalAlignment="Center" />
+                <NumericUpDown x:Name="MaximumCharactersBox" Grid.Row="1" Grid.Column="1" Minimum="100" Maximum="50000" Increment="100" Value="8000" />
+              </Grid>
               <TextBlock x:Name="GeneralStatus" Foreground="#155E63" TextWrapping="Wrap" />
             </StackPanel>
           </Border>
 
-          <Border x:Name="HistoryPage" Background="#FFFFFC" CornerRadius="18" Padding="24" IsVisible="False">
-            <StackPanel Spacing="18">
+          <Border x:Name="HistoryPage" Padding="0,4" IsVisible="False">
+            <StackPanel Spacing="14">
               <TextBlock Text="AI 记录" FontSize="18" FontWeight="SemiBold" Foreground="#155E63" />
-              <CheckBox x:Name="HistoryCheckBox" Content="保存完成的翻译和 AI 记录" />
-              <TextBlock Text="Core 使用 JSONL 存储接口，默认不记录选中文字。开启后仍会由平台存储层负责路径和权限。" TextWrapping="Wrap" Foreground="#7B6A60" />
-              <TextBlock Text="当前阶段已完成记录接口和测试，历史查看器将在下一步接入。" TextWrapping="Wrap" Foreground="#7B6A60" />
+              <CheckBox x:Name="HistoryCheckBox" Content="在本机保存翻译原文与译文" />
+              <Grid ColumnDefinitions="*,Auto,Auto">
+                <TextBox x:Name="HistorySearchBox" Watermark="搜索原文或译文" TextChanged="HistorySearchChanged" />
+                <Button Grid.Column="1" Margin="8,0" Content="刷新" Click="RefreshHistoryClick" />
+                <Button Grid.Column="2" Content="清空记录" Click="RequestClearHistoryClick" />
+              </Grid>
+              <StackPanel x:Name="ClearHistoryConfirmation" IsVisible="False" Spacing="8">
+                <TextBlock Text="清空本机全部翻译记录？此操作无法撤销。" Foreground="#B34335" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Content="确认清空" Click="ConfirmClearHistoryClick" />
+                  <Button Content="取消" Click="CancelClearHistoryClick" />
+                </StackPanel>
+              </StackPanel>
+              <TextBlock x:Name="HistoryStatus" TextWrapping="Wrap" Foreground="#155E63" />
+              <ListBox x:Name="HistoryList" Height="160" SelectionChanged="HistorySelectionChanged">
+                <ListBox.ItemTemplate>
+                  <DataTemplate x:DataType="local:HistoryListItem">
+                    <StackPanel Spacing="4" Margin="0,3">
+                      <TextBlock Text="{Binding Summary}" TextTrimming="CharacterEllipsis" MaxWidth="500" />
+                      <TextBlock Text="{Binding Details}" FontSize="12" Foreground="#64746F" />
+                    </StackPanel>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+              <TextBlock Text="原文" Foreground="#64746F" />
+              <TextBox x:Name="HistorySourceText" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" Height="90" />
+              <TextBlock Text="译文" Foreground="#64746F" />
+              <TextBox x:Name="HistoryTranslatedText" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" Height="120" />
             </StackPanel>
           </Border>
 
-          <Border x:Name="AppearancePage" Background="#FFFFFC" CornerRadius="18" Padding="24" IsVisible="False">
+          <Border x:Name="AppearancePage" Padding="0,4" IsVisible="False">
             <StackPanel Spacing="18">
               <TextBlock Text="翻译与外观" FontSize="18" FontWeight="SemiBold" Foreground="#155E63" />
               <Grid ColumnDefinitions="150,*" RowDefinitions="Auto,Auto,Auto">
@@ -59,11 +88,11 @@
                   <ComboBoxItem Content="日本語" />
                 </ComboBox>
                 <TextBlock Text="翻译示例" Grid.Row="1" VerticalAlignment="Top" />
-                <TextBox x:Name="SourceTextBox" Grid.Row="1" Grid.Column="1" Height="100" AcceptsReturn="True" TextWrapping="Wrap" Watermark="输入一段文字测试 Core 的流式翻译" />
+                <TextBox x:Name="SourceTextBox" Grid.Row="1" Grid.Column="1" Height="100" AcceptsReturn="True" TextWrapping="Wrap" Watermark="待翻译文本" />
                 <TextBlock Text="译文" Grid.Row="2" VerticalAlignment="Top" />
-                <Border Grid.Row="2" Grid.Column="1" Background="#FFF4E8" CornerRadius="10" Padding="12">
+                <Border Grid.Row="2" Grid.Column="1" Background="#FFFFFF" BorderBrush="#D5E3DE" BorderThickness="1" CornerRadius="6" Padding="12">
                   <ScrollViewer MaxHeight="180">
-                    <TextBlock x:Name="TranslationText" Text="尚未翻译" TextWrapping="Wrap" Foreground="#173F43" />
+                    <SelectableTextBlock x:Name="TranslationText" Text="尚未翻译" TextWrapping="Wrap" Foreground="#173F43" />
                   </ScrollViewer>
                 </Border>
               </Grid>
@@ -75,7 +104,7 @@
             </StackPanel>
           </Border>
 
-          <Border x:Name="ModelPage" Background="#FFFFFC" CornerRadius="18" Padding="24" IsVisible="False">
+          <Border x:Name="ModelPage" Padding="0,4" IsVisible="False">
             <StackPanel Spacing="16">
               <TextBlock Text="模型配置" FontSize="18" FontWeight="SemiBold" Foreground="#155E63" />
               <Grid ColumnDefinitions="150,*" RowDefinitions="Auto,Auto,Auto">
@@ -84,10 +113,9 @@
                 <TextBlock Text="Model" Grid.Row="1" VerticalAlignment="Center" />
                 <TextBox x:Name="ModelBox" Grid.Row="1" Grid.Column="1" Watermark="deepseek-v4-flash" />
                 <TextBlock Text="API Key" Grid.Row="2" VerticalAlignment="Center" />
-                <TextBox x:Name="ApiKeyField" Grid.Row="2" Grid.Column="1" PasswordChar="●" Watermark="Windows 使用系统凭据保存，macOS 将接入 Keychain" />
+                <TextBox x:Name="ApiKeyField" Grid.Row="2" Grid.Column="1" PasswordChar="●" Watermark="API Key" />
               </Grid>
               <StackPanel Orientation="Horizontal" Spacing="10">
-                <Button Content="保存设置" Click="SaveSettingsClick" />
                 <Button Content="测试连接" Click="TestConnectionClick" />
               </StackPanel>
               <TextBlock x:Name="ModelStatus" Foreground="#155E63" TextWrapping="Wrap" />
@@ -95,6 +123,10 @@
           </Border>
         </Grid>
       </ScrollViewer>
+      <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Margin="0,18,0,0">
+        <TextBlock x:Name="SaveStatus" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="#155E63" Margin="0,0,12,0" />
+        <Button Grid.Column="1" Content="保存设置" Click="SaveSettingsClick" />
+      </Grid>
     </Grid>
   </Grid>
 </Window>

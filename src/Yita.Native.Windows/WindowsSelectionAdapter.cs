@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Text;
+using Yita.Core;
 using Yita.Core.Selection;
 
 namespace Yita.Native.Windows;
@@ -372,7 +373,8 @@ public sealed class WindowsSelectionRuntime : IDisposable
     private readonly WindowsGlobalHotkeyService _hotkey = new();
     private readonly WindowsMouseSelectionService _mouse = new();
     private readonly WindowsSelectionAdapter _reader = new();
-    private volatile bool _isEnabled = true;
+    private readonly LatestRequestController _requests = new();
+    private volatile bool _isEnabled;
     private volatile int _selectionDelayMilliseconds = 80;
 
     public event EventHandler<SelectionCapturedEventArgs>? SelectionCaptured;
@@ -384,6 +386,7 @@ public sealed class WindowsSelectionRuntime : IDisposable
         _isEnabled = isEnabled;
         _selectionDelayMilliseconds = Math.Clamp(selectionDelayMilliseconds, 0, 2_000);
         _reader.UseClipboardFallback = useClipboardFallback;
+        if (!isEnabled) _requests.Cancel();
     }
 
     public void Start()
@@ -402,9 +405,11 @@ public sealed class WindowsSelectionRuntime : IDisposable
             if (!WindowsNativeMethods.GetCursorPos(out var point)) return;
             if (!_isEnabled) return;
             if (!IsExternalPoint(new ScreenPoint(point.X, point.Y))) return;
+            using var pending = _requests.Begin();
             var request = new SelectionRequest(SelectionTrigger.TranslateShortcut, new ScreenPoint(point.X, point.Y));
-            var result = await _reader.ReadAsync(request).ConfigureAwait(false);
-            SelectionCaptured?.Invoke(this, new SelectionCapturedEventArgs(request, result));
+            var result = await _reader.ReadAsync(request, pending.Token).ConfigureAwait(false);
+            if (_isEnabled && pending.IsCurrent)
+                SelectionCaptured?.Invoke(this, new SelectionCapturedEventArgs(request, result));
         }
         catch { }
     }
@@ -416,18 +421,21 @@ public sealed class WindowsSelectionRuntime : IDisposable
             var gesture = args.Gesture;
             if (!_isEnabled) return;
             if (!IsExternalGesture(gesture)) return;
+            using var pending = _requests.Begin();
 
             // Give the target application one short frame to commit its
             // selection before UIA or Ctrl+C reads it.
             if (_selectionDelayMilliseconds > 0)
-                await Task.Delay(_selectionDelayMilliseconds).ConfigureAwait(false);
+                await Task.Delay(_selectionDelayMilliseconds, pending.Token).ConfigureAwait(false);
+            if (!_isEnabled || !pending.IsCurrent || !IsExternalGesture(gesture)) return;
             var request = new SelectionRequest(
                 SelectionTrigger.MouseGesture,
                 gesture.End,
                 GetProcessNameAt(gesture.End),
                 gesture.Bounds);
-            var result = await _reader.ReadAsync(request).ConfigureAwait(false);
-            SelectionCaptured?.Invoke(this, new SelectionCapturedEventArgs(request, result));
+            var result = await _reader.ReadAsync(request, pending.Token).ConfigureAwait(false);
+            if (_isEnabled && pending.IsCurrent)
+                SelectionCaptured?.Invoke(this, new SelectionCapturedEventArgs(request, result));
         }
         catch
         {
@@ -490,6 +498,8 @@ public sealed class WindowsSelectionRuntime : IDisposable
 
     public void Dispose()
     {
+        _isEnabled = false;
+        _requests.Dispose();
         _hotkey.TranslateRequested -= OnTranslateRequested;
         _mouse.SelectionGestureCompleted -= OnSelectionGestureCompleted;
         _hotkey.Dispose();

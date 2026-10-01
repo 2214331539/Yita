@@ -56,9 +56,11 @@ public sealed class JsonSettingsStore : ISettingsStore
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { WriteIndented = true };
     private readonly string _path;
+    private readonly string? _fallbackPath;
 
-    public JsonSettingsStore(string? path = null)
+    public JsonSettingsStore(string? path = null, string? fallbackPath = null)
     {
+        _fallbackPath = fallbackPath;
         _path = path ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Yita", "settings.json");
     }
@@ -67,8 +69,9 @@ public sealed class JsonSettingsStore : ISettingsStore
     {
         try
         {
-            if (!File.Exists(_path)) return YitaSettings.Default;
-            await using var stream = File.OpenRead(_path);
+            var readPath = File.Exists(_path) ? _path : _fallbackPath;
+            if (readPath is null || !File.Exists(readPath)) return YitaSettings.Default;
+            await using var stream = File.OpenRead(readPath);
             return await JsonSerializer.DeserializeAsync<YitaSettings>(stream, JsonOptions, cancellationToken)
                 ?? YitaSettings.Default;
         }

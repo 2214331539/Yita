@@ -52,9 +52,9 @@ public interface IStreamingTranslator
 
 public interface ITranslationCache
 {
-    bool TryGet(string sourceText, string sourceLanguage, string targetLanguage, out string translation);
+    bool TryGet(TranslationRequest request, out string translation);
 
-    void Set(string sourceText, string sourceLanguage, string targetLanguage, string translation);
+    void Set(TranslationRequest request, string translation);
 }
 
 public interface ITranslationHistory

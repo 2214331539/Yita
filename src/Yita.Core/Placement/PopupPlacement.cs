@@ -19,13 +19,31 @@ public readonly record struct WorkArea(double X, double Y, double Width, double 
 
 public static class PopupPlacementResolver
 {
+    public static PopupOffset CaptureLogicalOffset(SelectionAnchor anchor, double x, double y, double scaling) =>
+        new((x - anchor.X) / ValidScale(scaling), (y - anchor.Y) / ValidScale(scaling));
+
+    public static (double X, double Y) ResolveForScale(
+        SelectionAnchor anchor, PopupSize logicalSize, WorkArea pixelWorkArea,
+        double scaling, PopupOffset? logicalOffset = null)
+    {
+        scaling = ValidScale(scaling);
+        var offset = logicalOffset is { IsValid: true } saved
+            ? new PopupOffset(saved.X * scaling, saved.Y * scaling)
+            : (PopupOffset?)null;
+        return Resolve(anchor, new PopupSize(logicalSize.Width * scaling, logicalSize.Height * scaling),
+            pixelWorkArea, offset);
+    }
+
+    private static double ValidScale(double scale) => double.IsFinite(scale) && scale > 0 ? scale : 1;
+
     public static (double X, double Y) Resolve(
         SelectionAnchor anchor,
         PopupSize size,
         WorkArea workArea,
         PopupOffset? savedOffset = null)
     {
-        if (!size.IsValid || !double.IsFinite(workArea.X) || !double.IsFinite(workArea.Y)
+        if (!double.IsFinite(anchor.X) || !double.IsFinite(anchor.Y)
+            || !size.IsValid || !double.IsFinite(workArea.X) || !double.IsFinite(workArea.Y)
             || !double.IsFinite(workArea.Width) || !double.IsFinite(workArea.Height)
             || workArea.Width <= 0 || workArea.Height <= 0)
             return (workArea.X, workArea.Y);

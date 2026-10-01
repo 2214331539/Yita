@@ -4,5 +4,9 @@
              x:Class="Yita.Desktop.App">
   <Application.Styles>
     <fluent:FluentTheme />
+    <Style Selector="Window">
+      <Setter Property="FontFamily" Value="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, sans-serif" />
+      <Setter Property="FontSize" Value="14" />
+    </Style>
   </Application.Styles>
 </Application>

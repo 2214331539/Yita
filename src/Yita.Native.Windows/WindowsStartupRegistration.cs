@@ -8,7 +8,7 @@ namespace Yita.Native.Windows;
 public static class WindowsStartupRegistration
 {
     private const string RunKeyPath = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
-    private const string ValueName = "Yita";
+    private const string ValueName = "Yita.CrossPlatform";
 
     public static void Apply(bool enabled)
     {

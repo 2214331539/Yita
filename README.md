@@ -151,6 +151,12 @@ Yita 使用独立于上游软件的配置目录和凭据标识，不会自动导
 
 ## 开发与构建
 
+### 跨平台迁移预览
+
+`codex/cross-platform-migration` 分支正在将业务层迁入 `Yita.Core`，用 Avalonia 重建桌面界面，并分别保留 Windows/macOS 原生适配器。Windows 预览已接入划词、流式浮窗、固定多窗口与历史记录；macOS 原生取词和权限功能尚未完成，当前下载仍为 WPF Windows 版本。
+
+预览使用 `Yita.CrossPlatform.sln` 构建。当前开发机可在构建后双击 `Start-Yita-cross-platform.cmd`；运行前退出旧版 Yita，并在预览中配置 API Key。详见 [Windows 预览启动与验收](docs/CROSS_PLATFORM_WINDOWS_PREVIEW.md) 和 [迁移开发计划](docs/CROSS_PLATFORM_MIGRATION_PLAN.md)。
+
 ### 技术栈
 
 - C#、.NET 8、WPF：窗口、设置、文字呈现和动效。
