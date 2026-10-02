@@ -85,3 +85,5 @@ dotnet run --project tools/Yita.MacHelperSmoke -c Release --no-build -- \
 ```
 
 self-test 不初始化 NSApplication、不检查真实桌面权限、不打开系统设置、不请求授权、不访问外部选区/剪贴板/Keychain/API。它证明 Swift 二进制与 C# 协议可以通信，不能证明真实桌面权限、选区读取、签名稳定性或 Mac 产品可用。
+
+2026-10-02，提交 `f85a8d8` 的 [GitHub Actions #36973376654](https://github.com/2214331539/Yita/actions/runs/36973376654) 已通过 Windows/macOS 构建、各 398 项测试、可控子进程通信和 Mac 实际 Swift helper 的 5 项 self-test。Swift 管道读取使用 `Darwin.read`，每个短请求在 stdin 仍保持打开时即可返回，不等待缓冲区填满或 EOF。

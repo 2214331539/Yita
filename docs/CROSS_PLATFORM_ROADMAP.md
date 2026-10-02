@@ -120,7 +120,9 @@ helper 协议与权限状态已进入下面的 C1 准备工作。Mac 真机验�
 - helper 支持权限查询、用户主动请求 Accessibility 和打开系统设置；全局输入、取词和 Cmd+C 能力保持明确的未实现状态，不会自动申请权限。
 - 设置页增加平台权限入口与状态，旧刷新不会覆盖新结果，关闭后释放 helper；Windows 真实设置页保持原有布局。
 - 客户端限制 30 秒内最多 3 次启动；helper 监控父进程并在 EOF/父进程退出后结束。
-- 本机 Release 构建 0 警告/0 错误，398 项测试通过：Core 47、原版业务 258、Windows 适配 22、Mac 存储/协议 34、Desktop 37；可控子进程 smoke 通过。Mac Swift 编译和 self-test 结果另按 CI 记录，真实桌面验证继续暂缓。
+- 本机 Release 构建 0 警告/0 错误，398 项测试通过：Core 47、原版业务 258、Windows 适配 22、Mac 存储/协议 34、Desktop 37；可控子进程 smoke 通过。
+- 代码提交 `f85a8d8` 的 [GitHub Actions #36973376654](https://github.com/2214331539/Yita/actions/runs/36973376654) 在 Windows/macOS 均通过：各自 Release 编译 0 警告/0 错误、398 项测试、6 项单实例跨进程检查及 5 项可控 helper 检查。Mac 另通过真实 Swift helper 的 5 项 self-test；包含开发签名校验与 C#/Swift 连续请求通信，不请求真实授权或访问外部选区。
+- 首次 Swift 通信检查发现 `FileHandle.read(upToCount:)` 等待管道数据的问题，已改为读取当前可用字节的 `Darwin.read`；保持 stdin 打开的连续短请求现已通过 CI。本机 Windows 源码预览已重新启动，真实 Mac 桌面验证继续暂缓。
 
 本批完成 C1 的协议和权限代码准备，未完成拖选/快捷键输入、正式签名或真实授权验收。下一批实现 AX 取词与坐标，然后推进安全 Cmd+C 回退和输入捕获；必须经真实 Mac 验收后才宣称可用。协议细节见 [Mac helper 协议](MAC_HELPER_PROTOCOL.md)。
 
