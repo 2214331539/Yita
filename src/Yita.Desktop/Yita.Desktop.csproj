@@ -52,4 +52,14 @@
           Outputs="$(TargetDir)Yita.Native.Mac.Helper.app/Contents/MacOS/Yita.Native.Mac.Helper">
     <Exec Command="bash &quot;$(MSBuildThisFileDirectory)../../scripts/Build-Mac-Helper.sh&quot; &quot;$(TargetDir)&quot;" />
   </Target>
+  <!-- Keep managed assemblies in Resources so macOS signs them as bundle resources. -->
+  <Target Name="CreateMacBundleAppHost" AfterTargets="Publish"
+          Condition="$([MSBuild]::IsOSPlatform('OSX')) and '$(MacBundleAppHostPath)' != ''">
+    <Error Condition="'$(RuntimeIdentifier)' != 'osx-arm64' or '$(SelfContained)' != 'true' or '$(PublishSingleFile)' == 'true'"
+           Text="Mac bundle packaging requires self-contained, non-single-file osx-arm64 output." />
+    <CreateAppHost AppHostSourcePath="$(AppHostSourcePath)"
+                   AppHostDestinationPath="$(MacBundleAppHostPath)"
+                   AppBinaryName="../Resources/Runtime/Yita.Desktop.dll"
+                   EnableMacOSCodeSign="true" />
+  </Target>
 </Project>

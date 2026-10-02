@@ -16,6 +16,8 @@ public sealed class MacHelperTests
         Assert.Equal(Path.Combine(source, suffix), MacHelperClient.ResolveHelperPath(source));
         Assert.Equal(Path.Combine(root, "Yita.app", "Contents", "Helpers", suffix),
             MacHelperClient.ResolveHelperPath(bundle + Path.DirectorySeparatorChar));
+        Assert.Equal(Path.Combine(root, "Yita.app", "Contents", "Helpers", suffix),
+            MacHelperClient.ResolveHelperPath(Path.Combine(root, "Yita.app", "Contents", "Resources", "Runtime")));
         var overridePath = Path.Combine(root, "custom-helper");
         Assert.Equal(overridePath, MacHelperClient.ResolveHelperPath(bundle, overridePath));
         Assert.Equal(Path.Combine(root, "unrelated", "Contents", "MacOS", suffix),

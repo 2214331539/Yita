@@ -23,11 +23,14 @@ cleanup() {
 }
 trap cleanup EXIT
 app="$work/bundle/Yita.app"
-mkdir -p "$app/Contents/MacOS" "$app/Contents/Helpers" "$app/Contents/Resources"
+runtime_root="$app/Contents/Resources/Runtime"
+mkdir -p "$app/Contents/MacOS" "$app/Contents/Helpers" "$runtime_root"
 cd "$repo_root"
 dotnet publish src/Yita.Desktop/Yita.Desktop.csproj -c Release -r osx-arm64 --self-contained true \
   -p:PublishTrimmed=false -p:PublishSingleFile=false -p:Version="$version" \
-  -p:AssemblyVersion=0.9.0.0 -p:FileVersion="0.9.0.$build_number" -o "$app/Contents/MacOS"
+  -p:AssemblyVersion=0.9.0.0 -p:FileVersion="0.9.0.$build_number" \
+  -p:MacBundleAppHostPath="$app/Contents/MacOS/Yita.Desktop" -o "$runtime_root"
+rm "$runtime_root/Yita.Desktop"
 bash scripts/Build-Mac-Helper.sh "$app/Contents/Helpers"
 cp packaging/macos/Info.plist "$app/Contents/Info.plist"
 helper_app="$app/Contents/Helpers/Yita.Native.Mac.Helper.app"
@@ -45,11 +48,11 @@ for size in 16 32 128 256 512; do
 done
 iconutil -c icns "$iconset" -o "$app/Contents/Resources/Yita.icns"
 pwsh -NoProfile -File scripts/Collect-DesktopLicenses.ps1 \
-  -PublishDirectory "$app/Contents/MacOS" -OutputDirectory "$app/Contents/Resources/Licenses"
+  -PublishDirectory "$runtime_root" -OutputDirectory "$app/Contents/Resources/Licenses"
 cp docs/MAC_PREVIEW_TESTING.md "$app/Contents/Resources/TESTING.md"
 
 manifest="$app/Contents/Resources/build-manifest.json"
-runtime="$(plutil -extract runtimeOptions.includedFrameworks.0.version raw -o - "$app/Contents/MacOS/Yita.Desktop.runtimeconfig.json")"
+runtime="$(plutil -extract runtimeOptions.includedFrameworks.0.version raw -o - "$runtime_root/Yita.Desktop.runtimeconfig.json")"
 plutil -create xml1 "$manifest"
 plutil -insert version -string "$version" "$manifest"
 plutil -insert commit -string "$(git rev-parse HEAD)" "$manifest"

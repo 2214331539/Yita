@@ -232,10 +232,12 @@ internal sealed class MacHelperClient : IMacHelperClient
     {
         if (!string.IsNullOrWhiteSpace(configured)) return Path.GetFullPath(configured);
         var directory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(baseDirectory));
-        var contents = Path.GetDirectoryName(directory);
+        var parent = Path.GetDirectoryName(directory);
+        var isResourceRuntime = Path.GetFileName(directory) == "Runtime" && Path.GetFileName(parent) == "Resources";
+        var contents = isResourceRuntime ? Path.GetDirectoryName(parent) : parent;
         var app = contents is null ? null : Path.GetDirectoryName(contents);
         // Installed bundles keep nested executables outside the managed runtime directory.
-        var root = Path.GetFileName(directory) == "MacOS" && Path.GetFileName(contents) == "Contents"
+        var root = (Path.GetFileName(directory) == "MacOS" || isResourceRuntime) && Path.GetFileName(contents) == "Contents"
             && app?.EndsWith(".app", StringComparison.Ordinal) == true
             ? Path.Combine(contents!, "Helpers") : directory;
         return Path.Combine(root, "Yita.Native.Mac.Helper.app", "Contents", "MacOS", "Yita.Native.Mac.Helper");

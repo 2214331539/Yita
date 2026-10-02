@@ -19,7 +19,7 @@ for required in LICENSE NOTICE.md LICENSE-SourceSans.md LICENSES/InstantTranslat
   [[ -s "$app/Contents/Resources/Licenses/$required" ]]
 done
 for required in libhostfxr.dylib libhostpolicy.dylib libcoreclr.dylib libAvaloniaNative.dylib libSkiaSharp.dylib libHarfBuzzSharp.dylib Yita.Desktop.runtimeconfig.json; do
-  [[ -s "$app/Contents/MacOS/$required" ]]
+  [[ -s "$app/Contents/Resources/Runtime/$required" ]]
 done
 native_count=0
 while IFS= read -r -d '' binary; do
