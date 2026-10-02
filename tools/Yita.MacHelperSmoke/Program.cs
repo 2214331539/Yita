@@ -44,6 +44,7 @@ public static class Program
                 await VerifySwiftSelectionFixtureAsync(args[1]);
                 await VerifySwiftClipboardFixtureAsync(args[1]);
                 await VerifySwiftInputFixtureAsync(args[1]);
+                await VerifySwiftLifecycleFixtureAsync(args[1]);
             }
             Console.WriteLine("Mac helper protocol smoke passed. No desktop selection, GUI authorization, clipboard, Keychain or API access.");
             return 0;
@@ -222,6 +223,44 @@ public static class Program
             && manual.Response.Pointer == new ScreenPoint(-700, 150), "Manual clipboard translation uses the current pointer without simulated copy");
         var action = await client.SendAsync("requestInputMonitoring");
         Check(action.DiagnosticCode == "mac-helper-self-test-action-disabled", "Input fixtures never request system authorization");
+    }
+
+    private static async Task VerifySwiftLifecycleFixtureAsync(string path)
+    {
+        ProcessStartInfo Start()
+        {
+            var info = new ProcessStartInfo(path);
+            foreach (var argument in new[] { "--self-test", "--selection-fixture", "range", "--input-fixture", "lifecycle" })
+                info.ArgumentList.Add(argument);
+            return info;
+        }
+        using var client = new MacHelperClient(Start);
+        using var runtime = new MacSelectionRuntime(client);
+        var activity = new List<bool>();
+        runtime.SessionActivityChanged += (_, active) => activity.Add(active);
+        var initial = (await client.SendAsync("configureInput", input: new(MouseEnabled: true))).Response!.Input!;
+        Check(initial is { SessionActive: true, SessionGeneration: 0 }, "Swift lifecycle fixture starts with an active session");
+        var suspended = (await client.SendAsync("pollInput")).Response!.Input!;
+        Check(suspended is { SessionActive: false, SessionGeneration: 1, MouseRunning: false, HotkeyRunning: false, Events.Length: 0 },
+            "Suspension crosses the Swift/C# protocol without retaining old input");
+        await runtime.HandleInputAsync(suspended);
+        var request = new SelectionRequest(SelectionTrigger.MouseGesture, new(-700, 150),
+            ForegroundApplication: "test.editor", ForegroundProcessId: 42);
+        var stale = await client.SendAsync("readSelection", request, input: new(Sequence: initial.Sequence));
+        Check(stale.Response?.Selection is { Failure: SelectionFailureKind.Cancelled, Text: null },
+            "Swift refuses selection reads while the desktop session is suspended");
+        var clipboard = await client.SendAsync("readClipboard");
+        Check(clipboard.Response?.Selection is { Source: SelectionSource.ManualClipboard, Failure: SelectionFailureKind.Cancelled, Text: null },
+            "Suspension also blocks manual pasteboard reads");
+        var stillSuspended = (await client.SendAsync("pollInput")).Response!.Input!;
+        Check(stillSuspended is { SessionActive: false, SessionGeneration: 1 }, "Empty polls retain the suspended lifecycle state");
+        var resumed = (await client.SendAsync("pollInput")).Response!.Input!;
+        await runtime.HandleInputAsync(resumed);
+        Check(resumed is { SessionActive: true, SessionGeneration: 2, MouseRunning: true, HotkeyRunning: true }
+            && activity.SequenceEqual(new[] { false, true }), "Resumed native state reaches the desktop session contract exactly once");
+        var restored = await client.SendAsync("readClipboard");
+        Check(restored.Response?.Selection is { Text: "fixture clipboard", Failure: SelectionFailureKind.None },
+            "Manual translation is available again after session recovery");
     }
 
     private static async Task<int> RunPeerAsync(string mode)

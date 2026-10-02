@@ -36,6 +36,8 @@
 
 ## 坐标约定
 
+协议 4 增加 `sessionActive/sessionGeneration`，每次轮询返回持久睡眠/会话状态。暂停时输入队列不接受新事件，旧选区取消、tap 停止、快捷键注销；恢复重新配置。Desktop 隐藏固定阅读窗口并在恢复时无激活地显示，不重译旧选区。菜单、登录项、Spaces 属性和验证边界见 [Mac 桌面生命周期](MAC_DESKTOP_LIFECYCLE.md)。
+
 CGEvent 和 AX 边界均使用 Quartz 全局点、左上角原点。当前 Avalonia.Native 11.2.6 的屏幕范围和窗口位置也使用这些全局点，其 `Screen.Scaling` 为 1；Retina 的 `RenderScaling` 用于渲染，不应再次乘到浮窗位置或窗口命中范围上。
 
 因此当前宿主直接传递 Quartz 点，保留外接屏的负坐标，并复用共享工作区约束和相对偏移。没有 AX 边界时使用本次拖选区域/指针，不伪造选区边界。升级 Avalonia 后须重新检查此约定。依据：[Screens.mm](https://github.com/AvaloniaUI/Avalonia/blob/11.2.6/native/Avalonia.Native/src/OSX/Screens.mm)、[WindowBaseImpl.mm](https://github.com/AvaloniaUI/Avalonia/blob/11.2.6/native/Avalonia.Native/src/OSX/WindowBaseImpl.mm)。

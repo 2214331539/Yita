@@ -16,9 +16,11 @@ Swift/AppKit helper 已在 `../Yita.Native.Mac.Helper` 实现权限检查和授�
 
 1. 真实 Accessibility/Input Monitoring 授权、撤销及输入兼容性验收；
 2. Retina、多屏、Spaces/全屏和窗口交互验收；
-3. 完善 NSStatusItem 菜单栏与登录启动；
+3. 真实菜单栏、登录启动与睡眠恢复验收；
 4. 正式 `.app`、签名、公证和更新身份验证。
 
-Cmd+C 回退保存多项/多格式已物化字节，校验前台/焦点和剪贴板变化，在同序列下恢复内容；runtime 根据用户设置显式启用，直接使用 adapter 的默认读取仍只使用 AX。当前 helper 协议为 3，包含输入序号与复制取消。EOF/父进程退出同样先清理，新的 helper 不与旧复制并发。NSPasteboard 不能原子比较并写入或验证复制所有者；真实格式和竞态仍需验收。详见 [Mac Cmd+C 回退](../../docs/MAC_CLIPBOARD_FALLBACK.md)。
+Cmd+C 回退保存多项/多格式已物化字节，校验前台/焦点和剪贴板变化，在同序列下恢复内容；runtime 根据用户设置显式启用，直接使用 adapter 的默认读取仍只使用 AX。当前 helper 协议为 4，包含输入序号、复制取消与持久会话状态。EOF/父进程退出同样先清理，新的 helper 不与旧复制并发。NSPasteboard 不能原子比较并写入或验证复制所有者；真实格式和竞态仍需验收。详见 [Mac Cmd+C 回退](../../docs/MAC_CLIPBOARD_FALLBACK.md)。
+
+菜单栏使用 Avalonia 已提供的 NSStatusItem/NSMenu，不由 helper 重复创建。`MacStartupRegistration` 为身份符合 `com.yita.desktop` 的 `.app` 配置当前用户下次登录项，源码预览禁用；`MacPopupWindowBehavior` 只修改已有 NSWindow 的 Spaces/全屏辅助属性。睡眠/显示器/用户会话通知取消旧输入，Desktop 隐藏固定窗口并在恢复时无激活地显示。可控测试不代表真实登录、全屏或窗口焦点已通过；详见 [Mac 桌面生命周期](../../docs/MAC_DESKTOP_LIFECYCLE.md)。
 
 helper 必须签名并设置 watchdog；AX provider 异常、超时或权限拒绝只能返回失败结果，不能关闭 Yita 主进程。

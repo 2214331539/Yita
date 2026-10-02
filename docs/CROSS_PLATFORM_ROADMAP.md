@@ -162,9 +162,20 @@ NSPasteboard 不能原子比较序列并写入，也没有可验证的复制所�
 
 本批完成输入到共享读取/呈现的代码接入，不作为真实桌面产品验收。下一批完善 Mac 菜单栏/登录启动、Spaces/全屏和窗口生命周期；Keychain、权限、目标应用和 Retina/多屏真机验收仍按维护者安排暂缓。实现与验证边界见 [Mac 原生输入](MAC_NATIVE_INPUT.md)。
 
+### C3 准备：菜单栏、登录项与睡眠恢复
+
+- 核对 Avalonia.Native 11.2.6 的托盘实现直接使用 NSStatusItem/NSMenu；复用现有入口，补齐输入修复、本地化、暂停状态、异常隔离和释放后命令过滤，不重复创建 helper 菜单栏。
+- `MacStartupRegistration` 为符合 `com.yita.desktop` 身份、XML 元数据和可执行路径的 `.app` 配置当前用户下次 GUI 登录项；源码预览不注册。独立参数、冲突/链接保护、原子替换和自身项删除已实现；注册/存储失败不静默保存错误偏好。
+- 协议升级为 4，每帧携带持久会话状态和代数。系统/显示器/用户会话暂停原因分别合并，清空旧输入、停止 tap/快捷键，恢复时重新配置；旧 AX/复制及模型请求取消，遗漏中间暂停帧也使旧手势失效。
+- Desktop 暂停时隐藏固定窗口，取消正在流式的工作，关闭/隐藏其他窗口；恢复原先可见的固定窗口，限制到现有工作区，不激活窗口或重新请求翻译。
+- 同一 Avalonia NSWindow 在 Cocoa 主线程设置 CanJoinAllSpaces/Transient/IgnoresCycle/FullScreenAuxiliary，清除冲突标志；保留当前 UI 和置顶级别，不建立第二套窗口渲染。
+- 本机 Release 构建 0 警告/0 错误，456 项测试通过：Core 47、原版业务 258、Windows 22、Mac 86、Desktop 43；可控 helper 通信通过。Swift 编译、会话管道和 16 组原生输入策略将由 Mac CI 验证。
+
+本批是 C3 的代码与可控验证准备。没有注册 runner 的真实登录项、请求授权或读取桌面数据；真实登录、锁屏、焦点、Spaces/全屏、Retina、多屏和签名验收仍暂缓。方案、限制与待验收项目见 [Mac 桌面生命周期](MAC_DESKTOP_LIFECYCLE.md)。
+
 ### C1. helper、权限与输入
 
-- 使用 Swift/Cocoa helper 承载 AX、全局输入和菜单栏；C# 保持业务和 Avalonia UI。helper 在自己的 Cocoa 主循环运行，不把跨进程阻塞放在 UI 回调内。
+- 使用 Swift/Cocoa helper 承载 AX 和全局输入；菜单栏复用 Avalonia 的原生 NSStatusItem/NSMenu，C# 保持业务和 Avalonia UI。helper 在自己的 Cocoa 主循环运行，不把跨进程阻塞放在 UI 回调内。
 - 使用结构化 IPC、请求编号、协议版本、超时与响应长度约束。区分权限拒绝、无选区、目标消失和 helper 故障；限制 helper 重启频率，防止重启循环。
 - 先固定 `.app` 的 Bundle ID、helper 身份和开发签名策略，再实施 Accessibility 授权，避免测试二进制和正式包被系统视为不同应用。
 - 根据实际使用的事件 API检测 Accessibility/Input Monitoring 能力，只引导用户授予所需权限。覆盖首次拒绝、之后开启、运行时撤销和系统设置跳转。
@@ -251,7 +262,8 @@ NSPasteboard 不能原子比较序列并写入，也没有可验证的复制所�
 - [x] C2 AX 代码：前台来源校验、直接/范围取词、安全控件过滤、结构化失败与边界查询；真实 Mac 验收待恢复。
 - [x] C2 复制代码：显式 Cmd+C、多格式备份、序列/来源检查、取消和 EOF 收尾；真实 Mac 复制验收待恢复。
 - [x] C1/C3 输入代码：全局鼠标、Carbon 快捷键、有界事件、来源/序号失效与 Desktop 接入；合成输入和 Swift 通信通过。
-- [ ] C3：完善菜单栏/登录启动和窗口生命周期，具备 Mac 条件后完成真实桌面验收。
+- [x] C3 代码：原生菜单栏入口、受约束的 `.app` 登录项、Spaces 属性和睡眠/会话恢复；本机可控回归通过。
+- [ ] C3 验收：Mac 编译/合成管道检查后，具备真机条件时完成菜单、登录、锁屏、焦点、Retina/多屏、Spaces/全屏与窗口生命周期验收。
 - [ ] D：双端兼容性矩阵、性能与阅读体验。
 - [ ] E：双端签名安装包、版本检查、升级与公开 Release。
 

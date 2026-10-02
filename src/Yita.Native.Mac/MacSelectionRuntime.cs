@@ -5,7 +5,7 @@ using Yita.Core.Selection;
 namespace Yita.Native.Mac;
 
 /// <summary>Consumes bounded native input batches; selection and clipboard work stays outside callbacks.</summary>
-public sealed class MacSelectionRuntime : ISelectionRuntime, IPlatformPermissionService
+public sealed class MacSelectionRuntime : ISelectionRuntime, IPlatformPermissionService, IDesktopSessionRuntime
 {
     private readonly IMacHelperClient _helper;
     private readonly MacSelectionAdapter _reader;
@@ -22,6 +22,8 @@ public sealed class MacSelectionRuntime : ISelectionRuntime, IPlatformPermission
     private ScreenPoint _pointer;
     private Task? _loop;
     private long _sequence;
+    private long _sessionGeneration;
+    private volatile bool _sessionActive = true;
     private int _needsConfiguration = 1;
     private volatile bool _mouseRunning;
     private volatile bool _hotkeyRunning;
@@ -46,6 +48,8 @@ public sealed class MacSelectionRuntime : ISelectionRuntime, IPlatformPermission
     public event EventHandler<SelectionCapturedEventArgs>? SelectionCaptured;
     public event EventHandler<ScreenPoint>? ExternalPointerPressed;
     public event EventHandler? StatusChanged;
+    public event EventHandler<bool>? SessionActivityChanged;
+    public bool IsSessionActive => _sessionActive;
     public bool IsRunning => _mouseRunning;
     public bool IsHotkeyRunning => _hotkeyRunning;
 
@@ -90,6 +94,7 @@ public sealed class MacSelectionRuntime : ISelectionRuntime, IPlatformPermission
                     CancelSelection();
                     _sequence = 0;
                     RepairInputCapture();
+                    UpdateSession(input);
                     await Task.Delay(_pollInterval, _stop).ConfigureAwait(false);
                     continue;
                 }
@@ -111,6 +116,8 @@ public sealed class MacSelectionRuntime : ISelectionRuntime, IPlatformPermission
 
     internal async Task HandleInputAsync(MacInputSnapshot snapshot, CancellationToken cancellationToken = default)
     {
+        UpdateSession(snapshot);
+        if (!_sessionActive) return;
         var received = System.Diagnostics.Stopwatch.GetTimestamp();
         foreach (var item in snapshot.Events)
         {
@@ -156,13 +163,13 @@ public sealed class MacSelectionRuntime : ISelectionRuntime, IPlatformPermission
             using var pending = _requests.Begin();
             var settings = Volatile.Read(ref _configuration);
             if (settings.Delay > 0) await Task.Delay(settings.Delay, pending.Token).ConfigureAwait(false);
-            if (_disposed || !pending.IsCurrent || !settings.Enabled || settings != Volatile.Read(ref _configuration)) return;
+            if (_disposed || !_sessionActive || !pending.IsCurrent || !settings.Enabled || settings != Volatile.Read(ref _configuration)) return;
             if (await _isOwnWindow(gesture.Start, pending.Token).ConfigureAwait(false)
                 || await _isOwnWindow(gesture.End, pending.Token).ConfigureAwait(false)) return;
             var request = new SelectionRequest(SelectionTrigger.MouseGesture, gesture.End, input.ForegroundApplication,
                 gesture.Bounds, settings.Context, input.ForegroundProcessId);
             var result = await _reader.ReadForInputAsync(request, settings.Copy, input.Sequence, pending.Token).ConfigureAwait(false);
-            if (!_disposed && pending.IsCurrent && settings.Enabled && settings == Volatile.Read(ref _configuration))
+            if (!_disposed && _sessionActive && pending.IsCurrent && settings.Enabled && settings == Volatile.Read(ref _configuration))
                 SelectionCaptured?.Invoke(this, new(request, result));
         }
         catch { }
@@ -174,13 +181,13 @@ public sealed class MacSelectionRuntime : ISelectionRuntime, IPlatformPermission
     {
         try
         {
-            if (_disposed) return;
+            if (_disposed || !_sessionActive) return;
             using var pending = _requests.Begin();
             var exchange = await _helper.SendAsync("readClipboard", cancellationToken: pending.Token).ConfigureAwait(false);
             var request = new SelectionRequest(SelectionTrigger.TranslateShortcut, exchange.Response?.Pointer ?? _pointer);
             var result = exchange.Response is { Status: "ok", Selection: { } selection } ? selection
                 : SelectionResult.Failed(SelectionFailureKind.ClipboardUnavailable, exchange.DiagnosticCode);
-            if (!_disposed && pending.IsCurrent) SelectionCaptured?.Invoke(this, new(request, result));
+            if (!_disposed && _sessionActive && pending.IsCurrent) SelectionCaptured?.Invoke(this, new(request, result));
         }
         catch { }
     }
@@ -191,6 +198,22 @@ public sealed class MacSelectionRuntime : ISelectionRuntime, IPlatformPermission
         lock (_gestureGate) { _press = null; _gestures.Cancel(); }
     }
 
+    private void UpdateSession(MacInputSnapshot snapshot)
+    {
+        if (_disposed) return;
+        if (_sessionGeneration == snapshot.SessionGeneration && _sessionActive == snapshot.SessionActive) return;
+        CancelSelection();
+        _sessionGeneration = snapshot.SessionGeneration;
+        // A missed sleep/wake pair still invalidates host requests and stale visible windows.
+        if (_sessionActive)
+        {
+            _sessionActive = false;
+            try { SessionActivityChanged?.Invoke(this, false); } catch { }
+        }
+        _sessionActive = snapshot.SessionActive;
+        if (_sessionActive) { try { SessionActivityChanged?.Invoke(this, true); } catch { } }
+    }
+
     private void SetStatus(NativeServiceState state, bool mouse, bool hotkey)
     {
         var changed = _state != state || _mouseRunning != mouse || _hotkeyRunning != hotkey;
@@ -198,7 +221,7 @@ public sealed class MacSelectionRuntime : ISelectionRuntime, IPlatformPermission
         if (changed && !_disposed) { try { StatusChanged?.Invoke(this, EventArgs.Empty); } catch { } }
     }
 
-    public string CreateDiagnostics(bool chinese) => $"macOS native input: {_state}; Mouse={IsRunning}; Hotkey={IsHotkeyRunning}; Protocol={MacHelperProtocol.Version}";
+    public string CreateDiagnostics(bool chinese) => $"macOS native input: {_state}; Mouse={IsRunning}; Hotkey={IsHotkeyRunning}; Session={IsSessionActive}; Protocol={MacHelperProtocol.Version}";
     public Task<PermissionState> GetStateAsync(CancellationToken cancellationToken = default) => _reader.GetStateAsync(cancellationToken);
     public Task<PlatformPermissionStatus> GetStatusAsync(CancellationToken cancellationToken = default) => _reader.GetStatusAsync(cancellationToken);
     public async Task RequestAccessibilityPermissionAsync(CancellationToken cancellationToken = default)

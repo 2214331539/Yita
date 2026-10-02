@@ -103,6 +103,46 @@ func runInputSelfTests() -> Int32 {
             let batch = input.poll()
             try expect(!batch.mouseRunning && batch.hotkeyRunning && batch.events.allSatisfy { $0.kind == "cancel" }, "separate capabilities")
         }
+        try test("Overlapping sleep display and user-session reasons require all reasons to clear") {
+            let session = NativeDesktopSession()
+            try expect(session.set(.sleep, suspended: true) && !session.isActive && session.generation == 1, "sleep")
+            try expect(!session.set(.displaySleep, suspended: true), "overlapping display sleep")
+            session.set(.inactiveUser, suspended: true)
+            try expect(!session.set(.sleep, suspended: false) && !session.isActive, "still suspended")
+            session.set(.displaySleep, suspended: false)
+            try expect(session.set(.inactiveUser, suspended: false) && session.isActive && session.generation == 2, "all clear")
+        }
+        try test("Duplicate workspace notifications cannot repeatedly advance session generation") {
+            let session = NativeDesktopSession()
+            for _ in 0..<20 { session.set(.sleep, suspended: true) }
+            for _ in 0..<20 { session.set(.sleep, suspended: false) }
+            try expect(session.generation == 2 && session.isActive, "deduplicated lifecycle")
+        }
+        try test("Suspension clears queued drags and shortcuts and is persistent across empty polls") {
+            let input = NativeInputManager(ownerPID: 99, selfTest: true, fixture: "drag")
+            input.configure(mouseEnabled: true)
+            input.receiveHotkey(pressed: true)
+            input.setSession(.sleep, suspended: true)
+            input.receiveHotkey(pressed: true)
+            for _ in 0..<3 {
+                let batch = input.poll()
+                try expect(!batch.sessionActive && batch.sessionGeneration == 1 && !batch.mouseRunning
+                    && !batch.hotkeyRunning && batch.events.isEmpty, "persistent suspended snapshot")
+            }
+            input.setSession(.sleep, suspended: false)
+            let resumed = input.poll()
+            try expect(resumed.sessionActive && resumed.sessionGeneration == 2 && resumed.mouseRunning && resumed.hotkeyRunning, "resumed input")
+            try expect(resumed.events.allSatisfy { $0.kind != "translateClipboard" }, "old shortcut discarded")
+        }
+        try test("Queue reset changes the selection generation and cannot replay a previous drag") {
+            let queue = NativeInputQueue(ownerPID: 99)
+            queue.setTarget(target, now: 10)
+            queue.record("pointerDown", point: point, timestamp: 10)
+            let previous = queue.sequence
+            queue.reset(now: 11)
+            let batch = queue.drain(now: 11)
+            try expect(batch.sequence > previous && batch.events.count == 1 && batch.events[0].kind == "cancel", "reset")
+        }
         print("Native input policy self-test passed. Synthetic input only; no event taps, hotkeys, clipboard or authorization access.")
         return 0
     } catch let error as Assertion { fputs("Input self-test failed: " + error.message + "\n", stderr) }

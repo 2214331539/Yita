@@ -1,6 +1,6 @@
 # Mac 原生 helper 协议
 
-当前协议版本为 `3`。实现位于 `src/Yita.Native.Mac/Helper` 与 `src/Yita.Native.Mac.Helper`，尚在 `codex/platform-host-services` 功能分支。权限、AX/Cmd+C、全局输入与 Desktop 自动触发已有代码接入；独立菜单栏 helper 和真实 Mac 桌面验收仍待完成。版本 2 新增事件投递权限和复制取消；版本 3 新增有界输入批次、输入序号、手动剪贴板与输入监控授权。旧 helper 不能与新客户端混用。
+当前协议版本为 `4`。实现位于 `src/Yita.Native.Mac/Helper` 与 `src/Yita.Native.Mac.Helper`，尚在 `codex/platform-host-services` 功能分支。权限、AX/Cmd+C、全局输入与 Desktop 自动触发已有代码接入；菜单栏复用 Avalonia 原生 NSStatusItem，真实 Mac 桌面验收仍待完成。版本 2 新增事件投递权限和复制取消；版本 3 新增有界输入批次、输入序号、手动剪贴板与输入监控授权；版本 4 新增持久会话状态与睡眠恢复。旧 helper 不能与新客户端混用。
 
 ## 进程与身份
 
@@ -16,7 +16,7 @@
 helper 启动后立即输出：
 
 ```json
-{"version":3,"id":"ready","status":"ready","bundleIdentifier":"com.yita.desktop.native-helper","processId":12345}
+{"version":4,"id":"ready","status":"ready","bundleIdentifier":"com.yita.desktop.native-helper","processId":12345}
 ```
 
 客户端检查协议版本、约定的 Bundle ID、握手状态和实际启动的 PID。失败即终止 helper。握手是协议一致性检查，不替代安装包及二进制的签名真实性检查。
@@ -26,14 +26,14 @@ helper 启动后立即输出：
 每个请求由客户端生成独立的 32 位十六进制 ID，同一 helper 上串行交换消息：
 
 ```json
-{"version":3,"id":"d2e39e2187ed4b8aa3580c563a13697ab","command":"permissions","selection":null,"allowClipboardFallback":false,"input":null}
+{"version":4,"id":"d2e39e2187ed4b8aa3580c563a13697ab","command":"permissions","selection":null,"allowClipboardFallback":false,"input":null}
 ```
 
 权限响应示例：
 
 ```json
 {
-  "version":3,
+  "version":4,
   "id":"d2e39e2187ed4b8aa3580c563a13697ab",
   "status":"ok",
   "permissions":{"accessibility":false,"inputMonitoring":false,"eventPosting":false},
@@ -63,7 +63,7 @@ helper 启动后立即输出：
 取词成功和可预期失败均用 `status:ok` 携带共享选区结果。例如成功：
 
 ```json
-{"version":3,"id":"d2e39e2187ed4b8aa3580c563a13697ab","status":"ok","selection":{"text":"hello","source":"accessibility","failure":"none","bounds":{"x":-800,"y":120,"width":90,"height":18}}}
+{"version":4,"id":"d2e39e2187ed4b8aa3580c563a13697ab","status":"ok","selection":{"text":"hello","source":"accessibility","failure":"none","bounds":{"x":-800,"y":120,"width":90,"height":18}}}
 ```
 
 权限拒绝、空选区、不支持、保护内容、目标变化、AX 超时等通过 `selection.failure` 和固定诊断代码区分。失败结果不携带文本、上下文或边界；客户端拒绝缺失 `source/failure` 或夹带内容的失败帧。文本使用 UTF-16 20,000 单位上限，上下文仅在明确请求时以范围接口读取附近最多 2,000 单位。坐标为 Quartz 全局点（左上角原点），与当前 Avalonia.Native 的屏幕/窗口位置约定一致，不乘 Retina 渲染倍率；无可靠边界时省略 `bounds`，真实多屏行为仍待验收。
@@ -71,7 +71,7 @@ helper 启动后立即输出：
 失败响应仍携带请求 ID：
 
 ```json
-{"version":3,"id":"d2e39e2187ed4b8aa3580c563a13697ab","status":"error","diagnosticCode":"unsupported-command"}
+{"version":4,"id":"d2e39e2187ed4b8aa3580c563a13697ab","status":"error","diagnosticCode":"unsupported-command"}
 ```
 
 客户端只接受 `ok/error`，拒绝错误版本、迟到/不同 ID、缺失必要字段或非法枚举。诊断代码通过固定白名单，未知错误不会把 helper 提供的任意文本带入界面或诊断。
@@ -86,6 +86,8 @@ helper 启动后立即输出：
 - 预留的取词结果仍遵循 Core 的 `SelectionResult`；拒绝无效坐标、过长文本和错误来源，上下文仅在明确开启时保留。
 
 ## 构建与非交互验证
+
+协议 4 的每个 `input` 对象必须包含布尔 `sessionActive` 和非负整数 `sessionGeneration`。暂停时鼠标/快捷键运行标志为 false、事件数组为空；遗漏状态、负代数或暂停帧携带运行输入均被拒绝。代数变化取消旧请求，即使 host 没有看到暂停的中间帧。睡眠/会话规则及窗口处理见 [Mac 桌面生命周期](MAC_DESKTOP_LIFECYCLE.md)。
 
 在 Mac 上构建跨平台解决方案会同时生成 helper，也可单独构建：
 

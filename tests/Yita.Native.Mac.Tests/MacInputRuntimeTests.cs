@@ -144,12 +144,57 @@ public sealed class MacInputRuntimeTests
         Assert.Equal(1, helper.SelectionReads);
     }
 
+    [Fact]
+    public async Task SuspensionCancelsPendingTextAndBlocksManualClipboardUntilResume()
+    {
+        using var helper = new TestHelper { DelayedSelection = new(TaskCreationOptions.RunContinuationsAsynchronously) };
+        using var runtime = new MacSelectionRuntime(helper);
+        runtime.Configure(true, true, 0);
+        var deliveries = 0;
+        var activity = new List<bool>();
+        runtime.SelectionCaptured += (_, _) => deliveries++;
+        runtime.SessionActivityChanged += (_, active) => activity.Add(active);
+        await runtime.HandleInputAsync(Batch(Input(MacInputKind.PointerDown, 1, -800), Input(MacInputKind.PointerUp, 2, -700)));
+        await runtime.HandleInputAsync(Batch() with { Sequence = 3, SessionActive = false, SessionGeneration = 1 });
+        runtime.TranslateClipboard();
+        Assert.DoesNotContain("readClipboard", helper.Commands);
+        Assert.True(helper.SelectionToken.IsCancellationRequested);
+        helper.DelayedSelection.SetResult(Success("readSelection"));
+        await Task.Delay(30);
+        Assert.Equal(0, deliveries);
+        await runtime.HandleInputAsync(Batch() with { Sequence = 4, SessionGeneration = 2 });
+        var manual = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        runtime.SelectionCaptured += (_, _) => manual.TrySetResult();
+        runtime.TranslateClipboard();
+        await manual.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.Equal(new[] { false, true }, activity);
+        Assert.True(runtime.IsSessionActive);
+    }
+
+    [Fact]
+    public async Task AMissedSleepWakePairStillResetsAPartialGesture()
+    {
+        using var helper = new TestHelper();
+        using var runtime = new MacSelectionRuntime(helper);
+        runtime.Configure(true, true, 0);
+        var activity = new List<bool>();
+        runtime.SessionActivityChanged += (_, active) => activity.Add(active);
+        await runtime.HandleInputAsync(Batch(Input(MacInputKind.PointerDown, 1, -800)));
+        await runtime.HandleInputAsync(Batch(Input(MacInputKind.PointerUp, 3, -700)) with { SessionGeneration = 2 });
+        Assert.Equal(0, helper.SelectionReads);
+        Assert.Equal(new[] { false, true }, activity);
+        await runtime.HandleInputAsync(Batch() with { SessionGeneration = 2 });
+        Assert.Equal(2, activity.Count);
+    }
+
     [Theory]
     [InlineData("too-many")]
     [InlineData("unordered")]
     [InlineData("stale")]
     [InlineData("missing-source")]
     [InlineData("invalid-point")]
+    [InlineData("suspended-input")]
+    [InlineData("negative-session")]
     public void InputProtocolRejectsMalformedOrUnboundedBatches(string mode)
     {
         var item = Input(MacInputKind.PointerDown, 1, 0);
@@ -159,9 +204,12 @@ public sealed class MacInputRuntimeTests
             "unordered" => new[] { item, item },
             "stale" => new[] { item with { AgeMilliseconds = 501 } },
             "missing-source" => new[] { item with { ForegroundProcessId = null } },
+            "negative-session" or "suspended-input" => new[] { item },
             _ => new[] { item with { Pointer = new(double.NaN, 0) } },
         };
-        var response = Success("permissions").Response! with { Input = Batch(events) };
+        var batch = mode == "suspended-input" ? Batch(events) with { SessionActive = false }
+            : mode == "negative-session" ? Batch(events) with { SessionGeneration = -1 } : Batch(events);
+        var response = Success("permissions").Response! with { Input = batch };
         Assert.Throws<MacHelperProtocolException>(() => MacHelperProtocol.ValidateResponse(response, "test", "pollInput"));
     }
 

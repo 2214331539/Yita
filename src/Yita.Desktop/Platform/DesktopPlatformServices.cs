@@ -12,7 +12,8 @@ internal sealed class DesktopPlatformServices
     internal string DataDirectory { get; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Yita");
     internal IStartupRegistration Startup { get; } = OperatingSystem.IsWindows()
-        ? new WindowsStartupService() : new UnsupportedStartupRegistration();
+        ? new WindowsStartupService() : OperatingSystem.IsMacOS()
+            ? new MacStartupRegistration() : new UnsupportedStartupRegistration();
 
     internal ISingleInstanceGuard AcquireInstance(bool requestActivation) => OperatingSystem.IsWindows()
         ? new WindowsSingleInstanceGuard(requestActivation)

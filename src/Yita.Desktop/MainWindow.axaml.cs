@@ -82,6 +82,7 @@ public sealed partial class MainWindow : Window
         {
             _selectionRuntime.SelectionCaptured += OnSelectionCaptured;
             _selectionRuntime.ExternalPointerPressed += OnExternalPointerPressed;
+            if (_selectionRuntime is IDesktopSessionRuntime session) session.SessionActivityChanged += OnDesktopSessionActivityChanged;
             if (_selectionRuntime is Yita.Native.Mac.MacSelectionRuntime mac) mac.StatusChanged += OnNativeInputStatusChanged;
         }
     }
@@ -232,17 +233,31 @@ public sealed partial class MainWindow : Window
             var settings = ReadSettings(true);
             var key = ApiKeyPasswordBox.Text?.Trim() ?? "";
             await _settingsGate.WaitAsync();
+            var startupApplied = false;
             try
             {
                 await _settingsStore.ValidateWriteAsync();
+                if (_startupRegistration.IsSupported)
+                {
+                    _startupRegistration.Apply(settings.StartWithSystem);
+                    startupApplied = true;
+                }
                 await _secretStore.SaveApiKeyAsync(key);
                 await _settingsStore.SaveAsync(settings);
                 _settings = settings;
                 _savedApiKey = key;
                 _credentialsAvailable = true;
             }
+            catch
+            {
+                if (startupApplied)
+                {
+                    try { _startupRegistration.Apply(_settings.StartWithSystem); }
+                    catch (Exception exception) { System.Diagnostics.Trace.TraceError("Startup rollback failed: {0}", exception.GetType().Name); }
+                }
+                throw;
+            }
             finally { _settingsGate.Release(); }
-            if (_startupRegistration.IsSupported && _selectionRuntime is not null) _startupRegistration.Apply(_settings.StartWithSystem);
             ApplyRuntimeSettings();
             Hide();
         }
@@ -338,8 +353,17 @@ public sealed partial class MainWindow : Window
             TranslationServiceDescriptionText.Text = Localize("Your API key is stored in macOS Keychain on this device.", "API Key 保存在本机 macOS Keychain 中。");
         else if (!OperatingSystem.IsWindows())
             TranslationServiceDescriptionText.Text = Localize("Your API key is kept for this session only on this platform.", "此平台仅在当前运行期间保留 API Key。");
+        if (!OperatingSystem.IsWindows())
+        {
+            StartWithSystemTitleText.Text = Localize("Start at login", "登录时启动");
+            Avalonia.Automation.AutomationProperties.SetName(StartWithWindowsCheckBox, StartWithSystemTitleText.Text);
+        }
         if (!_startupRegistration.IsSupported)
-            ToolTip.SetTip(StartWithWindowsCheckBox, Localize("Login startup is not available on this platform yet.", "此平台尚未支持登录时启动。"));
+            ToolTip.SetTip(StartWithWindowsCheckBox, OperatingSystem.IsMacOS()
+                ? Localize("Login startup requires an installed Yita.app; it is disabled in source previews.", "登录启动需要已安装的 Yita.app，源码预览中不可用。")
+                : Localize("Login startup is not available on this platform yet.", "此平台尚未支持登录时启动。"));
+        else if (OperatingSystem.IsMacOS())
+            ToolTip.SetTip(StartWithWindowsCheckBox, Localize("Applies at the next login. macOS may ask you to allow Yita in Login Items.", "下次登录时生效；macOS 可能需要在登录项中允许 Yita。"));
         UpdateMemoryStatus();
         UpdateThemePreview();
         SynchronizeWindowLanguage();

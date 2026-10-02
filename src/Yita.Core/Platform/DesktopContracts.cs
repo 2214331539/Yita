@@ -28,6 +28,12 @@ public interface ISingleInstanceGuard : IDisposable
     void StartActivationListener(Action openSettings);
 }
 
+public interface IDesktopSessionRuntime
+{
+    bool IsSessionActive { get; }
+    event EventHandler<bool>? SessionActivityChanged;
+}
+
 public interface IStartupRegistration
 {
     bool IsSupported { get; }

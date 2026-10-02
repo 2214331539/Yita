@@ -249,27 +249,129 @@ public sealed class PlatformHostTests
     }
 
     private static void Click(Button button) => button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+
+    [AvaloniaFact]
+    public async Task NativeMenuCommandsLocalizeAndCannotRunAfterDisposal()
+    {
+        using var runtime = new TestSelectionRuntime();
+        var settings = 0;
+        var toggles = 0;
+        var diagnostics = 0;
+        var about = 0;
+        var exits = 0;
+        using var tray = new YitaTrayController(() => settings++, () => toggles++, () => exits++, true,
+            runtime, () => diagnostics++, () => about++, createIcon: false);
+        var items = tray.NativeMenu.Items.OfType<NativeMenuItem>().ToArray();
+        void Invoke(string header) => ((INativeMenuItemExporterEventsImplBridge)items.Single(item => item.Header == header)).RaiseClicked();
+        Invoke("Translate clipboard");
+        Invoke("Settings…");
+        Invoke("Enable selection translation");
+        Invoke("Repair input capture");
+        await UntilAsync(() => runtime.Repairs == 1);
+        Invoke("Copy performance diagnostics");
+        Invoke("About Yita");
+        Assert.Equal(1, runtime.ClipboardRequests);
+        Assert.Equal((1, 1, 1, 1), (settings, toggles, diagnostics, about));
+        tray.SetEnabled(false);
+        Assert.False(items.Single(item => item.ToggleType == NativeMenuItemToggleType.CheckBox).IsChecked);
+        tray.ApplyUiLanguage("zh-CN");
+        Assert.Contains(items, item => item.Header == "修复划词捕获");
+        Assert.DoesNotContain(items, item => item.Header == "Settings…");
+        Invoke("退出");
+        Assert.Equal(1, exits);
+        tray.Dispose();
+        Invoke("设置…");
+        Invoke("退出");
+        Assert.Equal(1, settings);
+        Assert.Equal(1, exits);
+    }
+
+    [AvaloniaFact]
+    public async Task StartupFailureDoesNotPersistAnEnabledPreferenceOrReplaceCredentials()
+    {
+        var startup = new TestStartupRegistration { FailOnEnable = true };
+        using var fixture = await Fixture.CreateAsync(startup: startup);
+        fixture.Window.FindControl<ToggleSwitch>("StartWithWindowsCheckBox")!.IsChecked = true;
+        fixture.Window.FindControl<TextBox>("ApiKeyPasswordBox")!.Text = "replacement-key";
+        Click(fixture.Window.FindControl<Button>("SaveSettingsButton")!);
+        await UntilAsync(() => fixture.Window.OwnedWindows.Count > 0);
+        Assert.False(fixture.Window.SavedSettings.StartWithSystem);
+        Assert.Equal("test-key", await fixture.Secrets.ReadApiKeyAsync());
+        Assert.Equal(new[] { true }, startup.Applied);
+        foreach (var dialog in fixture.Window.OwnedWindows.ToArray()) dialog.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task FailedCredentialSaveRestoresThePreviousLoginRegistration()
+    {
+        var startup = new TestStartupRegistration();
+        var secrets = new TestSecretStore();
+        using var fixture = await Fixture.CreateAsync(startup: startup, secrets: secrets);
+        secrets.FailSaving = true;
+        fixture.Window.FindControl<ToggleSwitch>("StartWithWindowsCheckBox")!.IsChecked = true;
+        Click(fixture.Window.FindControl<Button>("SaveSettingsButton")!);
+        await UntilAsync(() => fixture.Window.OwnedWindows.Count > 0);
+        Assert.False(fixture.Window.SavedSettings.StartWithSystem);
+        Assert.False(startup.Enabled);
+        Assert.Equal(new[] { true, false }, startup.Applied);
+        foreach (var dialog in fixture.Window.OwnedWindows.ToArray()) dialog.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task SuspensionHidesPinnedWindowsDismissesOthersAndResumesWithoutReplayingSelection()
+    {
+        using var runtime = new TestSelectionRuntime();
+        using var fixture = await Fixture.CreateAsync(runtime);
+        await fixture.Window.ShowSelectionTranslationAsync(new(SelectionTrigger.MouseGesture, new(100, 150)),
+            new("pinned selection", SelectionSource.Accessibility));
+        var pinned = Assert.Single(fixture.Window.TranslationPopups);
+        pinned.FindControl<Avalonia.Controls.Primitives.ToggleButton>("PinButton")!.IsChecked = true;
+        await fixture.Window.ShowSelectionTranslationAsync(new(SelectionTrigger.MouseGesture, new(200, 150)),
+            new("temporary selection", SelectionSource.Accessibility));
+        var temporary = fixture.Window.TranslationPopups.Single(popup => popup != pinned);
+        var position = pinned.Position;
+        await Task.Run(() => runtime.SetSessionActive(false));
+        await UntilAsync(() => !pinned.IsVisible && !temporary.IsVisible);
+        runtime.Capture("stale selection");
+        await Task.Delay(30);
+        Assert.Equal(2, fixture.Handler.Calls);
+        await Task.Run(() => runtime.SetSessionActive(true));
+        await UntilAsync(() => pinned.IsVisible);
+        Assert.True(pinned.IsPinned);
+        Assert.False(temporary.IsVisible);
+        Assert.Equal(position, pinned.Position);
+        Assert.Equal(2, fixture.Handler.Calls);
+        fixture.Window.ShutdownServices();
+        Assert.Equal(0, runtime.SessionSubscribers);
+        runtime.SetSessionActive(true);
+        Assert.False(pinned.IsVisible);
+    }
     private static async Task UntilAsync(Func<bool> condition)
     {
         for (var attempt = 0; attempt < 200 && !condition(); attempt++) await Task.Delay(10);
         Assert.True(condition());
     }
 
-    private class TestSelectionRuntime : ISelectionRuntime
+    private class TestSelectionRuntime : ISelectionRuntime, IDesktopSessionRuntime
     {
         public event EventHandler<SelectionCapturedEventArgs>? SelectionCaptured;
         public event EventHandler<ScreenPoint>? ExternalPointerPressed;
+        public event EventHandler<bool>? SessionActivityChanged;
+        public bool IsSessionActive { get; private set; } = true;
+        public int SessionSubscribers => SessionActivityChanged?.GetInvocationList().Length ?? 0;
+        public void SetSessionActive(bool active) { IsSessionActive = active; SessionActivityChanged?.Invoke(this, active); }
         public int SelectionSubscribers => SelectionCaptured?.GetInvocationList().Length ?? 0;
         public int PointerSubscribers => ExternalPointerPressed?.GetInvocationList().Length ?? 0;
         public bool Enabled { get; private set; }
         public virtual bool IsRunning => true;
         public bool IsHotkeyRunning => true;
         public int ClipboardRequests { get; private set; }
+        public int Repairs;
         public void Start() { }
         public void Configure(bool isEnabled, bool useClipboardFallback, int selectionDelayMilliseconds,
             bool useWpsPdfCompatibility = true, bool useSelectionContext = false) => Enabled = isEnabled;
         public void TranslateClipboard() => ClipboardRequests++;
-        public void RepairInputCapture() { }
+        public void RepairInputCapture() => Interlocked.Increment(ref Repairs);
         public string CreateDiagnostics(bool chinese) => "Test input service";
         public void Capture(string text) => SelectionCaptured?.Invoke(this, new SelectionCapturedEventArgs(
             new SelectionRequest(SelectionTrigger.MouseGesture, new ScreenPoint(100, 150)),
@@ -293,9 +395,25 @@ public sealed class PlatformHostTests
 
     private sealed class TestStartupRegistration : IStartupRegistration
     {
+        public bool FailOnEnable { get; init; }
+        public List<bool> Applied { get; } = new();
         public bool IsSupported => true;
         public bool Enabled { get; private set; }
-        public void Apply(bool enabled) => Enabled = enabled;
+        public void Apply(bool enabled)
+        {
+            Applied.Add(enabled);
+            if (enabled && FailOnEnable) throw new IOException("Startup fixture unavailable.");
+            Enabled = enabled;
+        }
+    }
+
+    private sealed class TestSecretStore : ISecretStore
+    {
+        private readonly MemorySecretStore _inner = new();
+        public bool FailSaving { get; set; }
+        public Task<string?> ReadApiKeyAsync(CancellationToken cancellationToken = default) => _inner.ReadApiKeyAsync(cancellationToken);
+        public Task SaveApiKeyAsync(string value, CancellationToken cancellationToken = default) =>
+            FailSaving ? throw new IOException("Credential fixture unavailable.") : _inner.SaveApiKeyAsync(value, cancellationToken);
     }
 
     private sealed class TestPermissionService : IPlatformPermissionService, IDisposable
@@ -338,24 +456,25 @@ public sealed class PlatformHostTests
         public void Dispose() => Disposed = true;
     }
 
-    private sealed class Fixture(MainWindow window, ResponseHandler handler, string directory) : IDisposable
+    private sealed class Fixture(MainWindow window, ResponseHandler handler, string directory, ISecretStore secrets) : IDisposable
     {
         public MainWindow Window { get; } = window;
         public ResponseHandler Handler { get; } = handler;
+        public ISecretStore Secrets { get; } = secrets;
         public static async Task<Fixture> CreateAsync(ISelectionRuntime? runtime = null, IStartupRegistration? startup = null,
-            bool enabled = true, IPlatformPermissionService? permissions = null)
+            bool enabled = true, IPlatformPermissionService? permissions = null, ISecretStore? secrets = null)
         {
             var directory = Path.Combine(Path.GetTempPath(), "yita-host-tests-" + Guid.NewGuid().ToString("N"));
             var store = new JsonSettingsStore(Path.Combine(directory, "settings.json"));
             await store.SaveAsync(YitaSettings.Default with { IsEnabled = enabled });
-            var secret = new MemorySecretStore();
+            var secret = secrets ?? new MemorySecretStore();
             await secret.SaveApiKeyAsync("test-key");
             var handler = new ResponseHandler();
             var window = new MainWindow(runtime, store, secret, httpClient: new HttpClient(handler),
                 startupRegistration: startup ?? new UnsupportedStartupRegistration(), permissionService: permissions);
             window.Show();
             await window.Initialization;
-            return new Fixture(window, handler, directory);
+            return new Fixture(window, handler, directory, secret);
         }
         public void Dispose()
         {

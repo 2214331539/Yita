@@ -12,10 +12,10 @@
 | `Yita.Desktop` | `App.axaml.cs` 管理生命周期；`Platform/DesktopPlatformServices.cs` 创建系统实现；`MainWindow` 订阅共享输入事件并管理设置和阅读会话；`TranslationPopupWindow`、`QuestionAnswerWindow` 呈现翻译与问答 |
 | `Yita.Native.Windows` | `WindowsSelectionRuntime` 接收鼠标/快捷键；`WindowsSelectionAdapter` 组织取词；剪贴板、托盘、凭据、启动项与显示偏好各自独立 |
 | `Yita.Native.Windows.UIA.Worker` | Windows 专属 helper，独立访问 UI Automation provider |
-| `Yita.Native.Mac` | `MacSelectionRuntime` 消费输入批次并连接 Desktop；helper 客户端、权限与选区、Keychain 及加密修正记录 |
-| `Yita.Native.Mac.Helper` | Swift/AppKit/Carbon agent，鼠标事件 tap、全局快捷键、权限、AX/边界、Cmd+C 事务与取消；原生菜单栏尚待补齐 |
+| `Yita.Native.Mac` | `MacSelectionRuntime` 消费输入和会话状态并连接 Desktop；helper 客户端、权限与选区、Keychain、加密修正记录、登录项与浮窗原生属性 |
+| `Yita.Native.Mac.Helper` | Swift/AppKit/Carbon agent，鼠标事件 tap、全局快捷键、权限、AX/边界、Cmd+C 事务与取消、睡眠和用户会话通知 |
 
-Desktop 当前使用 XAML 与窗口 code-behind/partial class 配合独立业务服务，不宣称已经完成完整 MVVM。系统实现选择集中在工厂；字体/动效的显示偏好仍有 Windows 专属调用。功能分支的 macOS `ISelectionRuntime` 已接入；登录启动、真实安全存储与窗口原生行为仍需补齐/验收。
+Desktop 当前使用 XAML 与窗口 code-behind/partial class 配合独立业务服务，不宣称已经完成完整 MVVM。系统实现选择集中在工厂；字体/动效的显示偏好仍有 Windows 专属调用。功能分支的 macOS `ISelectionRuntime` 已接入；登录启动和窗口原生行为已有代码，真实安全存储及桌面行为仍待验收。
 
 ## 平台宿主接口
 
@@ -25,7 +25,9 @@ Desktop 当前使用 XAML 与窗口 code-behind/partial class 配合独立业务
 
 `ISingleInstanceGuard` 将实例归属和唤醒分离：Windows 沿用原互斥量/事件实现；非 Windows 使用文件独占句柄和当前用户专用管道。锁文件在退出时不删除，避免不同 inode 造成两个实例同时拥有锁。新进程发送有时限的一字节唤醒消息，主实例在设置窗口建立前保留待唤醒状态；后台启动不发送消息。
 
-`IStartupRegistration` 明确是否支持启动项，未实现的平台禁用开关。`IStatusIcon` 提供原生图标事件；Windows 保持自绘 Yita 菜单，其他平台先使用 Avalonia NativeMenu/TrayIcon。Mac 菜单和 `Cmd+Shift+T` 经 helper 主动读取剪贴板，并使用当前 Quartz 指针定位；没有原生 runtime 时仍保留 Avalonia 剪贴板的手动入口。
+`IStartupRegistration` 明确是否支持启动项。Mac 仅为符合身份与 XML 元数据约定的 `.app` 注册当前用户 LaunchAgent，源码预览禁用；配置下次 GUI 登录，不立即启动。`IStatusIcon` 提供原生图标事件；Windows 保持自绘 Yita 菜单，Mac 复用 Avalonia 的 NSStatusItem/NSMenu，包含本地化、启用状态与输入修复。Mac 菜单和 `Cmd+Shift+T` 经 helper 主动读取剪贴板，并使用当前 Quartz 指针定位；没有原生 runtime 时仍保留 Avalonia 剪贴板的手动入口。
+
+`IDesktopSessionRuntime` 把 Mac 睡眠/用户会话状态接入 Desktop。协议 4 每帧携带持久状态和代数；暂停取消旧选区和模型请求，隐藏固定窗口、关闭/隐藏其他窗口；恢复只无激活地显示原先可见的固定窗口，不自动重译。浮窗在 Cocoa 主线程设置 Spaces/全屏辅助属性，不更换 Avalonia UI。实现与限制见 [Mac 桌面生命周期](MAC_DESKTOP_LIFECYCLE.md)。
 
 系统凭据和修正数据保护由平台工厂创建。Mac Keychain 使用 Security.framework 的 SecItem API，不再启动 `security` 子进程；后台初始化密钥和修正数据，不在窗口输入回调中访问 Keychain。缺少输入服务时禁用自动划词、复制回退与 WPS 控件，并说明手动剪贴板入口；诊断列出启动项、凭据、设置和加密记忆状态，不包含正文、Key 或数据路径。
 
@@ -101,7 +103,7 @@ AX 读取仅针对当前前台应用，匹配请求中的 PID/Bundle ID，并在
 
 鼠标 tap 在独立 run loop 只入队，C# 定期消费有界批次；新输入序号使旧 AX/复制失效，键盘事件不保存文字。Quartz 点与当前 Avalonia.Native 的屏幕/窗口位置一致，不乘 Retina 渲染倍率。过滤自身窗口、过期/溢出事件、修饰键和来源变化；详细规则见 [Mac 原生输入](MAC_NATIVE_INPUT.md)。
 
-下一步是 Mac 菜单栏/登录启动、Spaces/全屏与窗口生命周期，以及真实权限、应用兼容性、Retina/多屏和签名验收。当前开发签名不替代正式包的 Developer ID、公证与更新后 TCC 检查。Linux 当前不在交付范围。
+Mac 菜单栏/登录项、Spaces 属性与睡眠恢复已具备代码及可控测试；下一步仍需真实权限、应用兼容性、窗口焦点、Retina/多屏和签名验收，再根据结果处理原生差异。当前开发签名不替代正式包的 Developer ID、公证与更新后 TCC 检查。Linux 当前不在交付范围。
 
 Avalonia 新架构的自包含发布、Setup 安装和升级尚未验收。旧 `Build-Setup.ps1` 与 `Publish.ps1` 构建 WPF；现有 release 工作流已禁止从包含 Desktop 项目的新标签发布该旧产物。历史 Release 与标签保留，不因 main 切换而重打包。
 

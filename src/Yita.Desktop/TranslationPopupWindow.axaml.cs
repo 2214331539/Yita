@@ -26,6 +26,7 @@ public sealed partial class TranslationPopupWindow : Window
     private bool _hasError;
     private bool _userSized;
     private bool _hasAnchor;
+    private bool _translationComplete;
     private AppSettings _settings = AppSettings.Default;
     private ExplanationAction? _lastExplanation;
     private bool _explanationComplete;
@@ -37,6 +38,7 @@ public sealed partial class TranslationPopupWindow : Window
     public TranslationPopupWindow()
     {
         InitializeComponent();
+        DesktopFloatingWindowBehavior.Apply(this);
         ReferenceTheme.Apply(Resources, _settings);
         SizeChanged += (_, _) => ConstrainToScreen();
         Opened += (_, _) => ReferenceMotion.Reveal(PopupRoot, scale: true);
@@ -113,6 +115,7 @@ public sealed partial class TranslationPopupWindow : Window
 
     public void BeginTranslation(string source)
     {
+        _translationComplete = false;
         _sourceText = source;
         _translatedText = _settings.UiLanguage == "zh-CN" ? "正在翻译…" : "Translating…";
         _hasError = false;
@@ -152,7 +155,18 @@ public sealed partial class TranslationPopupWindow : Window
         RefreshText();
     }
 
-    internal void CompleteTranslation() { QuestionRow.IsVisible = true; RefreshText(); }
+    internal void CompleteTranslation() { _translationComplete = true; QuestionRow.IsVisible = true; RefreshText(); }
+
+    internal void SuspendSession()
+    {
+        _dragging = false;
+        TranslationRequests.Cancel();
+        ExplanationRequests.Cancel();
+        if (LoadingPanel.IsVisible) SetError(_settings.UiLanguage == "zh-CN" ? "翻译已停止，请重新划词。" : "Translation stopped. Select the text again.");
+        else if (!_translationComplete) ShowNotice(_settings.UiLanguage == "zh-CN" ? "翻译已停止" : "Translation stopped");
+        _waitingForExplanation = false;
+        if (!_explanationComplete) ExplanationOverlay.IsVisible = false;
+    }
 
     public void PlaceNear(SelectionRequest request, SelectionResult result, PopupOffset? savedOffset = null)
     {

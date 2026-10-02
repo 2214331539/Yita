@@ -68,7 +68,7 @@
                     <ColumnDefinition Width="Auto" />
                   </Grid.ColumnDefinitions>
                   <StackPanel>
-                    <TextBlock FontWeight="SemiBold" Tag="loc:StartWithWindows" Text="Start with Windows" LineHeight="20" />
+                    <TextBlock x:Name="StartWithSystemTitleText" FontWeight="SemiBold" Tag="loc:StartWithWindows" Text="Start with Windows" LineHeight="20" />
                     <TextBlock Margin="0,3,18,0" Tag="loc:StartWithWindowsDescription" Text="Stay ready in the background after sign-in." Classes="supporting" LineHeight="20" />
                   </StackPanel>
                   <ToggleSwitch x:Name="StartWithWindowsCheckBox" Grid.Column="1" VerticalAlignment="Center" AutomationProperties.Name="Start with Windows" Classes="switch" />

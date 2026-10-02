@@ -42,6 +42,7 @@ internal sealed partial class QuestionAnswerWindow : Window
         (_settings, _source, _translation, _explanation, _kind, _runtime, _records, _context) =
             (settings, source, translation, explanation, kind, runtime, records, context);
         InitializeComponent();
+        DesktopFloatingWindowBehavior.Apply(this);
         ReferenceTheme.Apply(Resources, settings);
         ApplyUiLanguage(settings.UiLanguage);
         var chat = kind == QuestionContextKind.GeneralChat;
@@ -171,6 +172,16 @@ internal sealed partial class QuestionAnswerWindow : Window
     private void StopClick(object? sender, RoutedEventArgs e)
     {
         _requests.Cancel(); SetIdle();
+        RetryButton.IsVisible = true;
+    }
+
+    internal void SuspendSession()
+    {
+        if (!_streaming) return;
+        _requests.Cancel();
+        if (_waitingForAnswer) _pendingAnswer = _settings.UiLanguage == "zh-CN" ? "已停止。" : "Stopped.";
+        SetIdle();
+        RenderTranscript();
         RetryButton.IsVisible = true;
     }
     private async void RetryClick(object? sender, RoutedEventArgs e) => await AskAsync(_question);

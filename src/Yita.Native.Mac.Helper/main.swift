@@ -3,7 +3,7 @@ import ApplicationServices
 import Darwin
 import Foundation
 
-private let protocolVersion = 3
+private let protocolVersion = 4
 private let bundleIdentifier = "com.yita.desktop.native-helper"
 private let maximumRequestBytes = 64_000
 private let arguments = CommandLine.arguments
@@ -111,6 +111,10 @@ private func permissions() -> Permissions {
         response.input = nativeInput.poll()
         response.diagnosticCode = nativeInput.diagnostic
     case "readClipboard":
+        guard nativeInput.sessionActive else {
+            response.selection = NativeSelection(source: "manualClipboard", failure: "cancelled", diagnosticCode: "selection-cancelled")
+            emit(response); return
+        }
         let text = selfTest ? "fixture clipboard" : NSPasteboard.general.string(forType: .string)
         response.pointer = nativeInput.pointer
         if let text = text, text.utf16.count <= 20_000, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -123,7 +127,7 @@ private func permissions() -> Permissions {
             response.selection = .failed(.invalidRequest)
             emit(response); return
         }
-        let isInputCurrent = { request.input?.sequence == nil || request.input?.sequence == nativeInput.sequence }
+        let isInputCurrent = { nativeInput.sessionActive && (request.input?.sequence == nil || request.input?.sequence == nativeInput.sequence) }
         guard isInputCurrent() else { response.selection = .failed(.cancelled); emit(response); return }
         if selfTest, let fixture = selectionFixture, fixture.hasPrefix("clipboard") {
             response.selection = await readClipboardFixture(fixture, request: selection,

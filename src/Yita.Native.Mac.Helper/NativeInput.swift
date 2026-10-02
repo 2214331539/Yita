@@ -19,6 +19,8 @@ struct NativeInputEvent: Encodable {
 }
 
 struct NativeInputSnapshot: Encodable {
+    let sessionActive: Bool
+    let sessionGeneration: Int64
     let mouseRunning: Bool
     let hotkeyRunning: Bool
     let sequence: Int64
@@ -39,9 +41,17 @@ final class NativeInputQueue {
     private var items: [QueuedInput] = []
     private var generation: Int64 = 0
     private var target: SelectionTarget?
+    private var active = true
     private let ownerPID: Int32?
     init(ownerPID: Int32?) { self.ownerPID = ownerPID }
     var sequence: Int64 { lock.lock(); defer { lock.unlock() }; return generation }
+
+    func reset(now: TimeInterval, active: Bool = true) {
+        lock.lock(); defer { lock.unlock() }
+        self.active = active
+        items.removeAll(keepingCapacity: true)
+        append("cancel", point: SelectionPoint(x: 0, y: 0), timestamp: now, modified: false)
+    }
 
     func setTarget(_ value: SelectionTarget?, now: TimeInterval) {
         lock.lock(); defer { lock.unlock() }
@@ -52,6 +62,7 @@ final class NativeInputQueue {
 
     func record(_ kind: String, point: SelectionPoint, timestamp: TimeInterval, modified: Bool = false) {
         lock.lock(); defer { lock.unlock() }
+        guard active else { return }
         guard point.isValid, abs(point.x) <= 10_000_000, abs(point.y) <= 10_000_000, timestamp.isFinite else { return }
         if kind != "translateClipboard", target?.processId == ownerPID || target?.processId == getpid() {
             append("cancel", point: point, timestamp: timestamp, modified: false)
@@ -136,6 +147,8 @@ final class NativeMouseMonitor {
     }
 
     func receive(_ type: CGEventType, event: CGEvent) {
+        condition.lock(); let stopped = stopping; condition.unlock()
+        if stopped { return }
         let now = ProcessInfo.processInfo.systemUptime
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             condition.lock(); running = false; condition.unlock()
@@ -185,14 +198,18 @@ final class NativeInputManager {
     private var hotkey: EventHotKeyRef?
     private var handler: EventHandlerRef?
     private var observer: NSObjectProtocol?
+    private var sessionObservers: [NSObjectProtocol] = []
+    private let session = NativeDesktopSession()
     private var wanted = false
     private var configured = false
     private var lastRefresh: TimeInterval = -10
     private var tapStarts: [TimeInterval] = []
     private var fixtureEmitted = false
+    private var lifecycleFixtureStep = 0
     private var hotkeyHeld = false
     var diagnostic: String?
     var sequence: Int64 { queue.sequence }
+    var sessionActive: Bool { session.isActive }
     var pointer: SelectionPoint {
         if selfTest { return SelectionPoint(x: -700, y: 150) }
         let location = CGEvent(source: nil)?.location ?? .zero
@@ -215,7 +232,20 @@ final class NativeInputManager {
             updateTarget()
             observer = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification,
                 object: nil, queue: .main) { [weak self] _ in self?.updateTarget() }
+            let notifications: [(Notification.Name, NativeDesktopSession.Reason, Bool)] = [
+                (NSWorkspace.willSleepNotification, .sleep, true),
+                (NSWorkspace.didWakeNotification, .sleep, false),
+                (NSWorkspace.screensDidSleepNotification, .displaySleep, true),
+                (NSWorkspace.screensDidWakeNotification, .displaySleep, false),
+                (NSWorkspace.sessionDidResignActiveNotification, .inactiveUser, true),
+                (NSWorkspace.sessionDidBecomeActiveNotification, .inactiveUser, false)
+            ]
+            for (name, reason, suspended) in notifications {
+                sessionObservers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: name,
+                    object: nil, queue: .main) { [weak self] _ in self?.setSession(reason, suspended: suspended) })
+            }
         }
+        guard sessionActive else { return }
         if hotkey == nil {
             let types = [EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed)),
                          EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyReleased))]
@@ -236,7 +266,7 @@ final class NativeInputManager {
 
     func receiveHotkey(pressed: Bool) {
         if !pressed { hotkeyHeld = false; return }
-        guard !hotkeyHeld else { return }
+        guard sessionActive, !hotkeyHeld else { return }
         hotkeyHeld = true
         queue.record("translateClipboard", point: pointer, timestamp: ProcessInfo.processInfo.systemUptime)
     }
@@ -248,7 +278,7 @@ final class NativeInputManager {
     }
 
     private func refresh() {
-        guard !selfTest, configured else { return }
+        guard !selfTest, configured, sessionActive else { return }
         let now = ProcessInfo.processInfo.systemUptime
         guard now - lastRefresh >= 1 else { return }
         lastRefresh = now
@@ -270,10 +300,15 @@ final class NativeInputManager {
     }
 
     func poll() -> NativeInputSnapshot {
+        if selfTest, fixture == "lifecycle", configured {
+            if lifecycleFixtureStep == 1 { setSession(.sleep, suspended: true) }
+            if lifecycleFixtureStep == 3 { setSession(.sleep, suspended: false) }
+            lifecycleFixtureStep += 1
+        }
         if !configured { diagnostic = "input-not-configured" }
         else if diagnostic == "input-not-configured" { diagnostic = nil }
         refresh()
-        if selfTest, fixture == "drag", configured, wanted, !fixtureEmitted {
+        if selfTest, fixture == "drag", configured, wanted, sessionActive, !fixtureEmitted {
             fixtureEmitted = true
             let now = ProcessInfo.processInfo.systemUptime
             queue.record("pointerDown", point: SelectionPoint(x: -800, y: 120), timestamp: now)
@@ -300,8 +335,20 @@ final class NativeInputManager {
             }
             return item
         }
-        return NativeInputSnapshot(mouseRunning: selfTest ? configured && wanted && fixture != nil : monitor?.isRunning == true,
-            hotkeyRunning: selfTest ? configured && fixture != nil : hotkey != nil, sequence: batch.sequence, events: events)
+        return NativeInputSnapshot(sessionActive: sessionActive, sessionGeneration: session.generation,
+            mouseRunning: sessionActive && (selfTest ? configured && wanted && fixture != nil : monitor?.isRunning == true),
+            hotkeyRunning: sessionActive && (selfTest ? configured && fixture != nil : hotkey != nil),
+            sequence: batch.sequence, events: sessionActive ? events : [])
+    }
+
+    func setSession(_ reason: NativeDesktopSession.Reason, suspended: Bool) {
+        guard session.set(reason, suspended: suspended) else { return }
+        queue.reset(now: ProcessInfo.processInfo.systemUptime, active: sessionActive)
+        hotkeyHeld = false
+        if !sessionActive {
+            monitor?.stop(); monitor = nil
+            if let hotkey = hotkey { UnregisterEventHotKey(hotkey); self.hotkey = nil }
+        } else if configured { configure(mouseEnabled: wanted) }
     }
 
     func stop() {
@@ -310,6 +357,23 @@ final class NativeInputManager {
         if let hotkey = hotkey { UnregisterEventHotKey(hotkey); self.hotkey = nil }
         if let handler = handler { RemoveEventHandler(handler); self.handler = nil }
         if let observer = observer { NSWorkspace.shared.notificationCenter.removeObserver(observer); self.observer = nil }
+        for token in sessionObservers { NSWorkspace.shared.notificationCenter.removeObserver(token) }
+        sessionObservers.removeAll()
     }
     deinit { stop() }
+}
+
+// Persist lifecycle state in every snapshot so queue expiry/overflow cannot lose a suspension.
+final class NativeDesktopSession {
+    enum Reason: Hashable { case sleep, displaySleep, inactiveUser }
+    private var reasons: Set<Reason> = []
+    private(set) var generation: Int64 = 0
+    var isActive: Bool { reasons.isEmpty }
+    @discardableResult func set(_ reason: Reason, suspended: Bool) -> Bool {
+        let wasActive = isActive
+        if suspended { reasons.insert(reason) } else { reasons.remove(reason) }
+        guard wasActive != isActive else { return false }
+        if generation < Int64.max { generation += 1 }
+        return true
+    }
 }

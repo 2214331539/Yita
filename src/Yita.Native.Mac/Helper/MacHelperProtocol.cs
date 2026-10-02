@@ -6,7 +6,7 @@ namespace Yita.Native.Mac;
 
 internal static class MacHelperProtocol
 {
-    internal const int Version = 3;
+    internal const int Version = 4;
     internal const string BundleIdentifier = "com.yita.desktop.native-helper";
     internal const int MaximumRequestBytes = 64_000;
     internal const int MaximumResponseBytes = 256_000;
@@ -25,6 +25,10 @@ internal static class MacHelperProtocol
             if (document.RootElement.TryGetProperty("selection", out var selection) && selection.ValueKind != JsonValueKind.Null
                 && (selection.ValueKind != JsonValueKind.Object || !selection.TryGetProperty("source", out _)
                     || !selection.TryGetProperty("failure", out _)))
+                throw new MacHelperProtocolException(NativeServiceState.Unavailable);
+            if (document.RootElement.TryGetProperty("input", out var input) && input.ValueKind != JsonValueKind.Null
+                && (input.ValueKind != JsonValueKind.Object || !input.TryGetProperty("sessionActive", out _)
+                    || !input.TryGetProperty("sessionGeneration", out _)))
                 throw new MacHelperProtocolException(NativeServiceState.Unavailable);
             return JsonSerializer.Deserialize<MacHelperResponse>(data, JsonOptions)
                 ?? throw new MacHelperProtocolException(NativeServiceState.Unavailable);
@@ -56,7 +60,8 @@ internal static class MacHelperProtocol
             throw new MacHelperProtocolException(NativeServiceState.Unavailable);
         if (response.Input is { } input)
         {
-            if (input.Sequence < 0 || input.Events is null || input.Events.Length > 64)
+            if (input.Sequence < 0 || input.SessionGeneration < 0 || input.Events is null || input.Events.Length > 64
+                || (!input.SessionActive && (input.MouseRunning || input.HotkeyRunning || input.Events.Length != 0)))
                 throw new MacHelperProtocolException(NativeServiceState.Unavailable);
             long previous = 0;
             foreach (var item in input.Events)
@@ -112,6 +117,8 @@ internal sealed record MacInputEvent
 }
 internal sealed record MacInputSnapshot
 {
+    public bool SessionActive { get; init; } = true;
+    public long SessionGeneration { get; init; }
     public required bool MouseRunning { get; init; }
     public required bool HotkeyRunning { get; init; }
     public required long Sequence { get; init; }
