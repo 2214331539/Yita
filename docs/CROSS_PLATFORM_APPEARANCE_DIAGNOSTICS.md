@@ -45,7 +45,9 @@ Windows 保留当前微软雅黑界面与原版译文字体选项。macOS 界面
 
 ## 验证与待验收
 
-本机跨平台解决方案 Release 编译 0 警告/0 错误，487 项测试通过：Core 65、原版业务 258、Windows 22、Mac 86、Desktop 56。覆盖字体回退、偏好 JSON 保存、UI 预览/取消/保存、系统偏好优先、连续动画取消/分离、类型分类、有界样本与隐私、失败无模型请求和语言切换。单实例与可控 helper smoke 通过，新增 Cocoa probe 的 Mac 实际结果待 CI 核验。
+代码提交 `1772046` 的 [GitHub Actions #36994976722](https://github.com/2214331539/Yita/actions/runs/36994976722) 在 Windows/macOS 均通过：Release 编译 0 警告/0 错误，各 487 项测试（Core 65、原版业务 258、Windows 22、Mac 86、Desktop 56）。覆盖字体回退、偏好 JSON 保存、UI 预览/取消/保存、系统偏好优先、连续动画取消/分离、类型分类、有界样本与隐私、失败无模型请求和语言切换。本机同样通过，另有单实例与可控 helper smoke。
+
+Mac CI 通过实际 Cocoa 偏好读取及非主线程拒绝的 2 项 probe、34 项 Swift/C# 管道检查、17 组 AX、22 组剪贴板和 16 组输入策略。没有改动系统偏好、请求授权、读取外部应用文本或注册登录项；不能用这些结果替代真实桌面验收。
 
 本地布局截图位于忽略目录 `artifacts/appearance-validation`，覆盖设置四页、减少动效、失败状态、译文/问答和缩放阅读。截图使用可控文本与响应，不访问用户 API。
 

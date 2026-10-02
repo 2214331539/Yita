@@ -281,6 +281,7 @@ public sealed class ReferenceLayoutTests
         {
             ReferenceMotion.Enabled = false;
             window.UpdateLayout(); Dispatcher.UIThread.RunJobs();
+            AvaloniaHeadlessPlatform.ForceRenderTimerTick(3);
             using var bitmap = window.CaptureRenderedFrame();
             Assert.NotNull(bitmap);
             bitmap.Save(Path.Combine(directory, name + ".png"));

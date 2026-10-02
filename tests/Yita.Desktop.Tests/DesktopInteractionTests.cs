@@ -85,8 +85,16 @@ public sealed class DesktopInteractionTests
         Assert.Contains("denied", status.Text);
         Click(fixture.Window.FindControl<Button>("UiLanguageButton")!);
         Assert.Contains("读取被拒绝", status.Text);
-        fixture.Window.UpdateLayout(); Dispatcher.UIThread.RunJobs();
-        ReferenceLayoutTests.Capture(fixture.Window, "avalonia-selection-failure");
+        ReferenceMotion.SetReduceMotion(true);
+        try
+        {
+            for (var attempt = 0; attempt < 100 && ReferenceMotion.ActiveCount > 0; attempt++)
+            { Dispatcher.UIThread.RunJobs(); await Task.Delay(5); }
+            Assert.Equal(1, fixture.Window.FindControl<Grid>("SettingsRoot")!.Opacity);
+            fixture.Window.UpdateLayout(); Dispatcher.UIThread.RunJobs();
+            ReferenceLayoutTests.Capture(fixture.Window, "avalonia-selection-failure");
+        }
+        finally { ReferenceMotion.SetReduceMotion(false); }
         var report = fixture.Window.SelectionDiagnostics.CreateReport(false);
         Assert.DoesNotContain("private", report);
         Assert.DoesNotContain("987654", report);
