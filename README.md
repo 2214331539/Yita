@@ -249,7 +249,7 @@ Yita 是本地客户端，默认在线翻译不是离线模型。开启个人术
 
 通过 [Issues](https://github.com/2214331539/Yita/issues) 报告问题或提出建议。Pull Request 默认提交到 `main`，请运行当前解决方案的构建与测试；取词、剪贴板和请求生命周期修改应包含针对实际风险的回归验证，UI 修改应检查中英文、长文、缩放与加载/错误状态。
 
-新增平台能力应实现原生适配边界，保持 Core 不依赖平台 UI。macOS 后续工作包括 AXUIElement、Cmd+C 回退、选区坐标、Accessibility 权限、全局输入、菜单栏 helper 与真实设备验收。
+新增平台能力应实现原生适配边界，保持 Core 不依赖平台 UI。`codex/platform-host-services` 已有 AX 取词、显式 Cmd+C 回退与权限入口代码；macOS 后续工作包括全局输入、Desktop 接入、屏幕坐标转换、菜单栏 helper 与真实设备验收。
 
 ## 许可证与来源
 

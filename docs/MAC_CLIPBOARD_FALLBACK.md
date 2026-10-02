@@ -39,4 +39,6 @@ NSPasteboard 保存的是已物化格式，不能重建任意原应用的 lazy/p
 
 `--self-test --selection-fixture clipboard-slow` 在真实 Swift/C# 管道上模拟缓慢复制，验证显式启用、结构化结果、取消清理和 helper 后续可用性。它同样不发送真实键盘事件。
 
+2026-10-02，提交 `71c0ddc` 的 [GitHub Actions #36977995806](https://github.com/2214331539/Yita/actions/runs/36977995806) 已通过 Windows/macOS 各 418 项测试。Mac 通过全部 22 组剪贴板事务测试，以及实际 Swift 管道上的取消后复用、客户端释放和 EOF 后恢复/退出检查。跨进程 fixture 与生产期限使用同一种单调时钟，避免将 runner 调度延迟累计成虚拟等待；确定性策略测试的时钟保持独立。
+
 恢复 Mac 验收后，必须实际检查 Preview/浏览器/编辑器中的 Cmd+C、HID 输入计数是否正确区分 private 注入事件、单次 changeCount 规则、普通复制、富文本/图片原格式、权限撤销、取消/退出和延迟复制。CI 不能替代这些验收；不满足当前归属规则的应用先标记为需要手动复制。

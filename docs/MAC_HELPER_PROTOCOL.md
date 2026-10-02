@@ -45,7 +45,7 @@ helper 启动后立即输出：
 
 | 命令 | 当前行为 |
 | --- | --- |
-| `permissions` | 检查 AX 信任状态和 Input Monitoring 状态，不请求权限 |
+| `permissions` | 检查 AX 信任、Input Monitoring 和事件投递权限，不请求权限 |
 | `requestAccessibility` | 用户点击时调用 `AXIsProcessTrustedWithOptions` 提示授权；返回时用户可能尚未完成授权，需要再次检查 |
 | `openAccessibilitySettings` | 用户点击时打开系统辅助功能隐私设置 |
 | `readSelection` | 读取当前前台应用的 AX 选区；只有根请求 `allowClipboardFallback:true` 才允许安全检查后的 Cmd+C 回退 |
@@ -104,3 +104,5 @@ self-test 不初始化 NSApplication、不检查真实桌面权限、不打开�
 2026-10-02，提交 `f85a8d8` 的 [GitHub Actions #36973376654](https://github.com/2214331539/Yita/actions/runs/36973376654) 已通过 Windows/macOS 构建、各 398 项测试、可控子进程通信和 Mac 实际 Swift helper 的 5 项 self-test。Swift 管道读取使用 `Darwin.read`，每个短请求在 stdin 仍保持打开时即可返回，不等待缓冲区填满或 EOF。
 
 同日，AX 读取代码提交 `502d864` 的 [GitHub Actions #36974694338](https://github.com/2214331539/Yita/actions/runs/36974694338) 通过 Windows/macOS 构建、各 409 项测试，以及 Mac 实际 Swift helper 的 10 项管道检查、17 项 AX 策略 fixtures。真实 AX 权限、目标应用和屏幕坐标仍待真机验收。
+
+Cmd+C 与取消清理代码提交 `71c0ddc` 的 [GitHub Actions #36977995806](https://github.com/2214331539/Yita/actions/runs/36977995806) 通过 Windows/macOS 构建与各 418 项测试。Mac 实际 Swift helper 通过 20 项管道检查（包括复制显式启用、取消后复用、释放及 EOF 清理）、17 组 AX 策略与 22 组剪贴板事务 fixtures。IPC fixture 使用真实单调时间；纯策略测试仍使用虚拟时间，不改变生产超时。这些结果不代表真实桌面授权或外部应用兼容性已通过。

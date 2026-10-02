@@ -99,7 +99,7 @@ AX 读取仅针对当前前台应用，匹配请求中的 PID/Bundle ID，并在
 
 `ReadAsync(request, allowClipboardFallback:true)` 在 AX 空选区或不支持时尝试 Cmd+C。先检查前台和焦点、可复制角色、AX/事件投递权限、安全祖先、修饰键及可完整物化的多格式剪贴板。使用标记的 private CGEventSource 向原 PID 投递复制；以单次 changeCount、HID 输入计数与 80ms 稳定状态归属，在同序列下恢复原始字节。协议 2 支持复制取消和 EOF 清理，客户端等待清理完成后才启动新 helper。NSPasteboard 缺少原子序列写入和所有者校验，这套规则无法消除所有系统竞态；具体限制、手动回退和真实验收要求见 [Mac Cmd+C 回退](MAC_CLIPBOARD_FALLBACK.md)。
 
-下一步 macOS 需要实现 AXUIElement、选区坐标、Cmd+C/NSPasteboard、全局快捷键与鼠标、NSStatusItem，以及真实权限、窗口行为和签名验收。当前开发签名不替代正式包的 Developer ID、公证与更新后 TCC 检查。Linux 当前不在交付范围。
+下一步 macOS 需要捕获全局快捷键与鼠标，将已有 AX/Cmd+C 读取连接到 Desktop，完成屏幕坐标转换与 NSStatusItem 菜单栏，并开展真实权限、窗口行为和签名验收。当前开发签名不替代正式包的 Developer ID、公证与更新后 TCC 检查。Linux 当前不在交付范围。
 
 Avalonia 新架构的自包含发布、Setup 安装和升级尚未验收。旧 `Build-Setup.ps1` 与 `Publish.ps1` 构建 WPF；现有 release 工作流已禁止从包含 Desktop 项目的新标签发布该旧产物。历史 Release 与标签保留，不因 main 切换而重打包。
 
