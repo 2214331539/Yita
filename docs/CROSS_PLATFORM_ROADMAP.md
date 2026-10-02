@@ -19,7 +19,7 @@
 | 能力 | 当前证据 | 尚缺工作 |
 | --- | --- | --- |
 | Windows 取词与阅读 | UIA 隔离、原生控件、复制回退、浮窗与托盘已接入；本机 WPS PDF 等已验收；朋友验收了旧 WPF 安装版 | 新 Avalonia 版的多电脑、更多目标软件、安装后兼容性与长期运行 |
-| 平台宿主接入 | 功能分支已通过共享接口连接窗口、原生事件、托盘与启动项；单实例/唤醒通过双端 CI；Mac 菜单栏、受约束的 `.app` 登录项与会话恢复已有代码 | 合入主线、Mac 桌面/真实登录实测和正式应用打包 |
+| 平台宿主接入 | 功能分支已通过共享接口连接窗口、原生事件、托盘与启动项；单实例/唤醒通过双端 CI；Mac 菜单栏、受约束的 `.app` 登录项与会话恢复已有代码；Apple Silicon 内部试用包已生成 | 合入主线、Mac 桌面/真实登录实测和正式签名分发 |
 | 共享翻译与功能 | Core 复用原版提供器、SSE、取消、缓存、解释/问答和记录；Avalonia UI 已还原 | 保持回归，补齐跨平台宿主和存储依赖 |
 | Windows 分发 | 当前只能使用源码构建入口；旧 Release 是 WPF | Avalonia 自包含发布、helper 配套、新版 Setup、安装升级 |
 | macOS UI 与存储 | Mac CI 编译和自动化通过；原生 Keychain 与 AES-GCM 修正记录、菜单栏、Spaces 属性和睡眠恢复已有代码与可控测试 | Keychain 真机授权/锁定/签名验证、真实桌面生命周期、取词、权限和菜单栏验收 |
@@ -274,7 +274,15 @@ NSPasteboard 不能原子比较序列并写入，也没有可验证的复制所�
 - [x] D 准备代码：平台字体、减少动效、失败原因反馈及有界隐私诊断；本机及双端 CI 各 487 项通过，实际 Cocoa 偏好 probe 通过。
 - [ ] D：双端兼容性矩阵、性能与阅读体验。
 - [ ] E：双端签名安装包、版本检查、升级与公开 Release。
-- [ ] E 试用包：Apple Silicon 自包含 `.app`、DMG/ZIP、完整许可、包内 helper 启动与封装校验；通过 CI 后记录实际产物。真机验收见 [同学测试清单](MAC_PREVIEW_TESTING.md)。
+- [x] E 试用包：Apple Silicon 自包含 `.app`、DMG/ZIP、完整许可、包内 helper 启动与封装校验；`4004efd` 的 [Actions #36998582502](https://github.com/2214331539/Yita/actions/runs/36998582502) 已通过。真机验收见 [同学测试清单](MAC_PREVIEW_TESTING.md)。
+
+### Apple Silicon 内部试用包检查点
+
+- 2026-10-02，`4004efd` 生成 `0.9.0-macos-preview.4`，RID `osx-arm64`，SDK 8.0.425、自带 .NET 8.0.31。仅 Apple Silicon，包元数据最低 macOS 12.0；没有 Intel/Universal 包、Developer ID、公证或自动更新。
+- 标准 `.app` 将主 apphost 放在 `Contents/MacOS`，托管运行时放在 `Contents/Resources/Runtime`，原生 helper 放在 `Contents/Helpers`。使用 SDK 创建带相对托管入口的 apphost；源码运行目录仍受支持。嵌套代码由内到外 ad-hoc 签名。
+- macOS 打包工作流通过 488 项自动化、单实例与 helper 检查，验证 19 个 ARM64 原生二进制及完整签名。原始 `.app`、挂载 DMG 和解压 ZIP 均通过自带运行时启动与 fixture helper 通信；包内 AX/剪贴板/输入策略检查也通过，不读取真实桌面、Keychain 或 API。
+- 完整许可与恢复依赖清单随包附带，覆盖 26 个恢复包及字体/上游。DMG 为 47,737,078 字节，备用 ZIP 为 40,448,488 字节。Actions artifact 为 `Yita-macos-preview-4-osx-arm64`，默认保存 30 天。
+- 产物已下载到 `F:\Project\InstantTranslate\artifacts\macos-preview\preview-4`，外层 artifact 和四项分发文件的 SHA256 均已校验。仅推送当前功能分支，`main` 保持 `dd74328`。同学真实授权、外部划词和桌面生命周期尚待反馈；不将封装检查记为真机验收。
 
 ## 跨平台产品完成定义
 
