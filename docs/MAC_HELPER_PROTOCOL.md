@@ -117,3 +117,5 @@ self-test 不初始化 NSApplication、不检查真实桌面权限、不打开�
 Cmd+C 与取消清理代码提交 `71c0ddc` 的 [GitHub Actions #36977995806](https://github.com/2214331539/Yita/actions/runs/36977995806) 通过 Windows/macOS 构建与各 418 项测试。Mac 实际 Swift helper 通过 20 项管道检查（包括复制显式启用、取消后复用、释放及 EOF 清理）、17 组 AX 策略与 22 组剪贴板事务 fixtures。IPC fixture 使用真实单调时间；纯策略测试仍使用虚拟时间，不改变生产超时。这些结果不代表真实桌面授权或外部应用兼容性已通过。
 
 输入/宿主代码提交 `2f02aa2` 的 [GitHub Actions #36980861240](https://github.com/2214331539/Yita/actions/runs/36980861240) 在 Windows/macOS 各通过 434 项测试，构建零警告/错误。Mac 实际 Swift helper 通过 27 项管道检查、17 组 AX、22 组剪贴板和 12 组输入策略测试；覆盖合成拖选驱动 `MacSelectionRuntime`、旧输入序号拒绝、手动剪贴板与授权动作禁用。没有创建真实 tap、注册系统快捷键或读取桌面数据；真实 TCC 和原生窗口仍待验收。
+
+生命周期代码提交 `4b391b5` 的 [GitHub Actions #36982899304](https://github.com/2214331539/Yita/actions/runs/36982899304) 在 Windows/macOS 各通过 456 项测试，构建零警告/错误。Mac 实际 Swift helper 通过 34 项管道检查（新增持久暂停、拒绝读取和恢复）、17 组 AX、22 组剪贴板和 16 组输入策略测试。运行的登录项测试仅写入临时 fixture 目录，没有注册真实系统项目；窗口标志和合成会话不替代真实 NSWindow/登录验收。

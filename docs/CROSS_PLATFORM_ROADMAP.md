@@ -1,6 +1,6 @@
 # Yita 跨平台产品开发路线图
 
-更新日期：2026-10-02。状态：`codex/platform-host-services` 已完成阶段 B 宿主/存储与阶段 C 的 helper、权限、AX/Cmd+C、全局输入和 Desktop 触发代码接入，尚未合入 `main`。Mac Keychain/外部取词真机验证、菜单栏/登录启动与窗口生命周期仍待完成。维护者确认朋友已验收旧 WPF 安装版的安装与取词，并要求暂缓新版打包、优先继续平台开发。该反馈不作为 Avalonia Setup 的验收证据。当前代码事实见 [技术架构](ARCHITECTURE.md)，已完成的 Windows 验收见 [验收记录](WINDOWS_AVALONIA_ACCEPTANCE.md)。
+更新日期：2026-10-02。状态：`codex/platform-host-services` 已完成阶段 B 宿主/存储与阶段 C 的 helper、权限、AX/Cmd+C、全局输入、Desktop 触发、菜单栏、登录项和睡眠恢复代码，尚未合入 `main`。Mac Keychain、外部取词、真实登录和窗口行为仍待真机验证。维护者确认朋友已验收旧 WPF 安装版的安装与取词，并要求暂缓新版打包、优先继续平台开发。该反馈不作为 Avalonia Setup 的验收证据。当前代码事实见 [技术架构](ARCHITECTURE.md)，已完成的 Windows 验收见 [验收记录](WINDOWS_AVALONIA_ACCEPTANCE.md)。
 
 ## 产品目标与边界
 
@@ -19,10 +19,10 @@
 | 能力 | 当前证据 | 尚缺工作 |
 | --- | --- | --- |
 | Windows 取词与阅读 | UIA 隔离、原生控件、复制回退、浮窗与托盘已接入；本机 WPS PDF 等已验收；朋友验收了旧 WPF 安装版 | 新 Avalonia 版的多电脑、更多目标软件、安装后兼容性与长期运行 |
-| 平台宿主接入 | 功能分支已通过共享接口连接窗口、原生事件、托盘与启动项；单实例/唤醒通过 Windows 与 macOS CI 的跨进程检查 | 合入主线、Mac 桌面实测、Mac 登录启动和原生取词服务 |
+| 平台宿主接入 | 功能分支已通过共享接口连接窗口、原生事件、托盘与启动项；单实例/唤醒通过双端 CI；Mac 菜单栏、受约束的 `.app` 登录项与会话恢复已有代码 | 合入主线、Mac 桌面/真实登录实测和正式应用打包 |
 | 共享翻译与功能 | Core 复用原版提供器、SSE、取消、缓存、解释/问答和记录；Avalonia UI 已还原 | 保持回归，补齐跨平台宿主和存储依赖 |
 | Windows 分发 | 当前只能使用源码构建入口；旧 Release 是 WPF | Avalonia 自包含发布、helper 配套、新版 Setup、安装升级 |
-| macOS UI 与存储 | 解决方案在 macOS CI 编译与自动化测试通过；原生 Keychain 与 AES-GCM 修正记录已有实现和可控存储测试 | Keychain 真机授权/锁定/签名验证、真实桌面生命周期、原生取词、权限、菜单栏 |
+| macOS UI 与存储 | Mac CI 编译和自动化通过；原生 Keychain 与 AES-GCM 修正记录、菜单栏、Spaces 属性和睡眠恢复已有代码与可控测试 | Keychain 真机授权/锁定/签名验证、真实桌面生命周期、取词、权限和菜单栏验收 |
 | macOS 划词 | `MacSelectionRuntime` 已将鼠标/快捷键、权限、AX/边界和显式 Cmd+C 接入 Desktop；通过合成输入及实际 Swift 管道检查 | 真实授权、外部 AX/复制、Retina/多屏与窗口验收 |
 | 更新 | GitHub 已有旧版 Release | 新版发布流水线、版本检查、双端升级与回退 |
 | 许可分发 | 仓库保留 MIT、上游与字体声明；旧 Setup 有许可检查 | 新 Desktop 输出尚未复制声明；新增依赖也需随包附许可 |
@@ -169,7 +169,7 @@ NSPasteboard 不能原子比较序列并写入，也没有可验证的复制所�
 - 协议升级为 4，每帧携带持久会话状态和代数。系统/显示器/用户会话暂停原因分别合并，清空旧输入、停止 tap/快捷键，恢复时重新配置；旧 AX/复制及模型请求取消，遗漏中间暂停帧也使旧手势失效。
 - Desktop 暂停时隐藏固定窗口，取消正在流式的工作，关闭/隐藏其他窗口；恢复原先可见的固定窗口，限制到现有工作区，不激活窗口或重新请求翻译。
 - 同一 Avalonia NSWindow 在 Cocoa 主线程设置 CanJoinAllSpaces/Transient/IgnoresCycle/FullScreenAuxiliary，清除冲突标志；保留当前 UI 和置顶级别，不建立第二套窗口渲染。
-- 本机 Release 构建 0 警告/0 错误，456 项测试通过：Core 47、原版业务 258、Windows 22、Mac 86、Desktop 43；可控 helper 通信通过。Swift 编译、会话管道和 16 组原生输入策略将由 Mac CI 验证。
+- 本机 Release 构建 0 警告/0 错误，456 项测试通过：Core 47、原版业务 258、Windows 22、Mac 86、Desktop 43；可控 helper 通信通过。代码提交 `4b391b5` 的 [GitHub Actions #36982899304](https://github.com/2214331539/Yita/actions/runs/36982899304) 已在 Windows/macOS 各通过同样的 456 项测试和零警告/错误构建；Mac 另通过 34 项实际 Swift/C# 管道检查、17 组 AX、22 组剪贴板和 16 组输入策略测试。
 
 本批是 C3 的代码与可控验证准备。没有注册 runner 的真实登录项、请求授权或读取桌面数据；真实登录、锁屏、焦点、Spaces/全屏、Retina、多屏和签名验收仍暂缓。方案、限制与待验收项目见 [Mac 桌面生命周期](MAC_DESKTOP_LIFECYCLE.md)。
 
@@ -263,11 +263,17 @@ NSPasteboard 不能原子比较序列并写入，也没有可验证的复制所�
 - [x] C2 复制代码：显式 Cmd+C、多格式备份、序列/来源检查、取消和 EOF 收尾；真实 Mac 复制验收待恢复。
 - [x] C1/C3 输入代码：全局鼠标、Carbon 快捷键、有界事件、来源/序号失效与 Desktop 接入；合成输入和 Swift 通信通过。
 - [x] C3 代码：原生菜单栏入口、受约束的 `.app` 登录项、Spaces 属性和睡眠/会话恢复；本机可控回归通过。
-- [ ] C3 验收：Mac 编译/合成管道检查后，具备真机条件时完成菜单、登录、锁屏、焦点、Retina/多屏、Spaces/全屏与窗口生命周期验收。
+- [ ] C3 验收：Mac 编译与合成管道检查已通过；具备真机条件时完成菜单、登录、锁屏、焦点、Retina/多屏、Spaces/全屏与窗口生命周期验收。
 - [ ] D：双端兼容性矩阵、性能与阅读体验。
 - [ ] E：双端签名安装包、版本检查、升级与公开 Release。
 
 ## 跨平台产品完成定义
+
+### 继续开发顺序
+
+1. 在真机和打包仍暂缓期间，完善平台字体回退、界面/动效偏好与取词失败诊断。保留 Windows 已验收的 UI，Mac 使用系统字体；必要时在双端 CI 增加可控回归。
+2. 恢复 Mac 条件后执行阶段 B/C 的真机清单和应用兼容性矩阵，根据焦点、授权、全屏等实测结果调整原生实现；只有实际通过才标记支持。
+3. 恢复分发工作时先完成 .NET LTS 与 Windows Avalonia 安装基线，再推进 Mac `.app`、签名/公证、版本检查和更新。当前不创建新版 Setup 或公开 Release。
 
 只有同时满足以下条件，才将下载入口和 README 标记为 Windows/macOS 均可用：
 
