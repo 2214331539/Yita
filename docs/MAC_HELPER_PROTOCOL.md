@@ -1,6 +1,6 @@
 # Mac 原生 helper 协议
 
-当前协议版本为 `1`。实现位于 `src/Yita.Native.Mac/Helper` 与 `src/Yita.Native.Mac.Helper`，尚在 `codex/platform-host-services` 功能分支。当前只交付权限检查和通信基础；AX 取词、Cmd+C、全局输入与菜单栏仍待实现。
+当前协议版本为 `1`。实现位于 `src/Yita.Native.Mac/Helper` 与 `src/Yita.Native.Mac.Helper`，尚在 `codex/platform-host-services` 功能分支。当前交付权限检查、通信和 AX 选区读取代码；Cmd+C、全局输入、Desktop 自动触发与菜单栏原生 helper 仍待实现。真实 Mac 桌面验收继续暂缓。
 
 ## 进程与身份
 
@@ -37,18 +37,28 @@ helper 启动后立即输出：
   "id":"d2e39e2187ed4b8aa3580c563a13697ab",
   "status":"ok",
   "permissions":{"accessibility":false,"inputMonitoring":false},
-  "capabilities":{"selection":false,"clipboardFallback":false,"globalInput":false}
+  "capabilities":{"selection":true,"clipboardFallback":false,"globalInput":false}
 }
 ```
 
-权限与能力分别表示“系统已授权”和“产品已实现”。获得 Accessibility 权限不会使尚未实现的自动取词变为可用。
+权限与能力分别表示“系统已授权”和“helper 已实现”。`selection:true` 表示 helper 有 AX 读取代码，不表示 Desktop 已接入自动划词、获得权限或经过真实应用验收。获得 Accessibility 权限不会使尚未实现的全局输入变为可用。
 
 | 命令 | 当前行为 |
 | --- | --- |
 | `permissions` | 检查 AX 信任状态和 Input Monitoring 状态，不请求权限 |
 | `requestAccessibility` | 用户点击时调用 `AXIsProcessTrustedWithOptions` 提示授权；返回时用户可能尚未完成授权，需要再次检查 |
 | `openAccessibilitySettings` | 用户点击时打开系统辅助功能隐私设置 |
-| `readSelection` | 当前明确返回 `selection-not-implemented`，不读取文本、不发送 Cmd+C |
+| `readSelection` | 读取当前前台应用的 AX 选区与可选范围边界，返回结构化 `selection`；不发送 Cmd+C |
+
+`readSelection` 的 `selection` 请求使用共享 `SelectionRequest`，包含 `trigger`、本次 `pointer`、可选 `gestureBounds`、`includeContext`、可选 `foregroundApplication`（Mac Bundle ID）和可选 `foregroundProcessId`。有来源身份时必须匹配前台目标；来源在读取期间改变则取消结果，不能回传旧文本。PID/Bundle ID 只作运行时校验，不写入诊断。
+
+取词成功和可预期失败均用 `status:ok` 携带共享选区结果。例如成功：
+
+```json
+{"version":1,"id":"d2e39e2187ed4b8aa3580c563a13697ab","status":"ok","selection":{"text":"hello","source":"accessibility","failure":"none","bounds":{"x":-800,"y":120,"width":90,"height":18}}}
+```
+
+权限拒绝、空选区、不支持、保护内容、目标变化、AX 超时等通过 `selection.failure` 和固定诊断代码区分。失败结果不携带文本、上下文或边界；客户端拒绝缺失 `source/failure` 或夹带内容的失败帧。文本使用 UTF-16 20,000 单位上限，上下文仅在明确请求时以范围接口读取附近最多 2,000 单位。坐标为 Quartz 全局点（左上角原点），无可靠边界时省略 `bounds`，后续宿主需完成 Avalonia/DPI 转换。
 
 失败响应仍携带请求 ID：
 
@@ -85,5 +95,7 @@ dotnet run --project tools/Yita.MacHelperSmoke -c Release --no-build -- \
 ```
 
 self-test 不初始化 NSApplication、不检查真实桌面权限、不打开系统设置、不请求授权、不访问外部选区/剪贴板/Keychain/API。它证明 Swift 二进制与 C# 协议可以通信，不能证明真实桌面权限、选区读取、签名稳定性或 Mac 产品可用。
+
+新增 `--selection-self-test` 运行真实读取策略的可控 AX fixtures；另使用 `--self-test --selection-fixture range` 将固定合成选区经真实 Swift/C# 管道交换，覆盖范围回退、坐标、上下文选择和来源变化。fixture 参数仅在 `--self-test` 时启用，生产取词仍调用系统 AX API。两种模式均不读取真实桌面数据或申请授权。
 
 2026-10-02，提交 `f85a8d8` 的 [GitHub Actions #36973376654](https://github.com/2214331539/Yita/actions/runs/36973376654) 已通过 Windows/macOS 构建、各 398 项测试、可控子进程通信和 Mac 实际 Swift helper 的 5 项 self-test。Swift 管道读取使用 `Darwin.read`，每个短请求在 stdin 仍保持打开时即可返回，不等待缓冲区填满或 EOF。

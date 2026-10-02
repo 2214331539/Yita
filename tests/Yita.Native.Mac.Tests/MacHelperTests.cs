@@ -136,6 +136,10 @@ public sealed class MacHelperTests
     [InlineData("{\"id\":\"r\",\"status\":\"ok\"}")]
     [InlineData("{\"version\":1,\"id\":\"r\",\"status\":\"ok\",\"permissions\":{},\"capabilities\":{}}")]
     [InlineData("{\"version\":1,\"id\":\"r\",\"status\":\"ok\",\"selection\":{\"source\":99}}")]
+    [InlineData("{\"version\":1,\"id\":\"r\",\"status\":\"ok\",\"selection\":{\"text\":\"private\",\"failure\":\"none\"}}")]
+    [InlineData("{\"version\":1,\"id\":\"r\",\"status\":\"ok\",\"selection\":{\"source\":\"accessibility\"}}")]
+    [InlineData("null")]
+    [InlineData("[]")]
     public void MissingVersionPermissionFieldsAndUnknownEnumValuesAreRejected(string json)
     {
         Assert.Throws<MacHelperProtocolException>(() => MacHelperProtocol.Parse(Encoding.UTF8.GetBytes(json)));
@@ -151,8 +155,55 @@ public sealed class MacHelperTests
             new SelectionResult("text", SelectionSource.Accessibility, new SelectionBounds(0, 0, -1, 10)),
             new SelectionResult("text", SelectionSource.ManualClipboard),
             new SelectionResult(new string('x', 20_001), SelectionSource.Accessibility),
+            new SelectionResult("private", SelectionSource.Accessibility, Failure: SelectionFailureKind.ProtectedContent),
+            new SelectionResult(null, SelectionSource.Accessibility, Failure: SelectionFailureKind.Cancelled, Context: "private"),
         })
             Assert.Throws<MacHelperProtocolException>(() => MacHelperProtocol.ValidateResponse(response with { Selection = selection }, "request", "readSelection"));
+    }
+
+    [Theory]
+    [InlineData(SelectionFailureKind.Empty, "ax-empty")]
+    [InlineData(SelectionFailureKind.PermissionDenied, "ax-permission-denied")]
+    [InlineData(SelectionFailureKind.ProtectedContent, "ax-protected-content")]
+    [InlineData(SelectionFailureKind.Cancelled, "ax-target-changed")]
+    [InlineData(SelectionFailureKind.Timeout, "ax-timeout")]
+    [InlineData(SelectionFailureKind.UnsupportedApplication, "ax-unsupported")]
+    public async Task NativeSelectionFailuresStayTypedAndSourceIdentityIsForwarded(SelectionFailureKind failure, string diagnostic)
+    {
+        using var helper = new SelectionHelper(SelectionResult.Failed(failure, diagnostic));
+        using var adapter = new MacSelectionAdapter(helper);
+        var request = new SelectionRequest(SelectionTrigger.MouseGesture, new ScreenPoint(-500, 120),
+            ForegroundApplication: "test.editor", ForegroundProcessId: 42);
+        var result = await adapter.ReadAsync(request);
+        Assert.Equal(failure, result.Failure);
+        Assert.Equal("mac-helper-" + diagnostic, result.DiagnosticCode);
+        Assert.Null(result.Text);
+        Assert.Null(result.Context);
+        Assert.Equal(request, helper.Request);
+        Assert.Equal(42, helper.Request!.ForegroundProcessId);
+    }
+
+    [Fact]
+    public async Task InvalidSourceProcessAndCoordinatesNeverReachTheHelper()
+    {
+        using var helper = new SelectionHelper(new SelectionResult("text", SelectionSource.Accessibility));
+        using var adapter = new MacSelectionAdapter(helper);
+        var request = new SelectionRequest(SelectionTrigger.MouseGesture, new ScreenPoint(0, 0), ForegroundProcessId: 0);
+        Assert.False((await adapter.ReadAsync(request)).Succeeded);
+        Assert.False((await adapter.ReadAsync(request with { ForegroundProcessId = 42, Pointer = new ScreenPoint(double.NaN, 0) })).Succeeded);
+        Assert.Null(helper.Request);
+    }
+
+    private sealed class SelectionHelper(SelectionResult result) : IMacHelperClient
+    {
+        public SelectionRequest? Request { get; private set; }
+        public Task<MacHelperExchange> SendAsync(string command, SelectionRequest? selection = null, CancellationToken cancellationToken = default)
+        {
+            Request = selection;
+            return Task.FromResult(new MacHelperExchange(NativeServiceState.Available,
+                new MacHelperResponse { Version = 1, Id = "test", Status = "ok", Selection = result }));
+        }
+        public void Dispose() { }
     }
 
     private sealed class TestTimeProvider : TimeProvider

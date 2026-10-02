@@ -60,3 +60,7 @@ jobs:
       - name: Verify Swift helper protocol without GUI authorization
         if: runner.os == 'macOS'
         run: dotnet run --project tools/Yita.MacHelperSmoke/Yita.MacHelperSmoke.csproj --configuration Release --no-build -- --helper src/Yita.Desktop/bin/Release/net8.0/Yita.Native.Mac.Helper.app/Contents/MacOS/Yita.Native.Mac.Helper
+
+      - name: Verify AX selection policy against deterministic fixtures
+        if: runner.os == 'macOS'
+        run: src/Yita.Desktop/bin/Release/net8.0/Yita.Native.Mac.Helper.app/Contents/MacOS/Yita.Native.Mac.Helper --selection-self-test

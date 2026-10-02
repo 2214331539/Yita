@@ -1,6 +1,6 @@
 # Yita 跨平台产品开发路线图
 
-更新日期：2026-10-02。状态：`codex/platform-host-services` 已完成阶段 B 的宿主接口、单实例、设置迁移与 Mac 安全存储实现，以及阶段 C1 的 helper 协议和权限入口准备，尚未合入 `main`；Mac Keychain 真机验证和原生取词仍待完成。维护者确认朋友已验收旧 WPF 安装版的安装与取词，并要求暂缓新版打包、优先继续平台开发。该反馈不作为 Avalonia Setup 的验收证据。当前代码事实见 [技术架构](ARCHITECTURE.md)，已完成的 Windows 验收见 [验收记录](WINDOWS_AVALONIA_ACCEPTANCE.md)。
+更新日期：2026-10-02。状态：`codex/platform-host-services` 已完成阶段 B 的宿主接口、单实例、设置迁移与 Mac 安全存储实现，以及阶段 C1 的 helper 协议、权限入口和 C2 AX 读取代码准备，尚未合入 `main`；Mac Keychain/AX 真机验证、复制回退和全局输入仍待完成。维护者确认朋友已验收旧 WPF 安装版的安装与取词，并要求暂缓新版打包、优先继续平台开发。该反馈不作为 Avalonia Setup 的验收证据。当前代码事实见 [技术架构](ARCHITECTURE.md)，已完成的 Windows 验收见 [验收记录](WINDOWS_AVALONIA_ACCEPTANCE.md)。
 
 ## 产品目标与边界
 
@@ -23,7 +23,7 @@
 | 共享翻译与功能 | Core 复用原版提供器、SSE、取消、缓存、解释/问答和记录；Avalonia UI 已还原 | 保持回归，补齐跨平台宿主和存储依赖 |
 | Windows 分发 | 当前只能使用源码构建入口；旧 Release 是 WPF | Avalonia 自包含发布、helper 配套、新版 Setup、安装升级 |
 | macOS UI 与存储 | 解决方案在 macOS CI 编译与自动化测试通过；原生 Keychain 与 AES-GCM 修正记录已有实现和可控存储测试 | Keychain 真机授权/锁定/签名验证、真实桌面生命周期、原生取词、权限、菜单栏 |
-| macOS 划词 | `MacSelectionAdapter` 已接入隔离 helper 协议与权限状态；`readSelection` 明确报告未实现 | AX、Cmd+C、全局输入、坐标与 Desktop 接入 |
+| macOS 划词 | `MacSelectionAdapter` 已接入隔离 helper 协议与权限状态；`readSelection` 已实现 AX 读取与范围边界代码 | 真实 AX 验收、Cmd+C、全局输入、坐标转换与 Desktop 接入 |
 | 更新 | GitHub 已有旧版 Release | 新版发布流水线、版本检查、双端升级与回退 |
 | 许可分发 | 仓库保留 MIT、上游与字体声明；旧 Setup 有许可检查 | 新 Desktop 输出尚未复制声明；新增依赖也需随包附许可 |
 
@@ -126,6 +126,17 @@ helper 协议与权限状态已进入下面的 C1 准备工作。Mac 真机验�
 
 本批完成 C1 的协议和权限代码准备，未完成拖选/快捷键输入、正式签名或真实授权验收。下一批实现 AX 取词与坐标，然后推进安全 Cmd+C 回退和输入捕获；必须经真实 Mac 验收后才宣称可用。协议细节见 [Mac helper 协议](MAC_HELPER_PROTOCOL.md)。
 
+### C2 准备：AX 选区与范围边界
+
+- helper 仅查询前台应用，校验可选来源 PID/Bundle ID，排除自身目标，读取期间目标切换则取消并丢弃文本。
+- 检查聚焦/命中元素及各自最多 16 层祖先；密码控件、循环或超深路径停止读取。直接 `AXSelectedText` 优先，合法 `AXSelectedTextRange` / `AXStringForRange` 回退，不查询全文。
+- 范围可用时读取 `AXBoundsForRange`；边界缺失或非法时保留文本并返回 null。原生坐标为 Quartz 全局点，Avalonia/DPI 转换与 Retina/多屏验收尚未完成。
+- 一次 AX 读取总预算 1.2 秒，每次 AX 远程消息最多 150ms，仍受 C# 3 秒进程时限保护。空选区、不支持、权限拒绝、保护内容、超时和来源改变返回不同失败；失败帧不允许携带选区正文。
+- 文本最多 20,000 个 UTF-16 单位，超限停止而不静默截断；上下文只在明确开启时读取附近最多 2,000 单位。
+- 本机 Release 构建 0 警告/0 错误，409 项测试通过：Core 47、原版业务 258、Windows 适配 22、Mac 存储/协议 45、Desktop 37。Swift 策略 fixtures 和成功选区的真实跨进程交换由 macOS CI 验证，结果按后续记录。
+
+本批提供 AX 读取代码，尚未接入 Mac 输入事件或 Desktop 自动触发；真实应用授权、选区及坐标验收仍暂缓。下一批继续安全 Cmd+C 回退，随后接入全局鼠标/快捷键和宿主坐标转换。
+
 ### C1. helper、权限与输入
 
 - 使用 Swift/Cocoa helper 承载 AX、全局输入和菜单栏；C# 保持业务和 Avalonia UI。helper 在自己的 Cocoa 主循环运行，不把跨进程阻塞放在 UI 回调内。
@@ -212,6 +223,7 @@ helper 协议与权限状态已进入下面的 C1 准备工作。Mac 真机验�
 - [x] B2 实现：设置 schema/迁移保护、原生 Keychain 与 AES-GCM 修正记录、平台能力状态和可控测试。
 - [ ] B2 验收：真实 Mac Keychain、重启解密及签名身份检查；整个阶段 B 尚未完成。
 - [x] C1 准备：版本化 helper 协议、子进程隔离与重启限制、权限状态及显式授权入口；本机协议和 Desktop 回归通过。
+- [x] C2 AX 代码：前台来源校验、直接/范围取词、安全控件过滤、结构化失败与边界查询；真实 Mac 验收待恢复。
 - [ ] C：具备 Mac 条件后实现原生链路并完成真实桌面验收。
 - [ ] D：双端兼容性矩阵、性能与阅读体验。
 - [ ] E：双端签名安装包、版本检查、升级与公开 Release。

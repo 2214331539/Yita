@@ -29,14 +29,16 @@ public static class Program
             if (status.Service != NativeServiceState.Available)
                 Console.Error.WriteLine($"Helper status: {status.Service}; diagnostic: {status.DiagnosticCode}");
             Check(status.Service == NativeServiceState.Available, "Versioned handshake and permission response accepted");
-            Check(!status.SelectionSupported && !status.GlobalInputSupported && !status.Permissions.CanAttemptSelection,
-                "Unsupported selection/input and self-test permissions are reported honestly");
+            Check(status.SelectionSupported == (args.Length != 0) && !status.GlobalInputSupported && !status.Permissions.CanAttemptSelection,
+                "AX implementation, pending global input and denied self-test permissions are separate");
             var again = await adapter.GetStatusAsync();
             Check(again.Service == NativeServiceState.Available && starts == 1, "Multiple requests reuse one helper");
             var selection = await adapter.ReadAsync(new SelectionRequest(SelectionTrigger.TranslateShortcut, new ScreenPoint(10, 20)));
-            Check(selection.Failure == SelectionFailureKind.UnsupportedApplication, "Unimplemented selection is distinct from denied permissions");
+            Check(selection.Failure == (args.Length == 0 ? SelectionFailureKind.UnsupportedApplication : SelectionFailureKind.PermissionDenied),
+                "Typed selection failures distinguish unsupported readers from denied permissions");
             var action = await client.SendAsync("requestAccessibility");
             Check(action.DiagnosticCode == "mac-helper-self-test-action-disabled", "Self-test never requests Accessibility authorization");
+            if (args.Length != 0) await VerifySwiftSelectionFixtureAsync(args[1]);
             Console.WriteLine("Mac helper protocol smoke passed. No desktop selection, GUI authorization, clipboard, Keychain or API access.");
             return 0;
         }
@@ -45,6 +47,32 @@ public static class Program
             Console.Error.WriteLine("Mac helper smoke failed: " + exception.GetType().Name);
             return 1;
         }
+    }
+
+    private static async Task VerifySwiftSelectionFixtureAsync(string path)
+    {
+        ProcessStartInfo Start()
+        {
+            var info = new ProcessStartInfo(path);
+            info.ArgumentList.Add("--self-test");
+            info.ArgumentList.Add("--selection-fixture");
+            info.ArgumentList.Add("range");
+            return info;
+        }
+        using var client = new MacHelperClient(Start);
+        using var adapter = new MacSelectionAdapter(client);
+        var request = new SelectionRequest(SelectionTrigger.TranslateShortcut, new ScreenPoint(-700, 150),
+            ForegroundApplication: "test.editor", ForegroundProcessId: 42);
+        var selection = await adapter.ReadAsync(request);
+        Check(selection.Succeeded && selection.Text == "hello world" && selection.Source == SelectionSource.Accessibility,
+            "Swift range fixture round-trips a typed successful selection");
+        Check(selection.Bounds == new SelectionBounds(-800, 120, 90, 18), "Quartz coordinates survive the Swift/C# exchange");
+        Check(selection.Context is null, "Context stays absent without opt-in");
+        var withContext = await adapter.ReadAsync(request with { IncludeContext = true });
+        Check(withContext.Context == "prefix hello world suffix", "Explicit context requests round-trip a bounded snippet");
+        var stale = await adapter.ReadAsync(request with { ForegroundProcessId = 43 });
+        Check(stale.Failure == SelectionFailureKind.Cancelled && stale.Text is null
+            && stale.DiagnosticCode == "mac-helper-ax-target-changed", "Changed target identities return typed cancellation without text");
     }
 
     public static ProcessStartInfo CreatePeerStartInfo(string mode, string? runtimeConfig = null)

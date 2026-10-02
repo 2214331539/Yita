@@ -48,7 +48,7 @@
   <Target Name="BuildMacNativeHelper"
           AfterTargets="Build"
           Condition="$([MSBuild]::IsOSPlatform('OSX'))"
-          Inputs="../Yita.Native.Mac.Helper/main.swift;../Yita.Native.Mac.Helper/Info.plist;../../scripts/Build-Mac-Helper.sh"
+          Inputs="../Yita.Native.Mac.Helper/main.swift;../Yita.Native.Mac.Helper/SelectionReader.swift;../Yita.Native.Mac.Helper/SelectionSelfTests.swift;../Yita.Native.Mac.Helper/Info.plist;../../scripts/Build-Mac-Helper.sh"
           Outputs="$(TargetDir)Yita.Native.Mac.Helper.app/Contents/MacOS/Yita.Native.Mac.Helper">
     <Exec Command="bash &quot;$(MSBuildThisFileDirectory)../../scripts/Build-Mac-Helper.sh&quot; &quot;$(TargetDir)&quot;" />
   </Target>

@@ -20,7 +20,8 @@ public sealed class MacSelectionAdapter : ISelectionReader, IPlatformPermissionS
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (!_isMac()) return SelectionResult.Failed(SelectionFailureKind.UnsupportedApplication, "macos-only");
-        if (!request.Pointer.IsFinite || request.GestureBounds is { IsValid: false })
+        if (!request.Pointer.IsFinite || request.GestureBounds is { IsValid: false }
+            || request.ForegroundProcessId is <= 1)
             return SelectionResult.Failed(SelectionFailureKind.Unknown, "mac-invalid-selection-coordinates");
         var result = await _helper.SendAsync("readSelection", request, cancellationToken).ConfigureAwait(false);
         if (result.State != NativeServiceState.Available)

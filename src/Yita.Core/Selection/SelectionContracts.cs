@@ -46,7 +46,8 @@ public sealed record SelectionRequest(
     ScreenPoint Pointer,
     string? ForegroundApplication = null,
     SelectionBounds? GestureBounds = null,
-    bool IncludeContext = false);
+    bool IncludeContext = false,
+    int? ForegroundProcessId = null);
 
 public readonly record struct SelectionGesture(
     ScreenPoint Start,

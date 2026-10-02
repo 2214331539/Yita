@@ -12,8 +12,8 @@
 | `Yita.Desktop` | `App.axaml.cs` 管理生命周期；`Platform/DesktopPlatformServices.cs` 创建系统实现；`MainWindow` 订阅共享输入事件并管理设置和阅读会话；`TranslationPopupWindow`、`QuestionAnswerWindow` 呈现翻译与问答 |
 | `Yita.Native.Windows` | `WindowsSelectionRuntime` 接收鼠标/快捷键；`WindowsSelectionAdapter` 组织取词；剪贴板、托盘、凭据、启动项与显示偏好各自独立 |
 | `Yita.Native.Windows.UIA.Worker` | Windows 专属 helper，独立访问 UI Automation provider |
-| `Yita.Native.Mac` | 原生 helper 客户端、权限状态、Security.framework Keychain 适配器和修正数据密钥管理；AX 与全局输入尚未实现 |
-| `Yita.Native.Mac.Helper` | Swift/AppKit agent，权限检查/授权入口与 JSON 协议；当前不捕获全局输入或外部选区 |
+| `Yita.Native.Mac` | 原生 helper 客户端、权限及结构化选区结果、Security.framework Keychain 适配器和修正数据密钥管理；全局输入尚未实现 |
+| `Yita.Native.Mac.Helper` | Swift/AppKit agent，权限检查/授权入口、AX 选区与范围边界读取、JSON 协议；当前不捕获全局输入或发送 Cmd+C |
 
 Desktop 当前使用 XAML 与窗口 code-behind/partial class 配合独立业务服务，不宣称已经完成完整 MVVM。App、设置和托盘已通过共享宿主接口接入，系统实现选择集中在工厂；字体/动效的显示偏好仍有 Windows 专属调用。macOS 的 `ISelectionRuntime` 与登录启动尚未实现，安全存储需真机复验，窗口原生行为仍需补齐。
 
@@ -89,9 +89,13 @@ Mac 数据目录由 `Environment.SpecialFolder.LocalApplicationData` 解析，�
 
 ## 平台边界与发布
 
-Core 和 Desktop 可以在 Windows/macOS runner 上构建。macOS 已有 Keychain 适配代码及非 Windows 宿主入口，但 `MacSelectionAdapter` 尚未真正读取 AX 选区、请求权限或执行 Cmd+C，Desktop 也尚未注册 macOS 全局输入。因此编译成功或单实例检查通过不代表 macOS 划词功能完成。
+Core 和 Desktop 可以在 Windows/macOS runner 上构建。功能分支的 `MacSelectionAdapter` 已通过 Swift helper 接入权限管理与 AX 选区读取代码，但尚未执行 Cmd+C，Desktop 也尚未注册 macOS 全局输入。因此编译成功或可控测试通过不代表 macOS 划词功能完成。
 
 功能分支已实现 Swift helper 的开发 `.app`、ad-hoc 签名、请求编号与版本校验、有限长度读写、超时/取消隔离、父进程监控和重启限频。Mac 设置页提供检查、请求 Accessibility 授权和系统设置入口；只检查不自动请求授权。状态检查和已实现能力分开，仍禁用未接入的自动取词与快捷键。协议及非交互 self-test 见 [Mac helper 协议](MAC_HELPER_PROTOCOL.md)。
+
+AX 读取仅针对当前前台应用，匹配请求中的 PID/Bundle ID，并在返回前再次检查来源。检查聚焦元素、鼠标命中元素及各自最多 16 层祖先，拒绝安全文本框、循环或无法在限额内确认的路径。优先读取 `AXSelectedText`，无直接文本时根据合法 `AXSelectedTextRange` 调用 `AXStringForRange`，不查询全文 `AXValue`。读取预算 1.2 秒，远程 AX 消息最多 150ms；错误返回结构化选区失败，主程序不直接进入第三方 AX 调用。
+
+文本上限为 20,000 个 UTF-16 单位，超限停止此次操作而不静默截断。上下文仅在明确启用时查询附近最多 2,000 个单位。`AXBoundsForRange` 坐标暂以 Quartz 全局点返回，边界不可用时为 null；Desktop 的坐标转换、Retina、多屏和原生窗口行为仍待后续接入与真机验证。Swift 可控测试与 self-test 的合成文本只能验证读取策略和通信，不替代真实应用的 AX 支持验收。
 
 下一步 macOS 需要实现 AXUIElement、选区坐标、Cmd+C/NSPasteboard、全局快捷键与鼠标、NSStatusItem，以及真实权限、窗口行为和签名验收。当前开发签名不替代正式包的 Developer ID、公证与更新后 TCC 检查。Linux 当前不在交付范围。
 

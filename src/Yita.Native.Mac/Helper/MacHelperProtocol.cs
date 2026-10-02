@@ -19,6 +19,13 @@ internal static class MacHelperProtocol
     {
         try
         {
+            using var document = JsonDocument.Parse(data);
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+                throw new MacHelperProtocolException(NativeServiceState.Unavailable);
+            if (document.RootElement.TryGetProperty("selection", out var selection) && selection.ValueKind != JsonValueKind.Null
+                && (selection.ValueKind != JsonValueKind.Object || !selection.TryGetProperty("source", out _)
+                    || !selection.TryGetProperty("failure", out _)))
+                throw new MacHelperProtocolException(NativeServiceState.Unavailable);
             return JsonSerializer.Deserialize<MacHelperResponse>(data, JsonOptions)
                 ?? throw new MacHelperProtocolException(NativeServiceState.Unavailable);
         }
@@ -46,6 +53,8 @@ internal static class MacHelperProtocol
         if (response.Selection is { } selection &&
             (selection.Text?.Length > 20_000 || selection.Context?.Length > 20_000
                 || selection.Bounds is { IsValid: false }
+                || (selection.Failure != SelectionFailureKind.None
+                    && (selection.Text is not null || selection.Context is not null || selection.Bounds is not null))
                 || selection.Source == SelectionSource.ManualClipboard))
             throw new MacHelperProtocolException(NativeServiceState.Unavailable);
     }
@@ -53,6 +62,9 @@ internal static class MacHelperProtocol
     internal static string SafeDiagnostic(string? code) => code switch
     {
         "selection-not-implemented" or "permission-denied" or "open-settings-failed"
+            or "ax-permission-denied" or "ax-target-unavailable" or "ax-target-changed"
+            or "ax-protected-content" or "ax-timeout" or "ax-unsupported" or "ax-text-limit"
+            or "ax-unavailable" or "ax-empty" or "invalid-selection-request"
             or "unsupported-command" or "self-test-action-disabled" => "mac-helper-" + code,
         _ => "mac-helper-operation-failed",
     };

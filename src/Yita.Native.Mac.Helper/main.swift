@@ -8,6 +8,10 @@ private let bundleIdentifier = "com.yita.desktop.native-helper"
 private let maximumRequestBytes = 64_000
 private let arguments = CommandLine.arguments
 private let selfTest = arguments.contains("--self-test")
+private let selectionFixture: String? = {
+    guard selfTest, let index = arguments.firstIndex(of: "--selection-fixture"), index + 1 < arguments.count else { return nil }
+    return arguments[index + 1]
+}()
 private let parentPID: Int32? = {
     guard let index = arguments.firstIndex(of: "--parent-pid"), index + 1 < arguments.count else { return nil }
     return Int32(arguments[index + 1])
@@ -17,6 +21,7 @@ private struct Request: Decodable {
     let version: Int
     let id: String
     let command: String
+    let selection: NativeSelectionRequest?
 }
 
 private struct Permissions: Encodable {
@@ -25,7 +30,7 @@ private struct Permissions: Encodable {
 }
 
 private struct Capabilities: Encodable {
-    let selection = false
+    let selection = true
     let clipboardFallback = false
     let globalInput = false
 }
@@ -39,6 +44,7 @@ private struct Response: Encodable {
     var permissions: Permissions?
     var capabilities: Capabilities?
     var diagnosticCode: String?
+    var selection: NativeSelection?
 }
 
 private func emit(_ response: Response) {
@@ -75,7 +81,13 @@ private func handle(_ data: Data) {
             emit(Response(id: request.id, status: "error", diagnosticCode: "open-settings-failed")); return
         }
     case "readSelection":
-        emit(Response(id: request.id, status: "error", diagnosticCode: "selection-not-implemented")); return
+        guard let selection = request.selection else {
+            response.selection = .failed(.invalidRequest)
+            emit(response); return
+        }
+        if selfTest, let fixture = selectionFixture { response.selection = readSelectionFixture(fixture, request: selection) }
+        else if selfTest { response.selection = .failed(.permissionDenied) }
+        else { response.selection = AXSelectionReader(access: SystemAXSelectionAccess(ownerPID: parentPID)).read(selection) }
     default:
         emit(Response(id: request.id, status: "error", diagnosticCode: "unsupported-command")); return
     }
@@ -109,6 +121,9 @@ private func readRequests() {
     }
 }
 
+if arguments.contains("--selection-self-test") {
+    exit(runSelectionSelfTests())
+}
 if !selfTest {
     _ = NSApplication.shared
     NSApplication.shared.setActivationPolicy(.prohibited)
