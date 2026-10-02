@@ -1,6 +1,6 @@
 # Mac Cmd+C 回退
 
-本实现位于 `codex/platform-host-services`，通过 Swift helper 执行，尚未接入 Desktop 的 Mac 自动拖选/快捷键。真实 Mac 授权、目标应用和 pasteboard 行为仍待验收。Windows 的 Ctrl+C 策略保持独立。
+本实现位于 `codex/platform-host-services`，通过 Swift helper 执行，已由 `MacSelectionRuntime` 接入 Desktop 自动拖选。全局快捷键/菜单只读取用户主动复制的内容，不发送 Cmd+C。真实 Mac 授权、目标应用和 pasteboard 行为仍待验收。Windows 的 Ctrl+C 策略保持独立。
 
 ## 触发与权限
 
@@ -21,7 +21,7 @@
 
 ## 取消和退出
 
-helper 协议升级到 2。`cancelSelection` 携带原请求 ID，是没有单独响应的控制帧。stdin 读取不被正在等待复制的主循环阻塞，控制帧可以标记正在运行的请求。
+复制取消从协议 2 引入，当前协议为 3。`cancelSelection` 携带原请求 ID，是没有单独响应的控制帧。stdin 读取不被正在等待复制的主循环阻塞，控制帧可以标记正在运行的请求。自动拖选还传入原生输入序号，新输入使当前读取失效并进入同一恢复流程。
 
 客户端的通常请求时限为 3 秒。允许复制的请求取消或超时后，先通知原 ID，最多再等待 2 秒，让 helper 观察已投递的复制、恢复剪贴板并返回原响应。原来的有界读取任务保持存活，因此收到半帧时不会重新读错位置。清理完成后，丢弃旧结果并传播取消；不能把旧结果交给下一次请求。
 

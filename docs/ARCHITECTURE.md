@@ -2,7 +2,7 @@
 
 本文描述 `main` 当前代码的实际组织。主应用使用 C#、.NET 8 和 Avalonia 11.2.6；Windows 已实现划词翻译，macOS 原生取词仍待完成。旧 WPF 产品的完整快照保留在 `codex/csharp-wpf-legacy`。
 
-本文的平台宿主与存储说明对应 `codex/platform-host-services` 功能分支，尚未合入 `main`。该分支保持 Windows 取词实现，新增非 Windows 单实例、手动剪贴板入口、设置 schema 和 Mac 加密存储实现；不代表 macOS 自动划词已完成。
+本文的平台宿主与存储说明对应 `codex/platform-host-services` 功能分支，尚未合入 `main`。该分支新增单实例、设置 schema、Mac 加密存储与原生输入/取词到 Desktop 的代码链路；Mac 真机授权、应用兼容性和窗口生命周期仍待验收，不代表产品已可公开分发。
 
 ## 模块边界
 
@@ -12,20 +12,20 @@
 | `Yita.Desktop` | `App.axaml.cs` 管理生命周期；`Platform/DesktopPlatformServices.cs` 创建系统实现；`MainWindow` 订阅共享输入事件并管理设置和阅读会话；`TranslationPopupWindow`、`QuestionAnswerWindow` 呈现翻译与问答 |
 | `Yita.Native.Windows` | `WindowsSelectionRuntime` 接收鼠标/快捷键；`WindowsSelectionAdapter` 组织取词；剪贴板、托盘、凭据、启动项与显示偏好各自独立 |
 | `Yita.Native.Windows.UIA.Worker` | Windows 专属 helper，独立访问 UI Automation provider |
-| `Yita.Native.Mac` | 原生 helper 客户端、权限及结构化选区结果、Security.framework Keychain 适配器和修正数据密钥管理；全局输入尚未实现 |
-| `Yita.Native.Mac.Helper` | Swift/AppKit agent，权限、AX 选区与边界、显式启用的安全 Cmd+C 回退及取消控制；当前不捕获全局输入 |
+| `Yita.Native.Mac` | `MacSelectionRuntime` 消费输入批次并连接 Desktop；helper 客户端、权限与选区、Keychain 及加密修正记录 |
+| `Yita.Native.Mac.Helper` | Swift/AppKit/Carbon agent，鼠标事件 tap、全局快捷键、权限、AX/边界、Cmd+C 事务与取消；原生菜单栏尚待补齐 |
 
-Desktop 当前使用 XAML 与窗口 code-behind/partial class 配合独立业务服务，不宣称已经完成完整 MVVM。App、设置和托盘已通过共享宿主接口接入，系统实现选择集中在工厂；字体/动效的显示偏好仍有 Windows 专属调用。macOS 的 `ISelectionRuntime` 与登录启动尚未实现，安全存储需真机复验，窗口原生行为仍需补齐。
+Desktop 当前使用 XAML 与窗口 code-behind/partial class 配合独立业务服务，不宣称已经完成完整 MVVM。系统实现选择集中在工厂；字体/动效的显示偏好仍有 Windows 专属调用。功能分支的 macOS `ISelectionRuntime` 已接入；登录启动、真实安全存储与窗口原生行为仍需补齐/验收。
 
 ## 平台宿主接口
 
-`ISelectionRuntime` 提供启用配置、选区和外部点击事件、手动剪贴板翻译、修复及诊断。Windows 使用原 `WindowsSelectionRuntime` 实现；未来 Mac helper 通过同一事件模型连接设置和阅读浮窗。WPS 兼容参数为 Windows 特有偏好，Mac 不应将其视作自己的复制策略。
+`ISelectionRuntime` 提供启用配置、选区和外部点击事件、手动剪贴板翻译、修复及诊断。Windows 使用原 `WindowsSelectionRuntime`；Mac 使用 `MacSelectionRuntime`，共享同一阅读与翻译流程。Mac runtime 同时提供权限服务，避免设置页另启动一个 helper。WPS 兼容参数仍仅用于 Windows。
 
 原生事件可能来自后台线程，`MainWindow` 负责派发到 Avalonia UI 线程。关闭服务时解除事件订阅，已排队的回调再次检查关闭状态；runtime 生命周期仍由 App 管理，窗口不自行销毁输入服务。
 
 `ISingleInstanceGuard` 将实例归属和唤醒分离：Windows 沿用原互斥量/事件实现；非 Windows 使用文件独占句柄和当前用户专用管道。锁文件在退出时不删除，避免不同 inode 造成两个实例同时拥有锁。新进程发送有时限的一字节唤醒消息，主实例在设置窗口建立前保留待唤醒状态；后台启动不发送消息。
 
-`IStartupRegistration` 明确是否支持启动项，未实现的平台禁用开关。`IStatusIcon` 提供原生图标事件；Windows 保持自绘 Yita 菜单，其他平台先使用 Avalonia NativeMenu。菜单手动翻译可以通过 Avalonia 剪贴板工作，但此时还没有 Mac 全局快捷键或选区锚点，只以主屏中心放置浮窗。
+`IStartupRegistration` 明确是否支持启动项，未实现的平台禁用开关。`IStatusIcon` 提供原生图标事件；Windows 保持自绘 Yita 菜单，其他平台先使用 Avalonia NativeMenu/TrayIcon。Mac 菜单和 `Cmd+Shift+T` 经 helper 主动读取剪贴板，并使用当前 Quartz 指针定位；没有原生 runtime 时仍保留 Avalonia 剪贴板的手动入口。
 
 系统凭据和修正数据保护由平台工厂创建。Mac Keychain 使用 Security.framework 的 SecItem API，不再启动 `security` 子进程；后台初始化密钥和修正数据，不在窗口输入回调中访问 Keychain。缺少输入服务时禁用自动划词、复制回退与 WPS 控件，并说明手动剪贴板入口；诊断列出启动项、凭据、设置和加密记忆状态，不包含正文、Key 或数据路径。
 
@@ -89,9 +89,9 @@ Mac 数据目录由 `Environment.SpecialFolder.LocalApplicationData` 解析，�
 
 ## 平台边界与发布
 
-Core 和 Desktop 可以在 Windows/macOS runner 上构建。功能分支的 `MacSelectionAdapter` 已通过 Swift helper 接入权限、AX 和显式启用的 Cmd+C 回退代码，但 Desktop 尚未注册 macOS 全局输入。因此编译成功或可控测试通过不代表 macOS 划词功能完成。
+Core 和 Desktop 可以在 Windows/macOS runner 上构建。功能分支通过 `MacSelectionRuntime` 将 Swift 鼠标/快捷键、AX 和显式启用的 Cmd+C 接入 Desktop；编译与合成测试通过仍不代表真实 Mac 划词已验收。
 
-功能分支已实现 Swift helper 的开发 `.app`、ad-hoc 签名、请求编号与版本校验、有限长度读写、超时/取消隔离、父进程监控和重启限频。Mac 设置页提供检查、请求 Accessibility 授权和系统设置入口；只检查不自动请求授权。状态检查和已实现能力分开，仍禁用未接入的自动取词与快捷键。协议及非交互 self-test 见 [Mac helper 协议](MAC_HELPER_PROTOCOL.md)。
+功能分支已实现 Swift helper 的开发 `.app`、ad-hoc 签名、请求编号与版本校验、有限长度读写、超时/取消隔离、父进程监控和重启限频。Mac 设置页提供 Accessibility/Input Monitoring 的显式授权和系统设置入口；启动只检查、不自动请求授权。能力与实际监听状态分开；输入组件重建后重新配置。协议及非交互 self-test 见 [Mac helper 协议](MAC_HELPER_PROTOCOL.md)。
 
 AX 读取仅针对当前前台应用，匹配请求中的 PID/Bundle ID，并在返回前再次检查来源。检查聚焦元素、鼠标命中元素及各自最多 16 层祖先，拒绝安全文本框、循环或无法在限额内确认的路径。优先读取 `AXSelectedText`，无直接文本时根据合法 `AXSelectedTextRange` 调用 `AXStringForRange`，不查询全文 `AXValue`。读取预算 1.2 秒，远程 AX 消息最多 150ms；错误返回结构化选区失败，主程序不直接进入第三方 AX 调用。
 
@@ -99,7 +99,9 @@ AX 读取仅针对当前前台应用，匹配请求中的 PID/Bundle ID，并在
 
 `ReadAsync(request, allowClipboardFallback:true)` 在 AX 空选区或不支持时尝试 Cmd+C。先检查前台和焦点、可复制角色、AX/事件投递权限、安全祖先、修饰键及可完整物化的多格式剪贴板。使用标记的 private CGEventSource 向原 PID 投递复制；以单次 changeCount、HID 输入计数与 80ms 稳定状态归属，在同序列下恢复原始字节。协议 2 支持复制取消和 EOF 清理，客户端等待清理完成后才启动新 helper。NSPasteboard 缺少原子序列写入和所有者校验，这套规则无法消除所有系统竞态；具体限制、手动回退和真实验收要求见 [Mac Cmd+C 回退](MAC_CLIPBOARD_FALLBACK.md)。
 
-下一步 macOS 需要捕获全局快捷键与鼠标，将已有 AX/Cmd+C 读取连接到 Desktop，完成屏幕坐标转换与 NSStatusItem 菜单栏，并开展真实权限、窗口行为和签名验收。当前开发签名不替代正式包的 Developer ID、公证与更新后 TCC 检查。Linux 当前不在交付范围。
+鼠标 tap 在独立 run loop 只入队，C# 定期消费有界批次；新输入序号使旧 AX/复制失效，键盘事件不保存文字。Quartz 点与当前 Avalonia.Native 的屏幕/窗口位置一致，不乘 Retina 渲染倍率。过滤自身窗口、过期/溢出事件、修饰键和来源变化；详细规则见 [Mac 原生输入](MAC_NATIVE_INPUT.md)。
+
+下一步是 Mac 菜单栏/登录启动、Spaces/全屏与窗口生命周期，以及真实权限、应用兼容性、Retina/多屏和签名验收。当前开发签名不替代正式包的 Developer ID、公证与更新后 TCC 检查。Linux 当前不在交付范围。
 
 Avalonia 新架构的自包含发布、Setup 安装和升级尚未验收。旧 `Build-Setup.ps1` 与 `Publish.ps1` 构建 WPF；现有 release 工作流已禁止从包含 Desktop 项目的新标签发布该旧产物。历史 Release 与标签保留，不因 main 切换而重打包。
 

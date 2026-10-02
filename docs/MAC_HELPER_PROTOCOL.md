@@ -1,6 +1,6 @@
 # Mac 原生 helper 协议
 
-当前协议版本为 `2`。实现位于 `src/Yita.Native.Mac/Helper` 与 `src/Yita.Native.Mac.Helper`，尚在 `codex/platform-host-services` 功能分支。当前交付权限、AX 与显式启用的 Cmd+C 回退代码；全局输入、Desktop 自动触发与菜单栏原生 helper 仍待实现。真实 Mac 桌面验收继续暂缓。版本 2 新增事件投递权限、复制启用标记和取消控制；版本 1 helper 不能与新客户端混用。
+当前协议版本为 `3`。实现位于 `src/Yita.Native.Mac/Helper` 与 `src/Yita.Native.Mac.Helper`，尚在 `codex/platform-host-services` 功能分支。权限、AX/Cmd+C、全局输入与 Desktop 自动触发已有代码接入；独立菜单栏 helper 和真实 Mac 桌面验收仍待完成。版本 2 新增事件投递权限和复制取消；版本 3 新增有界输入批次、输入序号、手动剪贴板与输入监控授权。旧 helper 不能与新客户端混用。
 
 ## 进程与身份
 
@@ -16,7 +16,7 @@
 helper 启动后立即输出：
 
 ```json
-{"version":2,"id":"ready","status":"ready","bundleIdentifier":"com.yita.desktop.native-helper","processId":12345}
+{"version":3,"id":"ready","status":"ready","bundleIdentifier":"com.yita.desktop.native-helper","processId":12345}
 ```
 
 客户端检查协议版本、约定的 Bundle ID、握手状态和实际启动的 PID。失败即终止 helper。握手是协议一致性检查，不替代安装包及二进制的签名真实性检查。
@@ -26,45 +26,52 @@ helper 启动后立即输出：
 每个请求由客户端生成独立的 32 位十六进制 ID，同一 helper 上串行交换消息：
 
 ```json
-{"version":2,"id":"d2e39e2187ed4b8aa3580c563a13697ab","command":"permissions","selection":null,"allowClipboardFallback":false}
+{"version":3,"id":"d2e39e2187ed4b8aa3580c563a13697ab","command":"permissions","selection":null,"allowClipboardFallback":false,"input":null}
 ```
 
 权限响应示例：
 
 ```json
 {
-  "version":2,
+  "version":3,
   "id":"d2e39e2187ed4b8aa3580c563a13697ab",
   "status":"ok",
   "permissions":{"accessibility":false,"inputMonitoring":false,"eventPosting":false},
-  "capabilities":{"selection":true,"clipboardFallback":true,"globalInput":false}
+  "capabilities":{"selection":true,"clipboardFallback":true,"globalInput":true}
 }
 ```
 
-权限与能力分别表示“系统已授权”和“helper 已实现”。`selection:true` 表示 helper 有 AX 读取代码，不表示 Desktop 已接入自动划词、获得权限或经过真实应用验收。获得 Accessibility 权限不会使尚未实现的全局输入变为可用。
+权限与能力分别表示“系统已授权”和“helper 已实现”。`selection:true` / `globalInput:true` 不表示权限已授予、tap/快捷键正在运行或真实应用已通过验收；输入运行状态由 `input.mouseRunning/hotkeyRunning` 单独返回。
 
 | 命令 | 当前行为 |
 | --- | --- |
 | `permissions` | 检查 AX 信任、Input Monitoring 和事件投递权限，不请求权限 |
 | `requestAccessibility` | 用户点击时调用 `AXIsProcessTrustedWithOptions` 提示授权；返回时用户可能尚未完成授权，需要再次检查 |
 | `openAccessibilitySettings` | 用户点击时打开系统辅助功能隐私设置 |
+| `requestInputMonitoring` | 用户点击时调用 `CGRequestListenEventAccess`；不在启动时自动请求 |
+| `openInputMonitoringSettings` | 打开系统输入监控隐私设置 |
+| `configureInput` | 根据 `input.mouseEnabled` 配置只读鼠标 tap，并注册独立 Carbon 快捷键；返回输入运行状态和有界批次 |
+| `pollInput` | 返回最多 64 项输入事件与运行状态，已交付事件不重复返回 |
+| `readClipboard` | 用户主动读取当前剪贴板，不发送复制；返回 `manualClipboard` 结果与本次指针 |
 | `readSelection` | 读取当前前台应用的 AX 选区；只有根请求 `allowClipboardFallback:true` 才允许安全检查后的 Cmd+C 回退 |
 | `cancelSelection` | 控制帧，使用正在运行的选区请求 ID 标记取消，不额外发送响应；事务完成后仍返回原请求的结果 |
 
 `readSelection` 的 `selection` 请求使用共享 `SelectionRequest`，包含 `trigger`、本次 `pointer`、可选 `gestureBounds`、`includeContext`、可选 `foregroundApplication`（Mac Bundle ID）和可选 `foregroundProcessId`。有来源身份时必须匹配前台目标；来源在读取期间改变则取消结果，不能回传旧文本。PID/Bundle ID 只作运行时校验，不写入诊断。
 
+自动拖选的 `readSelection` 另携带 `input.sequence`。helper 在读取前、过程中和返回前验证输入序号，新输入使旧请求失效。事件包含 `kind`（`pointerDown/pointerUp/cancel/translateClipboard`）、`sequence`、`pointer`、`ageMilliseconds`、来源和修饰键标记；拒绝无序、过期、无来源的指针事件及无界批次。监听队列、权限和坐标约定见 [Mac 原生输入](MAC_NATIVE_INPUT.md)。
+
 取词成功和可预期失败均用 `status:ok` 携带共享选区结果。例如成功：
 
 ```json
-{"version":2,"id":"d2e39e2187ed4b8aa3580c563a13697ab","status":"ok","selection":{"text":"hello","source":"accessibility","failure":"none","bounds":{"x":-800,"y":120,"width":90,"height":18}}}
+{"version":3,"id":"d2e39e2187ed4b8aa3580c563a13697ab","status":"ok","selection":{"text":"hello","source":"accessibility","failure":"none","bounds":{"x":-800,"y":120,"width":90,"height":18}}}
 ```
 
-权限拒绝、空选区、不支持、保护内容、目标变化、AX 超时等通过 `selection.failure` 和固定诊断代码区分。失败结果不携带文本、上下文或边界；客户端拒绝缺失 `source/failure` 或夹带内容的失败帧。文本使用 UTF-16 20,000 单位上限，上下文仅在明确请求时以范围接口读取附近最多 2,000 单位。坐标为 Quartz 全局点（左上角原点），无可靠边界时省略 `bounds`，后续宿主需完成 Avalonia/DPI 转换。
+权限拒绝、空选区、不支持、保护内容、目标变化、AX 超时等通过 `selection.failure` 和固定诊断代码区分。失败结果不携带文本、上下文或边界；客户端拒绝缺失 `source/failure` 或夹带内容的失败帧。文本使用 UTF-16 20,000 单位上限，上下文仅在明确请求时以范围接口读取附近最多 2,000 单位。坐标为 Quartz 全局点（左上角原点），与当前 Avalonia.Native 的屏幕/窗口位置约定一致，不乘 Retina 渲染倍率；无可靠边界时省略 `bounds`，真实多屏行为仍待验收。
 
 失败响应仍携带请求 ID：
 
 ```json
-{"version":2,"id":"d2e39e2187ed4b8aa3580c563a13697ab","status":"error","diagnosticCode":"unsupported-command"}
+{"version":3,"id":"d2e39e2187ed4b8aa3580c563a13697ab","status":"error","diagnosticCode":"unsupported-command"}
 ```
 
 客户端只接受 `ok/error`，拒绝错误版本、迟到/不同 ID、缺失必要字段或非法枚举。诊断代码通过固定白名单，未知错误不会把 helper 提供的任意文本带入界面或诊断。
@@ -106,3 +113,5 @@ self-test 不初始化 NSApplication、不检查真实桌面权限、不打开�
 同日，AX 读取代码提交 `502d864` 的 [GitHub Actions #36974694338](https://github.com/2214331539/Yita/actions/runs/36974694338) 通过 Windows/macOS 构建、各 409 项测试，以及 Mac 实际 Swift helper 的 10 项管道检查、17 项 AX 策略 fixtures。真实 AX 权限、目标应用和屏幕坐标仍待真机验收。
 
 Cmd+C 与取消清理代码提交 `71c0ddc` 的 [GitHub Actions #36977995806](https://github.com/2214331539/Yita/actions/runs/36977995806) 通过 Windows/macOS 构建与各 418 项测试。Mac 实际 Swift helper 通过 20 项管道检查（包括复制显式启用、取消后复用、释放及 EOF 清理）、17 组 AX 策略与 22 组剪贴板事务 fixtures。IPC fixture 使用真实单调时间；纯策略测试仍使用虚拟时间，不改变生产超时。这些结果不代表真实桌面授权或外部应用兼容性已通过。
+
+输入/宿主代码提交 `2f02aa2` 的 [GitHub Actions #36980861240](https://github.com/2214331539/Yita/actions/runs/36980861240) 在 Windows/macOS 各通过 434 项测试，构建零警告/错误。Mac 实际 Swift helper 通过 27 项管道检查、17 组 AX、22 组剪贴板和 12 组输入策略测试；覆盖合成拖选驱动 `MacSelectionRuntime`、旧输入序号拒绝、手动剪贴板与授权动作禁用。没有创建真实 tap、注册系统快捷键或读取桌面数据；真实 TCC 和原生窗口仍待验收。

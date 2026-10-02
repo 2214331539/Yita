@@ -206,7 +206,7 @@ dotnet run --project tools/Yita.PlatformSmoke/Yita.PlatformSmoke.csproj -c Relea
 
 GitHub Actions 的 `Cross-platform architecture` 工作流在 Windows/macOS runner 上构建当前解决方案并运行测试；`Legacy WPF regression` 在 Windows 上检查保留的 WPF 解决方案。macOS 构建通过只能证明共享代码可构建，不能证明 macOS 划词功能已实现。
 
-平台宿主功能分支还会在 Mac 构建 Swift 权限/AX helper，并验证 C#/Swift JSON 通信、范围取词和剪贴板事务。AX 与显式启用的 Cmd+C 回退代码已实现，但 Desktop 自动触发和屏幕坐标转换仍待完成。CI 的 self-test 不请求桌面权限或读取真实选区/剪贴板；详细接口、开发签名和验证边界见 [Mac helper 协议](docs/MAC_HELPER_PROTOCOL.md)。
+`codex/platform-host-services` 功能分支已将 Mac 的 Swift 鼠标监听、Carbon `Cmd+Shift+T`、AX 与显式 Cmd+C 回退连接到 Desktop。CI 使用实际 Swift/C# 管道验证合成拖选与取消，不请求桌面权限或读取真实选区/剪贴板。代码接入不代表 Mac 真机已验收；接口与输入约定见 [Mac helper 协议](docs/MAC_HELPER_PROTOCOL.md) 和 [Mac 原生输入](docs/MAC_NATIVE_INPUT.md)。
 
 下一阶段的交付顺序、平台边界和发布验收标准见 [跨平台产品开发路线图](docs/CROSS_PLATFORM_ROADMAP.md)。已有结果见 [Windows 验收说明](docs/WINDOWS_AVALONIA_ACCEPTANCE.md)；[还原开发计划](docs/WINDOWS_AVALONIA_PARITY_PLAN.md) 和 [首次迁移计划](docs/CROSS_PLATFORM_MIGRATION_PLAN.md) 保留为历史记录。
 
@@ -249,7 +249,7 @@ Yita 是本地客户端，默认在线翻译不是离线模型。开启个人术
 
 通过 [Issues](https://github.com/2214331539/Yita/issues) 报告问题或提出建议。Pull Request 默认提交到 `main`，请运行当前解决方案的构建与测试；取词、剪贴板和请求生命周期修改应包含针对实际风险的回归验证，UI 修改应检查中英文、长文、缩放与加载/错误状态。
 
-新增平台能力应实现原生适配边界，保持 Core 不依赖平台 UI。`codex/platform-host-services` 已有 AX 取词、显式 Cmd+C 回退与权限入口代码；macOS 后续工作包括全局输入、Desktop 接入、屏幕坐标转换、菜单栏 helper 与真实设备验收。
+新增平台能力应实现原生适配边界，保持 Core 不依赖平台 UI。`codex/platform-host-services` 已接入 Mac 输入、AX/Cmd+C 和权限入口；后续工作包括菜单栏/登录启动、窗口生命周期、真实设备验收与正式分发。
 
 ## 许可证与来源
 

@@ -1,6 +1,6 @@
 # Yita 跨平台产品开发路线图
 
-更新日期：2026-10-02。状态：`codex/platform-host-services` 已完成阶段 B 的宿主接口、单实例、设置迁移与 Mac 安全存储实现，以及阶段 C1 的 helper 协议、权限入口和 C2 AX/复制回退代码准备，尚未合入 `main`；Mac Keychain/取词真机验证、全局输入与 Desktop 自动触发仍待完成。维护者确认朋友已验收旧 WPF 安装版的安装与取词，并要求暂缓新版打包、优先继续平台开发。该反馈不作为 Avalonia Setup 的验收证据。当前代码事实见 [技术架构](ARCHITECTURE.md)，已完成的 Windows 验收见 [验收记录](WINDOWS_AVALONIA_ACCEPTANCE.md)。
+更新日期：2026-10-02。状态：`codex/platform-host-services` 已完成阶段 B 宿主/存储与阶段 C 的 helper、权限、AX/Cmd+C、全局输入和 Desktop 触发代码接入，尚未合入 `main`。Mac Keychain/外部取词真机验证、菜单栏/登录启动与窗口生命周期仍待完成。维护者确认朋友已验收旧 WPF 安装版的安装与取词，并要求暂缓新版打包、优先继续平台开发。该反馈不作为 Avalonia Setup 的验收证据。当前代码事实见 [技术架构](ARCHITECTURE.md)，已完成的 Windows 验收见 [验收记录](WINDOWS_AVALONIA_ACCEPTANCE.md)。
 
 ## 产品目标与边界
 
@@ -23,7 +23,7 @@
 | 共享翻译与功能 | Core 复用原版提供器、SSE、取消、缓存、解释/问答和记录；Avalonia UI 已还原 | 保持回归，补齐跨平台宿主和存储依赖 |
 | Windows 分发 | 当前只能使用源码构建入口；旧 Release 是 WPF | Avalonia 自包含发布、helper 配套、新版 Setup、安装升级 |
 | macOS UI 与存储 | 解决方案在 macOS CI 编译与自动化测试通过；原生 Keychain 与 AES-GCM 修正记录已有实现和可控存储测试 | Keychain 真机授权/锁定/签名验证、真实桌面生命周期、原生取词、权限、菜单栏 |
-| macOS 划词 | `MacSelectionAdapter` 已接入隔离 helper、权限、AX/边界与显式 Cmd+C 回退代码 | 真实 AX/复制验收、全局输入、坐标转换与 Desktop 接入 |
+| macOS 划词 | `MacSelectionRuntime` 已将鼠标/快捷键、权限、AX/边界和显式 Cmd+C 接入 Desktop；通过合成输入及实际 Swift 管道检查 | 真实授权、外部 AX/复制、Retina/多屏与窗口验收 |
 | 更新 | GitHub 已有旧版 Release | 新版发布流水线、版本检查、双端升级与回退 |
 | 许可分发 | 仓库保留 MIT、上游与字体声明；旧 Setup 有许可检查 | 新 Desktop 输出尚未复制声明；新增依赖也需随包附许可 |
 
@@ -151,6 +151,17 @@ helper 协议与权限状态已进入下面的 C1 准备工作。Mac 真机验�
 
 NSPasteboard 不能原子比较序列并写入，也没有可验证的复制所有者；这套策略不能保证消除所有竞态。它保存已物化数据，不能重建任意 provider；强制终止或时限后才发生的复制也可能无法恢复。真实权限、输入计数、changeCount 与格式行为必须经 Mac 验收后才能标记可用。详见 [Mac Cmd+C 回退](MAC_CLIPBOARD_FALLBACK.md)。下一批接入全局拖选/快捷键与 Desktop，随后验证坐标和菜单栏。
 
+### C1/C3 准备：输入与 Desktop 链路
+
+- 协议升级到 3。只读 CGEvent tap 在独立 run loop 入队，C# 定期获取最多 64 项/500ms 内的事件；溢出、过期、来源变化和键盘输入使旧手势失效。键盘事件不保存文字或键码，注入复制事件受标记过滤。
+- Carbon 注册 `Cmd+Shift+T`，按住时不重复触发。快捷键/菜单只读取用户主动复制的内容，暂停自动翻译或没有 AX/鼠标权限时仍保留手动入口。
+- `MacSelectionRuntime` 复用同一 helper 的权限与读取服务，携带来源和输入序号，接入现有浮窗、翻译、设置、相对偏移与外部点击。权限操作导致 helper 重建时重新配置监听；UI 查询等待后过期的手势也被放弃。
+- 原生回调外检查窗口元数据，Desktop 再检查自身窗口；CGEvent/AX 的 Quartz 点直接符合当前 Avalonia.Native 11.2.6 的位置约定，不乘 Retina 渲染倍率。真实坐标和非激活窗口行为仍待验收。
+- 设置页新增用户显式的 Input Monitoring 授权/系统设置入口，保留 Accessibility 入口；启动不自动申请权限。tap 恢复限频，EOF/父进程退出释放监听、快捷键与订阅，并先完成已有复制清理。
+- 本机 Release 构建无警告/错误；本机全量 432 项通过后，新增恢复/过期回归的 Mac 测试共 68 项通过。最终代码提交 `2f02aa2` 的 [GitHub Actions #36980861240](https://github.com/2214331539/Yita/actions/runs/36980861240) 在 Windows/macOS 均通过：各自 434 项测试（Core 47、原版业务 258、Windows 22、Mac 68、Desktop 39）和零警告/错误编译。Mac 另通过 27 项实际 Swift 管道检查、17 组 AX、22 组剪贴板和 12 组输入策略测试。
+
+本批完成输入到共享读取/呈现的代码接入，不作为真实桌面产品验收。下一批完善 Mac 菜单栏/登录启动、Spaces/全屏和窗口生命周期；Keychain、权限、目标应用和 Retina/多屏真机验收仍按维护者安排暂缓。实现与验证边界见 [Mac 原生输入](MAC_NATIVE_INPUT.md)。
+
 ### C1. helper、权限与输入
 
 - 使用 Swift/Cocoa helper 承载 AX、全局输入和菜单栏；C# 保持业务和 Avalonia UI。helper 在自己的 Cocoa 主循环运行，不把跨进程阻塞放在 UI 回调内。
@@ -239,7 +250,8 @@ NSPasteboard 不能原子比较序列并写入，也没有可验证的复制所�
 - [x] C1 准备：版本化 helper 协议、子进程隔离与重启限制、权限状态及显式授权入口；本机协议和 Desktop 回归通过。
 - [x] C2 AX 代码：前台来源校验、直接/范围取词、安全控件过滤、结构化失败与边界查询；真实 Mac 验收待恢复。
 - [x] C2 复制代码：显式 Cmd+C、多格式备份、序列/来源检查、取消和 EOF 收尾；真实 Mac 复制验收待恢复。
-- [ ] C：具备 Mac 条件后实现原生链路并完成真实桌面验收。
+- [x] C1/C3 输入代码：全局鼠标、Carbon 快捷键、有界事件、来源/序号失效与 Desktop 接入；合成输入和 Swift 通信通过。
+- [ ] C3：完善菜单栏/登录启动和窗口生命周期，具备 Mac 条件后完成真实桌面验收。
 - [ ] D：双端兼容性矩阵、性能与阅读体验。
 - [ ] E：双端签名安装包、版本检查、升级与公开 Release。
 
