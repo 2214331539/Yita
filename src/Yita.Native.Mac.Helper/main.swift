@@ -1,5 +1,6 @@
 import AppKit
 import ApplicationServices
+import Darwin
 import Foundation
 
 private let protocolVersion = 1
@@ -84,21 +85,28 @@ private func handle(_ data: Data) {
 // Only the pipe reader runs off the Cocoa loop; permission APIs and actions run on the main thread.
 private func readRequests() {
     var pending = Data()
-    do {
-        while let chunk = try FileHandle.standardInput.read(upToCount: 4096), !chunk.isEmpty {
-            for byte in chunk {
-                if byte == 0x0A {
-                    let request = pending
-                    pending.removeAll(keepingCapacity: true)
-                    DispatchQueue.main.sync { handle(request) }
-                } else {
-                    guard pending.count < maximumRequestBytes else { exit(2) }
-                    pending.append(byte)
-                }
+    var buffer = [UInt8](repeating: 0, count: 4096)
+    while true {
+        // A pipe read must return available bytes without waiting to fill the buffer.
+        let count = buffer.withUnsafeMutableBytes { bytes in
+            Darwin.read(STDIN_FILENO, bytes.baseAddress, bytes.count)
+        }
+        if count == 0 { exit(pending.isEmpty ? 0 : 2) }
+        if count < 0 {
+            if errno == EINTR { continue }
+            exit(0)
+        }
+        for byte in buffer.prefix(count) {
+            if byte == 0x0A {
+                let request = pending
+                pending.removeAll(keepingCapacity: true)
+                DispatchQueue.main.sync { handle(request) }
+            } else {
+                guard pending.count < maximumRequestBytes else { exit(2) }
+                pending.append(byte)
             }
         }
-        exit(pending.isEmpty ? 0 : 2)
-    } catch { exit(0) }
+    }
 }
 
 if !selfTest {

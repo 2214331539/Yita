@@ -26,6 +26,8 @@ public static class Program
             using var client = new MacHelperClient(Start);
             using var adapter = new MacSelectionAdapter(client);
             var status = await adapter.GetStatusAsync();
+            if (status.Service != NativeServiceState.Available)
+                Console.Error.WriteLine($"Helper status: {status.Service}; diagnostic: {status.DiagnosticCode}");
             Check(status.Service == NativeServiceState.Available, "Versioned handshake and permission response accepted");
             Check(!status.SelectionSupported && !status.GlobalInputSupported && !status.Permissions.CanAttemptSelection,
                 "Unsupported selection/input and self-test permissions are reported honestly");
@@ -126,7 +128,11 @@ public static class Program
     }
     private static void Check(bool condition, string message)
     {
-        if (!condition) throw new InvalidOperationException();
+        if (!condition)
+        {
+            Console.Error.WriteLine("FAIL: " + message);
+            throw new InvalidOperationException();
+        }
         Console.WriteLine("PASS: " + message);
     }
 }
