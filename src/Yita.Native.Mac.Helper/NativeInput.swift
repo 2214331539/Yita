@@ -169,7 +169,7 @@ private let hotkeyCallback: EventHandlerUPP = { _, event, context in
     guard let event = event, let context = context else { return OSStatus(eventNotHandledErr) }
     var identifier = EventHotKeyID()
     guard GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID),
-        nil, UInt32(MemoryLayout<EventHotKeyID>.size), nil, &identifier) == noErr,
+        nil, MemoryLayout<EventHotKeyID>.size, nil, &identifier) == noErr,
         identifier.signature == 0x59495441, identifier.id == 1 else { return OSStatus(eventNotHandledErr) }
     let input = Unmanaged<NativeInputManager>.fromOpaque(context).takeUnretainedValue()
     input.receiveHotkey(pressed: GetEventKind(event) == UInt32(kEventHotKeyPressed))
@@ -221,7 +221,7 @@ final class NativeInputManager {
                          EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyReleased))]
             if handler == nil {
                 _ = types.withUnsafeBufferPointer { buffer in
-                    InstallEventHandler(GetApplicationEventTarget(), hotkeyCallback, UInt32(buffer.count), buffer.baseAddress,
+                    InstallEventHandler(GetApplicationEventTarget(), hotkeyCallback, buffer.count, buffer.baseAddress,
                         Unmanaged.passUnretained(self).toOpaque(), &handler)
                 }
             }
