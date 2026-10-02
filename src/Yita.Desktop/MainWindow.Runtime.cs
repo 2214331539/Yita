@@ -226,6 +226,9 @@ public sealed partial class MainWindow
         "Settings schema: " + _settings.SchemaVersion,
         "Settings writable: " + (_settingsFailure is null ? "yes" : "no (" + _settingsFailure + ")"),
         "Credential storage: " + (_credentialsAvailable ? "readable" : "unavailable"),
+        "Permission helper: " + (_permissionStatus?.Service.ToString() ?? "not configured"),
+        "Accessibility: " + (_permissionStatus?.Permissions.Accessibility == true ? "granted" : "unavailable"),
+        "Input monitoring: " + (_permissionStatus?.Permissions.InputMonitoring == true ? "granted" : "unavailable"),
         "Encrypted memory: " + (_memoryInitializationFailed || _memory?.LoadFailed == true ? "unreadable"
             : _memory is null ? "unavailable" : "available"),
     });
@@ -256,6 +259,8 @@ public sealed partial class MainWindow
         _connectionRequests.Dispose();
         _summaryRequests.Dispose();
         _clipboardRequests.Dispose();
+        _permissionRequests.Dispose();
+        (_permissionService as IDisposable)?.Dispose();
         foreach (var popup in _popups.ToArray()) popup.Close();
         foreach (var conversation in _conversations.ToArray()) conversation.Close();
         (_providerFactory as IDisposable)?.Dispose();

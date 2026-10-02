@@ -1,4 +1,5 @@
 using Yita.Core.Platform;
+using Yita.Core.Selection;
 using Yita.Core.Settings;
 using Yita.Native.Mac;
 using Yita.Native.Windows;
@@ -22,6 +23,9 @@ internal sealed class DesktopPlatformServices
 
     internal IStatusIcon? CreateStatusIcon(string iconPath) => OperatingSystem.IsWindows()
         ? new WindowsTrayIcon(iconPath) : null;
+
+    internal IPlatformPermissionService? CreatePermissionService() => OperatingSystem.IsMacOS()
+        ? new MacSelectionAdapter() : null;
 
     internal ISecretStore CreateSecretStore() => OperatingSystem.IsWindows()
         ? new WindowsCredentialSecretStore()

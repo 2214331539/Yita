@@ -12,7 +12,8 @@
 | `Yita.Desktop` | `App.axaml.cs` 管理生命周期；`Platform/DesktopPlatformServices.cs` 创建系统实现；`MainWindow` 订阅共享输入事件并管理设置和阅读会话；`TranslationPopupWindow`、`QuestionAnswerWindow` 呈现翻译与问答 |
 | `Yita.Native.Windows` | `WindowsSelectionRuntime` 接收鼠标/快捷键；`WindowsSelectionAdapter` 组织取词；剪贴板、托盘、凭据、启动项与显示偏好各自独立 |
 | `Yita.Native.Windows.UIA.Worker` | Windows 专属 helper，独立访问 UI Automation provider |
-| `Yita.Native.Mac` | 选区与权限契约、Security.framework Keychain 适配器、修正数据密钥管理；AX 和全局输入 helper 尚未实现 |
+| `Yita.Native.Mac` | 原生 helper 客户端、权限状态、Security.framework Keychain 适配器和修正数据密钥管理；AX 与全局输入尚未实现 |
+| `Yita.Native.Mac.Helper` | Swift/AppKit agent，权限检查/授权入口与 JSON 协议；当前不捕获全局输入或外部选区 |
 
 Desktop 当前使用 XAML 与窗口 code-behind/partial class 配合独立业务服务，不宣称已经完成完整 MVVM。App、设置和托盘已通过共享宿主接口接入，系统实现选择集中在工厂；字体/动效的显示偏好仍有 Windows 专属调用。macOS 的 `ISelectionRuntime` 与登录启动尚未实现，安全存储需真机复验，窗口原生行为仍需补齐。
 
@@ -90,7 +91,9 @@ Mac 数据目录由 `Environment.SpecialFolder.LocalApplicationData` 解析，�
 
 Core 和 Desktop 可以在 Windows/macOS runner 上构建。macOS 已有 Keychain 适配代码及非 Windows 宿主入口，但 `MacSelectionAdapter` 尚未真正读取 AX 选区、请求权限或执行 Cmd+C，Desktop 也尚未注册 macOS 全局输入。因此编译成功或单实例检查通过不代表 macOS 划词功能完成。
 
-下一步 macOS 需要实现和接入签名原生 helper：AXUIElement、选区坐标、Cmd+C/NSPasteboard、全局快捷键与鼠标、Accessibility/Input Monitoring、NSStatusItem，以及超时恢复和真机验收。Linux 当前不在交付范围。
+功能分支已实现 Swift helper 的开发 `.app`、ad-hoc 签名、请求编号与版本校验、有限长度读写、超时/取消隔离、父进程监控和重启限频。Mac 设置页提供检查、请求 Accessibility 授权和系统设置入口；只检查不自动请求授权。状态检查和已实现能力分开，仍禁用未接入的自动取词与快捷键。协议及非交互 self-test 见 [Mac helper 协议](MAC_HELPER_PROTOCOL.md)。
+
+下一步 macOS 需要实现 AXUIElement、选区坐标、Cmd+C/NSPasteboard、全局快捷键与鼠标、NSStatusItem，以及真实权限、窗口行为和签名验收。当前开发签名不替代正式包的 Developer ID、公证与更新后 TCC 检查。Linux 当前不在交付范围。
 
 Avalonia 新架构的自包含发布、Setup 安装和升级尚未验收。旧 `Build-Setup.ps1` 与 `Publish.ps1` 构建 WPF；现有 release 工作流已禁止从包含 Desktop 项目的新标签发布该旧产物。历史 Release 与标签保留，不因 main 切换而重打包。
 

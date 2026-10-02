@@ -121,7 +121,7 @@ flowchart TB
 | `Yita.Desktop` | Avalonia 设置页、阅读浮窗、解释/问答、主题、字体和桌面生命周期 | Windows 已实现；其他平台需验收 |
 | `Yita.Native.Windows` | 鼠标钩子、全局快捷键、原生控件取词、剪贴板事务、托盘、开机启动、凭据与 DPAPI | 已实现 |
 | `Yita.Native.Windows.UIA.Worker` | 在独立进程中访问第三方 UI Automation provider，隔离阻塞和崩溃 | 已实现 |
-| `Yita.Native.Mac` | macOS 原生边界与 Keychain 凭据适配器；后续 AXUIElement、Cmd+C、权限和菜单栏 helper | 部分实现，原生取词待完成 |
+| `Yita.Native.Mac` | Keychain、加密修正记录、helper 协议与权限入口；后续 AXUIElement、Cmd+C 与输入捕获 | 部分实现，原生取词待完成 |
 
 ### 实现策略
 
@@ -205,6 +205,8 @@ dotnet run --project tools/Yita.PlatformSmoke/Yita.PlatformSmoke.csproj -c Relea
 维护者已确认朋友电脑上的旧 WPF 安装版安装与取词通过。新版 Avalonia Setup 仍未生成，按当前开发安排暂缓打包，优先完善平台宿主和 macOS 原生链路；两者验收记录分开。
 
 GitHub Actions 的 `Cross-platform architecture` 工作流在 Windows/macOS runner 上构建当前解决方案并运行测试；`Legacy WPF regression` 在 Windows 上检查保留的 WPF 解决方案。macOS 构建通过只能证明共享代码可构建，不能证明 macOS 划词功能已实现。
+
+平台宿主功能分支还会在 Mac 构建 Swift 权限 helper，并验证 C#/Swift JSON 通信。CI 的 self-test 不请求桌面权限或读取真实选区；详细接口、开发签名和验证边界见 [Mac helper 协议](docs/MAC_HELPER_PROTOCOL.md)。
 
 下一阶段的交付顺序、平台边界和发布验收标准见 [跨平台产品开发路线图](docs/CROSS_PLATFORM_ROADMAP.md)。已有结果见 [Windows 验收说明](docs/WINDOWS_AVALONIA_ACCEPTANCE.md)；[还原开发计划](docs/WINDOWS_AVALONIA_PARITY_PLAN.md) 和 [首次迁移计划](docs/CROSS_PLATFORM_MIGRATION_PLAN.md) 保留为历史记录。
 

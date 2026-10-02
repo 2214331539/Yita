@@ -6,7 +6,9 @@ macOS 原生适配器目前包含 Keychain 凭据存储、修正数据密钥管�
 
 `Yita.Native.Mac.Tests` 使用可控 Keychain 验证错误、取消、竞争及真实 AES 加密文件读写；不访问开发者的真实 Keychain。原生绑定、系统授权、锁定和签名身份仍待 Mac 真机验证，不宣称 macOS 桌面产品可用。
 
-真实选区实现后续使用 Swift/Objective-C helper，并通过受限的本地 IPC 返回结构化结果：
+Swift/AppKit helper 已在 `../Yita.Native.Mac.Helper` 实现权限检查和授权入口；Desktop 在 macOS 构建时生成并开发签名。`MacHelperClient` 处理握手、编号、长度限制、超时/取消、崩溃和重启限频，`MacSelectionAdapter` 将响应映射为共享权限与选区模型。协议见 [Mac helper 协议](../../docs/MAC_HELPER_PROTOCOL.md)。
+
+当前 `readSelection` 明确报告尚未实现。后续通过同一 helper 接入：
 
 1. AXUIElement 读取 `AXSelectedText` 和 `AXSelectedTextRange`；
 2. `AXBoundsForRange` 返回选区锚点；

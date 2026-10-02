@@ -42,6 +42,12 @@
                 <TextBlock Tag="loc:GeneralTitle" Text="General" Classes="section" LineHeight="20" />
                 <TextBlock Margin="0,4,0,17" Tag="loc:GeneralDescription" Text="Control availability and selection behavior." Classes="supporting" LineHeight="20" />
                 <TextBlock x:Name="PlatformStatusText" Margin="0,0,0,14" TextWrapping="Wrap" IsVisible="False" Classes="supporting" LineHeight="20" />
+                <TextBlock x:Name="NativePermissionStatusText" TextWrapping="Wrap" IsVisible="False" Classes="supporting" LineHeight="20" />
+                <WrapPanel x:Name="PermissionActionsPanel" Margin="0,8,0,14" IsVisible="False">
+                  <Button Margin="0,0,8,6" Content="Check permissions" Tag="loc:CheckPermissions" Click="CheckPermissions_Click" Classes="secondary" />
+                  <Button x:Name="RequestAccessibilityButton" Margin="0,0,8,6" Content="Grant access" Tag="loc:RequestAccessibility" Click="RequestAccessibility_Click" Classes="secondary" />
+                  <Button x:Name="OpenPermissionSettingsButton" Margin="0,0,0,6" Content="System settings" Tag="loc:OpenPermissionSettings" Click="OpenPermissionSettings_Click" Classes="secondary" />
+                </WrapPanel>
                 <Grid>
                   <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />

@@ -147,5 +147,23 @@ public interface IPlatformPermissionService
 {
     Task<PermissionState> GetStateAsync(CancellationToken cancellationToken = default);
 
+    async Task<PlatformPermissionStatus> GetStatusAsync(CancellationToken cancellationToken = default) =>
+        new(NativeServiceState.Available, await GetStateAsync(cancellationToken).ConfigureAwait(false));
+
+    Task RequestAccessibilityPermissionAsync(CancellationToken cancellationToken = default) =>
+        OpenAccessibilitySettingsAsync(cancellationToken);
+
     Task OpenAccessibilitySettingsAsync(CancellationToken cancellationToken = default);
 }
+
+public enum NativeServiceState
+{
+    Available, NotSupported, Missing, Timeout, ProtocolMismatch, Unavailable, RestartBackoff,
+}
+
+public sealed record PlatformPermissionStatus(
+    NativeServiceState Service,
+    PermissionState Permissions,
+    bool SelectionSupported = false,
+    bool GlobalInputSupported = false,
+    string? DiagnosticCode = null);

@@ -13,6 +13,52 @@ namespace Yita.Desktop.Tests;
 public sealed class PlatformHostTests
 {
     [AvaloniaFact]
+    public async Task PermissionActionsAreExplicitLocalizedAndDoNotEnableUnimplementedInput()
+    {
+        var permissions = new TestPermissionService();
+        using var fixture = await Fixture.CreateAsync(permissions: permissions);
+        Assert.Equal(1, permissions.Checks);
+        Assert.Equal(0, permissions.Requests);
+        Assert.Equal(0, permissions.SettingsOpened);
+        Assert.True(fixture.Window.FindControl<WrapPanel>("PermissionActionsPanel")!.IsVisible);
+        Assert.True(fixture.Window.FindControl<Button>("RequestAccessibilityButton")!.IsEnabled);
+        await fixture.Window.RefreshPlatformPermissionsAsync(MainWindow.PermissionAction.RequestAccessibility);
+        Assert.Equal(1, permissions.Requests);
+        Assert.Contains("granted", fixture.Window.FindControl<TextBlock>("NativePermissionStatusText")!.Text);
+        Assert.False(fixture.Window.FindControl<ToggleSwitch>("EnabledCheckBox")!.IsEnabled);
+        await fixture.Window.RefreshPlatformPermissionsAsync(MainWindow.PermissionAction.OpenSettings);
+        Assert.Equal(1, permissions.SettingsOpened);
+        Click(fixture.Window.FindControl<Button>("UiLanguageButton")!);
+        Assert.Equal("请求授权", fixture.Window.FindControl<Button>("RequestAccessibilityButton")!.Content);
+        Assert.Contains("已授权", fixture.Window.FindControl<TextBlock>("NativePermissionStatusText")!.Text);
+        Assert.DoesNotContain("test-key", fixture.Window.CreatePlatformDiagnostics());
+        fixture.Window.ShutdownServices();
+        Assert.True(permissions.Disposed);
+    }
+
+    [AvaloniaFact]
+    public async Task StalePermissionResponsesCannotReplaceFreshStateOrUpdateAfterShutdown()
+    {
+        var permissions = new TestPermissionService();
+        using var fixture = await Fixture.CreateAsync(permissions: permissions);
+        var delayed = new TaskCompletionSource<PlatformPermissionStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
+        permissions.Next = delayed.Task;
+        var stale = fixture.Window.RefreshPlatformPermissionsAsync();
+        await fixture.Window.RefreshPlatformPermissionsAsync();
+        var current = fixture.Window.PermissionStatus;
+        delayed.SetResult(new(NativeServiceState.Missing, default));
+        await stale;
+        Assert.Equal(current, fixture.Window.PermissionStatus);
+        var afterClose = new TaskCompletionSource<PlatformPermissionStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
+        permissions.Next = afterClose.Task;
+        var pending = fixture.Window.RefreshPlatformPermissionsAsync();
+        fixture.Window.ShutdownServices();
+        afterClose.SetResult(new(NativeServiceState.Timeout, default));
+        await pending;
+        Assert.Equal(current, fixture.Window.PermissionStatus);
+    }
+
+    [AvaloniaFact]
     public async Task FutureSettingsDisableSavingWithoutChangingTheFileOrCredentials()
     {
         var directory = Path.Combine(Path.GetTempPath(), "yita-future-settings-" + Guid.NewGuid().ToString("N"));
@@ -201,6 +247,28 @@ public sealed class PlatformHostTests
         public void Apply(bool enabled) => Enabled = enabled;
     }
 
+    private sealed class TestPermissionService : IPlatformPermissionService, IDisposable
+    {
+        public int Checks { get; private set; }
+        public int Requests { get; private set; }
+        public int SettingsOpened { get; private set; }
+        public bool Disposed { get; private set; }
+        public Task<PlatformPermissionStatus>? Next { get; set; }
+        public Task<PermissionState> GetStateAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(new PermissionState(Requests > 0, false, false));
+        public Task<PlatformPermissionStatus> GetStatusAsync(CancellationToken cancellationToken = default)
+        {
+            Checks++;
+            if (Next is { } next) { Next = null; return next; }
+            return Task.FromResult(new PlatformPermissionStatus(NativeServiceState.Available, new(Requests > 0, false, false)));
+        }
+        public Task RequestAccessibilityPermissionAsync(CancellationToken cancellationToken = default)
+        { Requests++; return Task.CompletedTask; }
+        public Task OpenAccessibilitySettingsAsync(CancellationToken cancellationToken = default)
+        { SettingsOpened++; return Task.CompletedTask; }
+        public void Dispose() => Disposed = true;
+    }
+
     private sealed class TestStatusIcon : IStatusIcon
     {
         public event EventHandler<ScreenPoint>? MenuRequested;
@@ -216,7 +284,8 @@ public sealed class PlatformHostTests
     {
         public MainWindow Window { get; } = window;
         public ResponseHandler Handler { get; } = handler;
-        public static async Task<Fixture> CreateAsync(ISelectionRuntime? runtime = null, IStartupRegistration? startup = null, bool enabled = true)
+        public static async Task<Fixture> CreateAsync(ISelectionRuntime? runtime = null, IStartupRegistration? startup = null,
+            bool enabled = true, IPlatformPermissionService? permissions = null)
         {
             var directory = Path.Combine(Path.GetTempPath(), "yita-host-tests-" + Guid.NewGuid().ToString("N"));
             var store = new JsonSettingsStore(Path.Combine(directory, "settings.json"));
@@ -225,7 +294,7 @@ public sealed class PlatformHostTests
             await secret.SaveApiKeyAsync("test-key");
             var handler = new ResponseHandler();
             var window = new MainWindow(runtime, store, secret, httpClient: new HttpClient(handler),
-                startupRegistration: startup ?? new UnsupportedStartupRegistration());
+                startupRegistration: startup ?? new UnsupportedStartupRegistration(), permissionService: permissions);
             window.Show();
             await window.Initialization;
             return new Fixture(window, handler, directory);

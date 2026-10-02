@@ -1,6 +1,6 @@
 # Yita 跨平台产品开发路线图
 
-更新日期：2026-10-02。状态：`codex/platform-host-services` 已完成阶段 B 的宿主接口、单实例、设置迁移与 Mac 安全存储实现，尚未合入 `main`；Mac Keychain 真机验证和原生取词仍待完成。维护者确认朋友已验收旧 WPF 安装版的安装与取词，并要求暂缓新版打包、优先继续平台开发。该反馈不作为 Avalonia Setup 的验收证据。当前代码事实见 [技术架构](ARCHITECTURE.md)，已完成的 Windows 验收见 [验收记录](WINDOWS_AVALONIA_ACCEPTANCE.md)。
+更新日期：2026-10-02。状态：`codex/platform-host-services` 已完成阶段 B 的宿主接口、单实例、设置迁移与 Mac 安全存储实现，以及阶段 C1 的 helper 协议和权限入口准备，尚未合入 `main`；Mac Keychain 真机验证和原生取词仍待完成。维护者确认朋友已验收旧 WPF 安装版的安装与取词，并要求暂缓新版打包、优先继续平台开发。该反馈不作为 Avalonia Setup 的验收证据。当前代码事实见 [技术架构](ARCHITECTURE.md)，已完成的 Windows 验收见 [验收记录](WINDOWS_AVALONIA_ACCEPTANCE.md)。
 
 ## 产品目标与边界
 
@@ -23,7 +23,7 @@
 | 共享翻译与功能 | Core 复用原版提供器、SSE、取消、缓存、解释/问答和记录；Avalonia UI 已还原 | 保持回归，补齐跨平台宿主和存储依赖 |
 | Windows 分发 | 当前只能使用源码构建入口；旧 Release 是 WPF | Avalonia 自包含发布、helper 配套、新版 Setup、安装升级 |
 | macOS UI 与存储 | 解决方案在 macOS CI 编译与自动化测试通过；原生 Keychain 与 AES-GCM 修正记录已有实现和可控存储测试 | Keychain 真机授权/锁定/签名验证、真实桌面生命周期、原生取词、权限、菜单栏 |
-| macOS 划词 | `MacSelectionAdapter` 目前是占位实现 | AX、Cmd+C、全局输入、坐标与 Desktop 接入 |
+| macOS 划词 | `MacSelectionAdapter` 已接入隔离 helper 协议与权限状态；`readSelection` 明确报告未实现 | AX、Cmd+C、全局输入、坐标与 Desktop 接入 |
 | 更新 | GitHub 已有旧版 Release | 新版发布流水线、版本检查、双端升级与回退 |
 | 许可分发 | 仓库保留 MIT、上游与字体声明；旧 Setup 有许可检查 | 新 Desktop 输出尚未复制声明；新增依赖也需随包附许可 |
 
@@ -109,9 +109,20 @@
 - 本机 Release 构建 0 警告/0 错误，376 项测试通过：Core 47、原版业务 258、Windows 适配 22、Mac 可控存储 14、Desktop 35。Mac 测试没有访问真实 Keychain；没有调用真实翻译 API。
 - 代码提交 `47928d0` 的 [GitHub Actions #36971410773](https://github.com/2214331539/Yita/actions/runs/36971410773) 在 Windows/macOS 均通过：各自 Release 编译 0 警告/0 错误、376 项测试和 6 项跨进程检查。本机更新后的 Windows 源码预览已启动；此记录不代表 Mac Keychain 原生调用或外部划词已验收。
 
-下一步先完善 helper 协议与权限状态的可控检查，再接入 AX/helper。Mac 真机验收仍暂缓：Keychain 首次创建/更新/删除、锁定与拒绝访问、重启解密、签名变化均待验证。阶段 B 的真实平台验收和 Mac 产品尚未标记为全部完成。
+helper 协议与权限状态已进入下面的 C1 准备工作。Mac 真机验收仍暂缓：Keychain 首次创建/更新/删除、锁定与拒绝访问、重启解密、签名变化均待验证。阶段 B 的真实平台验收和 Mac 产品尚未标记为全部完成。
 
 ## 阶段 C：macOS 原生链路
+
+### C1 准备：helper 协议与权限入口
+
+- Swift/AppKit helper 使用稳定 Bundle ID，生成开发 `.app` 并 ad-hoc 签名；源码构建入口和 CI 已接入，不生成正式安装包。
+- C# 客户端验证版本、身份声明、实际 PID 与请求编号，限制字节长度，总请求默认 3 秒；取消/超时或异常进程不能污染下次请求。
+- helper 支持权限查询、用户主动请求 Accessibility 和打开系统设置；全局输入、取词和 Cmd+C 能力保持明确的未实现状态，不会自动申请权限。
+- 设置页增加平台权限入口与状态，旧刷新不会覆盖新结果，关闭后释放 helper；Windows 真实设置页保持原有布局。
+- 客户端限制 30 秒内最多 3 次启动；helper 监控父进程并在 EOF/父进程退出后结束。
+- 本机 Release 构建 0 警告/0 错误，398 项测试通过：Core 47、原版业务 258、Windows 适配 22、Mac 存储/协议 34、Desktop 37；可控子进程 smoke 通过。Mac Swift 编译和 self-test 结果另按 CI 记录，真实桌面验证继续暂缓。
+
+本批完成 C1 的协议和权限代码准备，未完成拖选/快捷键输入、正式签名或真实授权验收。下一批实现 AX 取词与坐标，然后推进安全 Cmd+C 回退和输入捕获；必须经真实 Mac 验收后才宣称可用。协议细节见 [Mac helper 协议](MAC_HELPER_PROTOCOL.md)。
 
 ### C1. helper、权限与输入
 
@@ -184,7 +195,7 @@
 - 本机 Windows 可以验证 Windows 原生输入、PDF 兼容、真实 UI 和 Setup，也可完成共享协议与可控响应测试。
 - GitHub macOS runner 用于编译 Swift/C#、核心测试、打包与允许的原生检查。托管 runner 的 GUI 与 TCC 授权条件不能替代用户桌面验收。
 - Mac 首次授权、授权撤销、全局鼠标、其他应用选区、Spaces、复制恢复和升级后权限，需要可交互 Mac 或具备对应条件的自托管环境。
-- 维护者此前暂缓 Mac 验证；本路线图列出恢复后的工作与门槛，本次没有启动 Mac 实现或改变已暂缓的验证安排。
+- 维护者此前暂缓 Mac 真机验证；当前推进 helper 协议、权限入口和 CI 编译检查，真实桌面验收仍待恢复，不以 CI 通过替代授权及外部划词验收。
 - Apple Silicon 与 Intel 的构建、运行和应用兼容性分别记录。只验证一种架构时，另一种保留为待验收。
 
 ## 近期执行清单
@@ -198,6 +209,7 @@
 - [x] B1：宿主接口、Windows 接入、跨平台单实例及手动剪贴板回退；本机自动化和原生 smoke 通过。
 - [x] B2 实现：设置 schema/迁移保护、原生 Keychain 与 AES-GCM 修正记录、平台能力状态和可控测试。
 - [ ] B2 验收：真实 Mac Keychain、重启解密及签名身份检查；整个阶段 B 尚未完成。
+- [x] C1 准备：版本化 helper 协议、子进程隔离与重启限制、权限状态及显式授权入口；本机协议和 Desktop 回归通过。
 - [ ] C：具备 Mac 条件后实现原生链路并完成真实桌面验收。
 - [ ] D：双端兼容性矩阵、性能与阅读体验。
 - [ ] E：双端签名安装包、版本检查、升级与公开 Release。

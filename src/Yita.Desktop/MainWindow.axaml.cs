@@ -10,6 +10,7 @@ using Avalonia.Platform.Storage;
 using Yita.Core;
 using Yita.Core.Platform;
 using Yita.Core.Parity;
+using Yita.Core.Selection;
 using Yita.Core.Settings;
 using Yita.Core.Translation;
 using Yita.Services;
@@ -24,6 +25,7 @@ public sealed partial class MainWindow : Window
     private readonly ISecretStore _secretStore;
     private readonly ISelectionRuntime? _selectionRuntime;
     private readonly IStartupRegistration _startupRegistration;
+    private readonly IPlatformPermissionService? _permissionService;
     private readonly ITranslationProviderFactory _providerFactory;
     private ReferenceTranslationRuntime _translationRuntime;
     private TranslationMemoryStore? _memory;
@@ -56,11 +58,12 @@ public sealed partial class MainWindow : Window
 
     public MainWindow(ISelectionRuntime? selectionRuntime, ISettingsStore? settingsStore = null,
         ISecretStore? secretStore = null, JsonlTranslationHistoryStore? historyStore = null, HttpClient? httpClient = null,
-        IStartupRegistration? startupRegistration = null)
+        IStartupRegistration? startupRegistration = null, IPlatformPermissionService? permissionService = null)
     {
         _selectionRuntime = selectionRuntime;
         var platform = _platform;
         _startupRegistration = startupRegistration ?? platform.Startup;
+        _permissionService = permissionService ?? platform.CreatePermissionService();
         var directory = platform.DataDirectory;
         _settingsStore = settingsStore ?? new JsonSettingsStore(Path.Combine(directory, "desktop-settings.json"),
             Path.Combine(directory, "settings.json"));
@@ -97,6 +100,7 @@ public sealed partial class MainWindow : Window
             try { _savedApiKey = await _secretStore.ReadApiKeyAsync() ?? ""; _credentialsAvailable = true; }
             catch { SetStatus(ConnectionStatusText, Localize("Could not read credentials. Unlock the system credential store or enter your API key again.", "无法读取凭据，请解锁系统凭据存储或重新填写 API Key。"), true); }
             if (_usePlatformMemory) await InitializeMemoryAsync();
+            if (_permissionService is not null) await RefreshPlatformPermissionsAsync();
             if (_shuttingDown) return;
             PopulateSettings();
             ApplyRuntimeSettings();
@@ -329,6 +333,7 @@ public sealed partial class MainWindow : Window
         SaveSettingsButton.IsEnabled = _settingsFailure is null;
         PlatformStatusText.IsVisible = _selectionRuntime is null;
         PlatformStatusText.Text = Localize("Automatic selection and global shortcuts are unavailable in this preview. Clipboard translation remains available from the menu.", "此预览版尚未提供自动划词和全局快捷键，可通过菜单手动翻译剪贴板内容。");
+        UpdatePermissionControls();
         if (OperatingSystem.IsMacOS())
             TranslationServiceDescriptionText.Text = Localize("Your API key is stored in macOS Keychain on this device.", "API Key 保存在本机 macOS Keychain 中。");
         else if (!OperatingSystem.IsWindows())

@@ -11,6 +11,7 @@
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" PrivateAssets="all" />
     <ProjectReference Include="..\..\src\Yita.Native.Mac\Yita.Native.Mac.csproj" />
+    <ProjectReference Include="../../tools/Yita.MacHelperSmoke/Yita.MacHelperSmoke.csproj" />
     <Using Include="Xunit" />
   </ItemGroup>
 </Project>
