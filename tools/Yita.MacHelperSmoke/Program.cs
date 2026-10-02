@@ -107,7 +107,10 @@ public static class Program
             Check(false, "Clipboard cancellation is propagated");
         }
         catch (OperationCanceledException) { Check(true, "Clipboard cancellation finishes Swift cleanup before propagating"); }
-        Check((await adapter.GetStatusAsync()).Service == NativeServiceState.Available && starts == 1,
+        var recovered = await adapter.GetStatusAsync();
+        if (recovered.Service != NativeServiceState.Available || starts != 1)
+            Console.Error.WriteLine($"Cancellation recovery: {recovered.Service}; diagnostic: {recovered.DiagnosticCode}; helper starts: {starts}");
+        Check(recovered.Service == NativeServiceState.Available && starts == 1,
             "The helper remains usable after canceled clipboard cleanup");
         using var closingClient = new MacHelperClient(Start);
         var permission = await closingClient.SendAsync("permissions");

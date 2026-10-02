@@ -42,8 +42,8 @@ import Foundation
         posts += 1
         postedAt = clock
     }
-    func advance() {
-        clock += 0.015
+    func advance(to time: TimeInterval? = nil) {
+        clock = time ?? (clock + 0.015)
         if let start = postedAt, !copied, !neverCopies, clock - start >= copyDelay {
             copied = true
             sequence += copyIncrements
@@ -82,9 +82,14 @@ import Foundation
     let result = AXSelectionReader(access: ax, isCancelled: { control.isCancelled }).read(request)
     guard allowClipboardFallback, ["empty", "unsupportedApplication"].contains(result.failure) else { return result }
     let clipboard = FixtureClipboardAccess()
+    clipboard.clock = ProcessInfo.processInfo.systemUptime
     clipboard.copyDelay = name == "clipboard-slow" ? 0.45 : 0.03
-    let selection = await ClipboardSelectionReader(ax: ax, clipboard: clipboard, now: { clipboard.clock },
-        pause: { try? await Task.sleep(nanoseconds: 15_000_000); clipboard.advance() },
+    // IPC deadlines and simulated copy delays share real time, including scheduler delays.
+    let selection = await ClipboardSelectionReader(ax: ax, clipboard: clipboard,
+        pause: {
+            try? await Task.sleep(nanoseconds: 15_000_000)
+            clipboard.advance(to: ProcessInfo.processInfo.systemUptime)
+        },
         isCancelled: { control.isCancelled }).read(request)
     if clipboard.copied && !clipboard.restored { exit(9) }
     return selection
