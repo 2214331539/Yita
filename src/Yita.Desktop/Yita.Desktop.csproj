@@ -60,6 +60,7 @@
     <CreateAppHost AppHostSourcePath="$(AppHostSourcePath)"
                    AppHostDestinationPath="$(MacBundleAppHostPath)"
                    AppBinaryName="../Resources/Runtime/Yita.Desktop.dll"
+                   IntermediateAssembly="@(IntermediateAssembly->'%(FullPath)')"
                    EnableMacOSCodeSign="true" />
   </Target>
 </Project>

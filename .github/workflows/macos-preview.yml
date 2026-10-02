@@ -9,6 +9,11 @@ on:
       - 'scripts/Verify-Mac-Package.sh'
       - 'scripts/Collect-DesktopLicenses.ps1'
       - 'packaging/macos/**'
+      - 'src/**'
+      - 'assets/branding/yita/**'
+      - 'tools/Yita.MacHelperSmoke/**'
+      - 'global.json'
+      - 'Directory.Build.*'
       - 'LICENSES/**'
       - 'docs/MAC_PREVIEW_TESTING.md'
   workflow_dispatch:
