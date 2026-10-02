@@ -27,8 +27,14 @@ internal sealed class DesktopPlatformServices
         ? new WindowsCredentialSecretStore()
         : OperatingSystem.IsMacOS() ? new MacKeychainSecretStore() : new MemorySecretStore();
 
-    internal ITranslationMemoryProtector? CreateMemoryProtector() => OperatingSystem.IsWindows()
-        ? new WindowsTranslationMemoryProtector() : null;
+    internal async Task<ITranslationMemoryProtector?> CreateMemoryProtectorAsync(string memoryPath,
+        CancellationToken cancellationToken = default)
+    {
+        if (OperatingSystem.IsWindows()) return new WindowsTranslationMemoryProtector();
+        if (OperatingSystem.IsMacOS()) return await MacTranslationMemoryProtector.CreateAsync(
+            allowCreate: !File.Exists(memoryPath), cancellationToken).ConfigureAwait(false);
+        return null;
+    }
 
     internal string PlatformName => OperatingSystem.IsWindows() ? "Windows" : OperatingSystem.IsMacOS() ? "macOS" : "Desktop";
 }

@@ -1,6 +1,6 @@
 # Yita 跨平台产品开发路线图
 
-更新日期：2026-10-02。状态：`codex/platform-host-services` 已完成阶段 B 的宿主接口与单实例接入，尚未合入 `main`；平台安全存储和 Mac 原生取词仍待完成。维护者确认朋友已验收旧 WPF 安装版的安装与取词，并要求暂缓新版打包、优先继续平台开发。该反馈不作为 Avalonia Setup 的验收证据。当前代码事实见 [技术架构](ARCHITECTURE.md)，已完成的 Windows 验收见 [验收记录](WINDOWS_AVALONIA_ACCEPTANCE.md)。
+更新日期：2026-10-02。状态：`codex/platform-host-services` 已完成阶段 B 的宿主接口、单实例、设置迁移与 Mac 安全存储实现，尚未合入 `main`；Mac Keychain 真机验证和原生取词仍待完成。维护者确认朋友已验收旧 WPF 安装版的安装与取词，并要求暂缓新版打包、优先继续平台开发。该反馈不作为 Avalonia Setup 的验收证据。当前代码事实见 [技术架构](ARCHITECTURE.md)，已完成的 Windows 验收见 [验收记录](WINDOWS_AVALONIA_ACCEPTANCE.md)。
 
 ## 产品目标与边界
 
@@ -22,7 +22,7 @@
 | 平台宿主接入 | 功能分支已通过共享接口连接窗口、原生事件、托盘与启动项；单实例/唤醒通过 Windows 与 macOS CI 的跨进程检查 | 合入主线、Mac 桌面实测、Mac 登录启动和原生取词服务 |
 | 共享翻译与功能 | Core 复用原版提供器、SSE、取消、缓存、解释/问答和记录；Avalonia UI 已还原 | 保持回归，补齐跨平台宿主和存储依赖 |
 | Windows 分发 | 当前只能使用源码构建入口；旧 Release 是 WPF | Avalonia 自包含发布、helper 配套、新版 Setup、安装升级 |
-| macOS UI 与存储 | 解决方案在 macOS CI 编译与自动化测试通过；Keychain 有待真机验证的实现 | 真实桌面生命周期、原生取词、权限、菜单栏、修正数据加密 |
+| macOS UI 与存储 | 解决方案在 macOS CI 编译与自动化测试通过；原生 Keychain 与 AES-GCM 修正记录已有实现和可控存储测试 | Keychain 真机授权/锁定/签名验证、真实桌面生命周期、原生取词、权限、菜单栏 |
 | macOS 划词 | `MacSelectionAdapter` 目前是占位实现 | AX、Cmd+C、全局输入、坐标与 Desktop 接入 |
 | 更新 | GitHub 已有旧版 Release | 新版发布流水线、版本检查、双端升级与回退 |
 | 许可分发 | 仓库保留 MIT、上游与字体声明；旧 Setup 有许可检查 | 新 Desktop 输出尚未复制声明；新增依赖也需随包附许可 |
@@ -99,7 +99,16 @@
 - 新增 `tools/Yita.PlatformSmoke`，Windows/macOS CI 执行不需要 GUI 授权的单实例跨进程检查；修复 Unix 文件锁冲突返回原始 errno、与 Windows 错误码不同的问题，仅将明确的锁冲突识别为重复实例。
 - 2026-10-02，代码提交 `3d8b3ed` 的 [GitHub Actions #36969943525](https://github.com/2214331539/Yita/actions/runs/36969943525) 在 Windows/macOS 均通过：各自 Release 编译 0 警告/0 错误、344 项自动化测试及 6 项跨进程检查。此结果不替代 Mac Accessibility 权限、其他应用划词、Keychain 或真实桌面验收。
 
-下一批 B2：设置 schema 与迁移/降级保护、Mac Keychain 可靠性与修正数据保护、缺失平台能力的明确状态。B2 完成后再接入 AX/helper；本次没有将阶段 B 或 Mac 产品标记为全部完成。
+### B2. 设置迁移与安全存储检查点
+
+- 设置 schema 1，旧预览配置从 0 迁移；加载不修改文件，首次保存升级创建原字节备份。损坏、不可读、重复/非法版本和未来版本均拒绝覆盖；保存前检查版本，避免先变更 API Key 再发现版本不兼容。
+- 设置保存串行化、原子替换、限制文件大小并支持取消；旧 WPF 偏好导入保持原文件、独立启动项及记录目的地。
+- Mac 凭据由命令行工具改为原生 SecItem API；区分缺失与访问失败。密钥和记录在后台初始化，Key 不进入进程参数、设置 JSON 或诊断。
+- Mac 修正记忆接入共享 AES-GCM，独立密钥由 Keychain 保存；竞争创建只复用获胜密钥，密钥丢失、错误格式或密文篡改均保留原文件并禁止覆盖，没有明文回退。
+- 设置页说明缺失的自动取词/快捷键能力、禁用相应控件，显示设置只读与加密存储失败状态；诊断只记录能力、版本和状态。
+- 本机 Release 构建 0 警告/0 错误，376 项测试通过：Core 47、原版业务 258、Windows 适配 22、Mac 可控存储 14、Desktop 35。Mac 测试没有访问真实 Keychain；没有调用真实翻译 API。
+
+下一步先完善 helper 协议与权限状态的可控检查，再接入 AX/helper。Mac 真机验收仍暂缓：Keychain 首次创建/更新/删除、锁定与拒绝访问、重启解密、签名变化均待验证。阶段 B 的真实平台验收和 Mac 产品尚未标记为全部完成。
 
 ## 阶段 C：macOS 原生链路
 
@@ -186,7 +195,8 @@
 - [ ] A2：新版自包含 publish、helper、许可清单与 Yita Setup。
 - [ ] A3：干净 Windows 安装/升级/卸载和不同电脑的划词验证。
 - [x] B1：宿主接口、Windows 接入、跨平台单实例及手动剪贴板回退；本机自动化和原生 smoke 通过。
-- [ ] B2：设置迁移、Mac 安全存储与平台能力状态；整个阶段 B 尚未完成。
+- [x] B2 实现：设置 schema/迁移保护、原生 Keychain 与 AES-GCM 修正记录、平台能力状态和可控测试。
+- [ ] B2 验收：真实 Mac Keychain、重启解密及签名身份检查；整个阶段 B 尚未完成。
 - [ ] C：具备 Mac 条件后实现原生链路并完成真实桌面验收。
 - [ ] D：双端兼容性矩阵、性能与阅读体验。
 - [ ] E：双端签名安装包、版本检查、升级与公开 Release。

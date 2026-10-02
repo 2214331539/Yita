@@ -25,8 +25,11 @@ public sealed partial class MainWindow : Window
     private readonly ISelectionRuntime? _selectionRuntime;
     private readonly IStartupRegistration _startupRegistration;
     private readonly ITranslationProviderFactory _providerFactory;
-    private readonly ReferenceTranslationRuntime _translationRuntime;
-    private readonly TranslationMemoryStore? _memory;
+    private ReferenceTranslationRuntime _translationRuntime;
+    private TranslationMemoryStore? _memory;
+    private IDisposable? _memoryProtector;
+    private readonly bool _usePlatformMemory;
+    private readonly DesktopPlatformServices _platform = new();
     private readonly HttpClient? _injectedClient;
     private readonly AiHistoryStore _records = new();
     private readonly SemaphoreSlim _settingsGate = new(1, 1);
@@ -39,6 +42,9 @@ public sealed partial class MainWindow : Window
     private bool _apiKeyClearRequested;
     private bool _shuttingDown;
     private Task? _initialization;
+    private SettingsFailureKind? _settingsFailure;
+    private bool _memoryInitializationFailed;
+    private bool _credentialsAvailable;
 
     public bool IsSelectionTranslationEnabled => _settings.IsEnabled;
     public event EventHandler? SettingsChanged;
@@ -53,7 +59,7 @@ public sealed partial class MainWindow : Window
         IStartupRegistration? startupRegistration = null)
     {
         _selectionRuntime = selectionRuntime;
-        var platform = new DesktopPlatformServices();
+        var platform = _platform;
         _startupRegistration = startupRegistration ?? platform.Startup;
         var directory = platform.DataDirectory;
         _settingsStore = settingsStore ?? new JsonSettingsStore(Path.Combine(directory, "desktop-settings.json"),
@@ -61,9 +67,7 @@ public sealed partial class MainWindow : Window
         _secretStore = secretStore ?? platform.CreateSecretStore();
         _injectedClient = httpClient;
         _providerFactory = httpClient is null ? new TranslationProviderFactory() : new InjectedTranslationProviderFactory(httpClient);
-        if (settingsStore is null && platform.CreateMemoryProtector() is { } protector)
-            _memory = new TranslationMemoryStore(Path.Combine(directory, "desktop-translation-memory.dat"),
-                protector);
+        _usePlatformMemory = settingsStore is null;
         _translationRuntime = new ReferenceTranslationRuntime(_providerFactory, _memory);
         InitializeComponent();
         _ready = true;
@@ -84,9 +88,15 @@ public sealed partial class MainWindow : Window
     {
         try
         {
-            _settings = await _settingsStore.LoadAsync();
-            try { _savedApiKey = await _secretStore.ReadApiKeyAsync() ?? ""; }
-            catch { SetStatus(ConnectionStatusText, Localize("Could not read credentials. Enter your API key again.", "无法读取凭据，请重新填写 API Key。"), true); }
+            try { _settings = await _settingsStore.LoadAsync(); }
+            catch (SettingsStoreException exception)
+            {
+                _settingsFailure = exception.Kind;
+                _settings = YitaSettings.Default with { IsEnabled = false };
+            }
+            try { _savedApiKey = await _secretStore.ReadApiKeyAsync() ?? ""; _credentialsAvailable = true; }
+            catch { SetStatus(ConnectionStatusText, Localize("Could not read credentials. Unlock the system credential store or enter your API key again.", "无法读取凭据，请解锁系统凭据存储或重新填写 API Key。"), true); }
+            if (_usePlatformMemory) await InitializeMemoryAsync();
             if (_shuttingDown) return;
             PopulateSettings();
             ApplyRuntimeSettings();
@@ -94,15 +104,39 @@ public sealed partial class MainWindow : Window
         catch (Exception exception) { await ShowMessageAsync(Localize("Could not load settings: ", "加载设置失败：") + exception.Message); }
     }
 
+    private async Task InitializeMemoryAsync()
+    {
+        ITranslationMemoryProtector? protector = null;
+        try
+        {
+            var path = Path.Combine(_platform.DataDirectory, "desktop-translation-memory.dat");
+            protector = await _platform.CreateMemoryProtectorAsync(path);
+            if (protector is null) return;
+            var memory = await Task.Run(() => new TranslationMemoryStore(path, protector));
+            if (_shuttingDown) { (protector as IDisposable)?.Dispose(); return; }
+            _memoryProtector = protector as IDisposable;
+            _memory = memory;
+            _translationRuntime = new ReferenceTranslationRuntime(_providerFactory, memory);
+        }
+        catch
+        {
+            (protector as IDisposable)?.Dispose();
+            _memoryInitializationFailed = true;
+        }
+    }
+
     private void PopulateSettings()
     {
         _ready = false;
         var value = _settings.ToOriginal(_savedApiKey);
         EnabledCheckBox.IsChecked = value.IsEnabled;
+        EnabledCheckBox.IsEnabled = _selectionRuntime is not null;
         StartWithWindowsCheckBox.IsChecked = value.StartWithWindows;
         StartWithWindowsCheckBox.IsEnabled = _startupRegistration.IsSupported;
         ClipboardFallbackCheckBox.IsChecked = value.UseClipboardFallback;
+        ClipboardFallbackCheckBox.IsEnabled = _selectionRuntime is not null;
         WpsPdfCompatibilityCheckBox.IsChecked = value.UseWpsPdfCompatibility;
+        WpsPdfCompatibilityCheckBox.IsEnabled = OperatingSystem.IsWindows() && _selectionRuntime is not null;
         UseSelectionContextCheckBox.IsChecked = value.UseSelectionContext;
         SelectionDelayTextBox.Text = value.SelectionDelayMilliseconds.ToString(CultureInfo.InvariantCulture);
         MaximumSelectionTextBox.Text = value.MaximumSelectionCharacters.ToString(CultureInfo.InvariantCulture);
@@ -189,20 +223,28 @@ public sealed partial class MainWindow : Window
         try
         {
             await InitializeAsync();
+            if (_settingsFailure is not null) return;
             var settings = ReadSettings(true);
             var key = ApiKeyPasswordBox.Text?.Trim() ?? "";
             await _settingsGate.WaitAsync();
             try
             {
+                await _settingsStore.ValidateWriteAsync();
                 await _secretStore.SaveApiKeyAsync(key);
                 await _settingsStore.SaveAsync(settings);
                 _settings = settings;
                 _savedApiKey = key;
+                _credentialsAvailable = true;
             }
             finally { _settingsGate.Release(); }
             if (_startupRegistration.IsSupported && _selectionRuntime is not null) _startupRegistration.Apply(_settings.StartWithSystem);
             ApplyRuntimeSettings();
             Hide();
+        }
+        catch (SettingsStoreException exception)
+        {
+            _settingsFailure = exception.Kind;
+            ApplyUiLanguage(_uiLanguage);
         }
         catch (Exception exception) { await ShowMessageAsync(exception.Message); }
     }
@@ -230,6 +272,7 @@ public sealed partial class MainWindow : Window
 
     private async Task PersistSettingsWithStatusAsync()
     {
+        if (_settingsFailure is not null) return;
         try
         {
             await _settingsGate.WaitAsync();
@@ -279,6 +322,17 @@ public sealed partial class MainWindow : Window
         ToolTip.SetTip(SelectionDelayTextBox, L("SelectionDelayTooltip"));
         ToolTip.SetTip(MaximumSelectionTextBox, L("MaximumSelectionTooltip"));
         ToolTip.SetTip(CustomAccentColorTextBox, L("CustomColorTooltip"));
+        SettingsStatusText.IsVisible = _settingsFailure is not null;
+        SettingsStatusText.Text = _settingsFailure == SettingsFailureKind.NewerVersion
+            ? Localize("These settings require a newer Yita version. Editing is disabled; the file has been preserved.", "设置来自更高版本的 Yita，已禁止保存并保留原文件，请更新软件。")
+            : Localize("Settings could not be read. Saving is disabled; the file has been preserved.", "无法读取设置，已禁止保存并保留原文件。请检查或恢复设置文件。");
+        SaveSettingsButton.IsEnabled = _settingsFailure is null;
+        PlatformStatusText.IsVisible = _selectionRuntime is null;
+        PlatformStatusText.Text = Localize("Automatic selection and global shortcuts are unavailable in this preview. Clipboard translation remains available from the menu.", "此预览版尚未提供自动划词和全局快捷键，可通过菜单手动翻译剪贴板内容。");
+        if (OperatingSystem.IsMacOS())
+            TranslationServiceDescriptionText.Text = Localize("Your API key is stored in macOS Keychain on this device.", "API Key 保存在本机 macOS Keychain 中。");
+        else if (!OperatingSystem.IsWindows())
+            TranslationServiceDescriptionText.Text = Localize("Your API key is kept for this session only on this platform.", "此平台仅在当前运行期间保留 API Key。");
         if (!_startupRegistration.IsSupported)
             ToolTip.SetTip(StartWithWindowsCheckBox, Localize("Login startup is not available on this platform yet.", "此平台尚未支持登录时启动。"));
         UpdateMemoryStatus();
@@ -439,8 +493,11 @@ public sealed partial class MainWindow : Window
     private void UpdateMemoryStatus()
     {
         var count = _memory?.Count ?? 0;
-        TranslationMemoryStatusText.Text = count == 0 ? L("TranslationMemoryEmpty") : string.Format(L("TranslationMemoryCount"), count);
-        ClearTranslationMemoryButton.IsEnabled = count > 0;
+        TranslationMemoryStatusText.Text = _memoryInitializationFailed || _memory?.LoadFailed == true
+            ? Localize("Encrypted memory could not be opened. Existing data has been preserved.", "无法打开加密翻译记忆，已保留原数据。")
+            : _memory is null ? Localize("Encrypted memory is unavailable.", "加密翻译记忆不可用。")
+            : count == 0 ? L("TranslationMemoryEmpty") : string.Format(L("TranslationMemoryCount"), count);
+        ClearTranslationMemoryButton.IsEnabled = _memory is not null && (count > 0 || _memory.LoadFailed);
     }
 
     private async void ClearTranslationMemoryButton_Click(object? sender, RoutedEventArgs e)

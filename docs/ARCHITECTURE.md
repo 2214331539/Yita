@@ -2,19 +2,19 @@
 
 本文描述 `main` 当前代码的实际组织。主应用使用 C#、.NET 8 和 Avalonia 11.2.6；Windows 已实现划词翻译，macOS 原生取词仍待完成。旧 WPF 产品的完整快照保留在 `codex/csharp-wpf-legacy`。
 
-本文的平台宿主接口说明对应 `codex/platform-host-services` 功能分支，尚未合入 `main`。该分支保持 Windows 取词实现，新增非 Windows 单实例与手动剪贴板入口；不代表 macOS 自动划词已完成。
+本文的平台宿主与存储说明对应 `codex/platform-host-services` 功能分支，尚未合入 `main`。该分支保持 Windows 取词实现，新增非 Windows 单实例、手动剪贴板入口、设置 schema 和 Mac 加密存储实现；不代表 macOS 自动划词已完成。
 
 ## 模块边界
 
 | 模块 | 入口与主要职责 |
 | --- | --- |
-| `Yita.Core` | `Parity/ReferenceTranslationRuntime.cs` 编排当前翻译；`Settings/YitaSettings.cs` 保存偏好；`LatestRequestController.cs` 管理取消和版本；`Placement/PopupPlacement.cs` 处理位置；`Platform` 定义宿主契约和可移植单实例 |
+| `Yita.Core` | `Parity/ReferenceTranslationRuntime.cs` 编排当前翻译；`Settings` 保存偏好、迁移和防止降级覆盖；`LatestRequestController.cs` 管理取消和版本；`Placement/PopupPlacement.cs` 处理位置；`Platform` 定义宿主契约、单实例和 AES-GCM 修正数据保护 |
 | `Yita.Desktop` | `App.axaml.cs` 管理生命周期；`Platform/DesktopPlatformServices.cs` 创建系统实现；`MainWindow` 订阅共享输入事件并管理设置和阅读会话；`TranslationPopupWindow`、`QuestionAnswerWindow` 呈现翻译与问答 |
 | `Yita.Native.Windows` | `WindowsSelectionRuntime` 接收鼠标/快捷键；`WindowsSelectionAdapter` 组织取词；剪贴板、托盘、凭据、启动项与显示偏好各自独立 |
 | `Yita.Native.Windows.UIA.Worker` | Windows 专属 helper，独立访问 UI Automation provider |
-| `Yita.Native.Mac` | 选区与权限契约、Keychain 适配器；AX 和全局输入 helper 尚未实现 |
+| `Yita.Native.Mac` | 选区与权限契约、Security.framework Keychain 适配器、修正数据密钥管理；AX 和全局输入 helper 尚未实现 |
 
-Desktop 当前使用 XAML 与窗口 code-behind/partial class 配合独立业务服务，不宣称已经完成完整 MVVM。App、设置和托盘已通过共享宿主接口接入，系统实现选择集中在工厂；字体/动效的显示偏好仍有 Windows 专属调用。macOS 的 `ISelectionRuntime` 与登录启动尚未实现，安全存储和窗口原生行为仍需补齐。
+Desktop 当前使用 XAML 与窗口 code-behind/partial class 配合独立业务服务，不宣称已经完成完整 MVVM。App、设置和托盘已通过共享宿主接口接入，系统实现选择集中在工厂；字体/动效的显示偏好仍有 Windows 专属调用。macOS 的 `ISelectionRuntime` 与登录启动尚未实现，安全存储需真机复验，窗口原生行为仍需补齐。
 
 ## 平台宿主接口
 
@@ -26,7 +26,7 @@ Desktop 当前使用 XAML 与窗口 code-behind/partial class 配合独立业务
 
 `IStartupRegistration` 明确是否支持启动项，未实现的平台禁用开关。`IStatusIcon` 提供原生图标事件；Windows 保持自绘 Yita 菜单，其他平台先使用 Avalonia NativeMenu。菜单手动翻译可以通过 Avalonia 剪贴板工作，但此时还没有 Mac 全局快捷键或选区锚点，只以主屏中心放置浮窗。
 
-系统凭据和 Windows 修正数据保护的创建也移至平台工厂。Mac Keychain 实现和修正数据加密仍需进一步验证；没有增加明文持久化替代。
+系统凭据和修正数据保护由平台工厂创建。Mac Keychain 使用 Security.framework 的 SecItem API，不再启动 `security` 子进程；后台初始化密钥和修正数据，不在窗口输入回调中访问 Keychain。缺少输入服务时禁用自动划词、复制回退与 WPS 控件，并说明手动剪贴板入口；诊断列出启动项、凭据、设置和加密记忆状态，不包含正文、Key 或数据路径。
 
 ## 原版代码复用
 
@@ -79,6 +79,12 @@ Windows 构建自动将 `Yita.UIA.Worker.exe` 及其依赖放在 Desktop 输出�
 | 健康诊断 | `desktop-runtime-health.log` |
 
 没有新设置时可导入旧 WPF 阅读偏好；开机启动和 AI 记录目的地保持独立。首次升级旧预览配置会开启通用剪贴板回退，后续显式关闭并保存会被保留。
+
+`JsonSettingsStore` 当前 `schemaVersion` 为 1，无该字段的旧预览配置视为 0。加载只做内存迁移；第一次保存升级前，以原字节创建 `desktop-settings.json.schema-0.bak`，不覆盖已存在的备份。设置采用临时文件、刷新和原子替换，保存串行化且尊重取消。文件超过 1 MiB、内容损坏、不可读或版本高于当前实现时返回明确错误，禁止默认值覆盖和偷偷导入旧设置。保存前再次校验磁盘文件，避免已经加载的旧配置覆盖后来写入的新版本；更改凭据前也先检查设置版本。错误状态显示在设置页并禁用保存，恢复可读配置后重启加载。
+
+Mac 数据目录由 `Environment.SpecialFolder.LocalApplicationData` 解析，并使用同样的 `Yita` 子目录和 Desktop 文件名；它不是 Windows 数据的自动同步副本。API Key 保存在 Keychain 服务 `com.yita.Yita` / 账户 `deepseek-api-key`，保留原适配器的项目身份。修正记忆采用独立随机 256-bit 密钥，存于同一服务的 `translation-memory-key-v1`；记录文件使用 .NET AES-GCM、随机 96-bit nonce、128-bit tag 和经过认证的格式头。首次创建密钥遇到竞争时读取获胜者，绝不更新已有加密密钥。
+
+已存在记录却缺少密钥、密钥无效、Keychain 拒绝访问或密文验证失败时保留原文件，禁止保存修正，普通翻译仍可使用；没有明文回退。Windows DPAPI 文件不能直接复制到 Mac 解密。AES 密钥在退出时清零；显式清除修正只删除记录，保留账户密钥以便以后继续保存。Keychain 原生绑定、锁定/授权/签名变化仍需真实 Mac 验收；伪 Keychain 和 AES 测试不能代替它。
 
 ## 平台边界与发布
 

@@ -174,7 +174,7 @@ scripts/ · packaging/windows/       旧 WPF 打包流程与开发辅助脚本
 | `main` | 当前 C#/.NET/Avalonia 架构的主开发分支 |
 | `codex/csharp-wpf-legacy` | 切换前 GitHub main 的完整 Yita WPF 快照，保留旧源码、README 与打包流程 |
 | `codex/csharp-wpf-upstream-baseline` | 切换前本地 main 的上游 WPF 基线，单独保留其历史 |
-| `codex/platform-host-services` | 当前开发中的共享宿主接口、单实例与平台接入，尚未合入 main |
+| `codex/platform-host-services` | 共享宿主、单实例、设置版本迁移和 Mac 安全存储开发，尚未合入 main |
 
 旧 WPF 与新 Avalonia 都使用 C#，旧分支名中的 `csharp-wpf` 用来区分界面与原生组织方式。已有版本标签与 Release 资产保留，不重写历史。
 
@@ -226,7 +226,9 @@ GitHub Actions 的 `Cross-platform architecture` 工作流在 Windows/macOS runn
 | AI 记录 | 用户选择的目录，明文 Markdown，自动保存默认关闭 |
 | 在线请求 | 选区发送给所配置的 API 服务；启用上下文后也可能发送周边段落 |
 
-首次启动可导入旧 WPF 阅读偏好，保存到新文件；不沿用旧版开机启动或 AI 记录目录。旧 WPF 使用 `settings.json` 和 `Yita/DeepSeekApiKey`，当前程序使用独立设置与凭据标识。macOS Keychain 适配器已有代码，但真机验证仍待完成。
+首次启动可导入旧 WPF 阅读偏好，保存到新文件；不沿用旧版开机启动或 AI 记录目录。旧 WPF 使用 `settings.json` 和 `Yita/DeepSeekApiKey`，当前程序使用独立设置与凭据标识。
+
+平台宿主功能分支新增设置格式版本和迁移备份；损坏、不可读或由更高版本写入的配置会禁止覆盖。Mac 凭据改用原生 Keychain API，主动保存的修正使用 Keychain 密钥保护的 AES-GCM；这些代码仍需真实 Mac 授权与运行验收，没有明文持久化回退。具体迁移、密钥与文件规则见 [架构说明](docs/ARCHITECTURE.md)。
 
 Yita 是本地客户端，默认在线翻译不是离线模型。开启个人术语或修正示例时，请求可能附带相关内容。分享日志、记录或截图前请脱敏，不要提交 API Key 或私人文档。
 

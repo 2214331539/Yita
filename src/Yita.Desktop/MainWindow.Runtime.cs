@@ -209,12 +209,26 @@ public sealed partial class MainWindow
         try
         {
             if (Clipboard is { } clipboard)
-                await clipboard.SetTextAsync(_performance.CreateReport(_settings.UiLanguage == "zh-CN") + "\n\n"
+                await clipboard.SetTextAsync(CreatePlatformDiagnostics() + "\n\n"
+                    + _performance.CreateReport(_settings.UiLanguage == "zh-CN") + "\n\n"
                     + (_selectionRuntime?.CreateDiagnostics(_settings.UiLanguage == "zh-CN")
                     ?? Localize("Input capture is unavailable.", "划词捕获不可用。")));
         }
         catch { }
     }
+
+    internal string CreatePlatformDiagnostics() => string.Join("\n", new[]
+    {
+        "Yita " + _platform.PlatformName + " Avalonia preview",
+        "Automatic selection: " + (_selectionRuntime is null ? "not implemented" : "available"),
+        "Global shortcut: " + (_selectionRuntime?.IsHotkeyRunning == true ? "running" : "unavailable"),
+        "Login startup: " + (_startupRegistration.IsSupported ? "available" : "not implemented"),
+        "Settings schema: " + _settings.SchemaVersion,
+        "Settings writable: " + (_settingsFailure is null ? "yes" : "no (" + _settingsFailure + ")"),
+        "Credential storage: " + (_credentialsAvailable ? "readable" : "unavailable"),
+        "Encrypted memory: " + (_memoryInitializationFailed || _memory?.LoadFailed == true ? "unreadable"
+            : _memory is null ? "unavailable" : "available"),
+    });
 
     internal void DismissUnpinnedWindows()
     {
@@ -245,6 +259,7 @@ public sealed partial class MainWindow
         foreach (var popup in _popups.ToArray()) popup.Close();
         foreach (var conversation in _conversations.ToArray()) conversation.Close();
         (_providerFactory as IDisposable)?.Dispose();
+        _memoryProtector?.Dispose();
         _injectedClient?.Dispose();
         ApiKeyPasswordBox.Text = "";
         _savedApiKey = "";

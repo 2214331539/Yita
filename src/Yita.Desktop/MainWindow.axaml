@@ -18,6 +18,7 @@
       <StackPanel Grid.Column="1" VerticalAlignment="Center">
         <TextBlock FontSize="24" FontWeight="SemiBold" Foreground="{DynamicResource AppTextBrush}" Tag="loc:HeaderTitle" Text="Settings" LineHeight="31" />
         <TextBlock Margin="0,3,0,0" Tag="loc:HeaderSubtitle" Text="Translation behavior, appearance, and connection" Classes="supporting" LineHeight="20" />
+        <TextBlock x:Name="SettingsStatusText" Margin="0,6,0,0" TextWrapping="Wrap" IsVisible="False" Classes="supporting" LineHeight="20" />
       </StackPanel>
       <StackPanel Grid.Column="2" VerticalAlignment="Center">
         <TextBlock Margin="0,0,0,6" HorizontalAlignment="Right" Tag="loc:InterfaceLanguage" Text="Interface language" Classes="label" LineHeight="19" />
@@ -40,6 +41,7 @@
               <StackPanel>
                 <TextBlock Tag="loc:GeneralTitle" Text="General" Classes="section" LineHeight="20" />
                 <TextBlock Margin="0,4,0,17" Tag="loc:GeneralDescription" Text="Control availability and selection behavior." Classes="supporting" LineHeight="20" />
+                <TextBlock x:Name="PlatformStatusText" Margin="0,0,0,14" TextWrapping="Wrap" IsVisible="False" Classes="supporting" LineHeight="20" />
                 <Grid>
                   <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -366,7 +368,7 @@
             <Border Margin="0,14,0,0" Classes="card">
               <StackPanel>
                 <TextBlock Tag="loc:TranslationServiceTitle" Text="Translation service" Classes="section" LineHeight="20" />
-                <TextBlock Margin="0,4,0,17" Tag="loc:TranslationServiceDescription" Text="Your API key is stored only in Windows Credential Manager on this device." Classes="supporting" LineHeight="20" />
+                <TextBlock x:Name="TranslationServiceDescriptionText" Margin="0,4,0,17" Tag="loc:TranslationServiceDescription" Text="Your API key is stored only in Windows Credential Manager on this device." Classes="supporting" LineHeight="20" />
                 <Grid>
                   <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -419,7 +421,7 @@
         <TextBlock VerticalAlignment="Center" Tag="loc:FooterHint" Text="Changes take effect immediately after saving" Classes="supporting" LineHeight="20" />
         <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
           <Button Margin="0,0,8,0" Content="Cancel" Tag="loc:Cancel" IsCancel="True" Classes="secondary" Click="CancelButton_Click" />
-          <Button Content="Save settings" Tag="loc:SaveSettings" IsDefault="True" Click="SaveButton_Click" Classes="primary" />
+          <Button x:Name="SaveSettingsButton" Content="Save settings" Tag="loc:SaveSettings" IsDefault="True" Click="SaveButton_Click" Classes="primary" />
         </StackPanel>
       </Grid>
     </Border>

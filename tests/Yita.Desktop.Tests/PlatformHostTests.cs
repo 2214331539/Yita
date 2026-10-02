@@ -13,6 +13,77 @@ namespace Yita.Desktop.Tests;
 public sealed class PlatformHostTests
 {
     [AvaloniaFact]
+    public async Task FutureSettingsDisableSavingWithoutChangingTheFileOrCredentials()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "yita-future-settings-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, "settings.json");
+        const string contents = "{\"schemaVersion\":99,\"privateFutureData\":\"preserve\"}";
+        await File.WriteAllTextAsync(path, contents);
+        var secrets = new MemorySecretStore();
+        await secrets.SaveApiKeyAsync("existing-private-key");
+        var window = new MainWindow(null, new JsonSettingsStore(path), secrets);
+        try
+        {
+            window.Show();
+            await window.Initialization;
+            Assert.False(window.FindControl<Button>("SaveSettingsButton")!.IsEnabled);
+            Assert.True(window.FindControl<TextBlock>("SettingsStatusText")!.IsVisible);
+            Assert.False(window.IsSelectionTranslationEnabled);
+            window.FindControl<TextBox>("ApiKeyPasswordBox")!.Text = "replacement-private-key";
+            Click(window.FindControl<Button>("SaveSettingsButton")!);
+            window.ToggleEnabledFromTray();
+            await Task.Delay(30);
+            Assert.Equal(contents, await File.ReadAllTextAsync(path));
+            Assert.Equal("existing-private-key", await secrets.ReadApiKeyAsync());
+            Assert.DoesNotContain("private", window.CreatePlatformDiagnostics());
+            Assert.DoesNotContain(directory, window.CreatePlatformDiagnostics());
+            Click(window.FindControl<Button>("UiLanguageButton")!);
+            Assert.Contains("更高版本", window.FindControl<TextBlock>("SettingsStatusText")!.Text);
+        }
+        finally { window.Close(); Directory.Delete(directory, true); }
+    }
+
+    [AvaloniaFact]
+    public async Task MissingInputServiceIsExplainedAndItsControlsAreDisabled()
+    {
+        using var fixture = await Fixture.CreateAsync();
+        Assert.True(fixture.Window.FindControl<TextBlock>("PlatformStatusText")!.IsVisible);
+        Assert.False(fixture.Window.FindControl<ToggleSwitch>("EnabledCheckBox")!.IsEnabled);
+        Assert.False(fixture.Window.FindControl<ToggleSwitch>("WpsPdfCompatibilityCheckBox")!.IsEnabled);
+        Assert.Contains("not implemented", fixture.Window.CreatePlatformDiagnostics());
+        Click(fixture.Window.FindControl<Button>("UiLanguageButton")!);
+        Assert.Contains("自动划词", fixture.Window.FindControl<TextBlock>("PlatformStatusText")!.Text);
+    }
+
+    [AvaloniaFact]
+    public async Task FutureSettingsReplacedAfterLoadingAreDetectedBeforeSavingCredentials()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "yita-settings-recheck-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, "settings.json");
+        var store = new JsonSettingsStore(path);
+        await store.SaveAsync(YitaSettings.Default);
+        var secrets = new MemorySecretStore();
+        await secrets.SaveApiKeyAsync("existing-key");
+        var window = new MainWindow(null, store, secrets);
+        try
+        {
+            window.Show();
+            await window.Initialization;
+            const string future = "{\"schemaVersion\":99}";
+            await File.WriteAllTextAsync(path, future);
+            window.FindControl<TextBox>("ApiKeyPasswordBox")!.Text = "replacement-key";
+            Click(window.FindControl<Button>("SaveSettingsButton")!);
+            await UntilAsync(() => !window.FindControl<Button>("SaveSettingsButton")!.IsEnabled);
+            Assert.Equal("existing-key", await secrets.ReadApiKeyAsync());
+            Assert.Equal(future, await File.ReadAllTextAsync(path));
+            Assert.True(window.FindControl<TextBlock>("SettingsStatusText")!.IsVisible);
+        }
+        finally { window.Close(); Directory.Delete(directory, true); }
+    }
+
+    [AvaloniaFact]
     public async Task PlatformEventsReachTheSharedWindowFromABackgroundThreadAndDetachOnShutdown()
     {
         using var runtime = new TestSelectionRuntime();

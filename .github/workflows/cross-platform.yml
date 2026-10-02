@@ -17,6 +17,7 @@ on:
       - 'tests/Yita.Core.Tests/**'
       - 'tests/Yita.Core.Parity.Tests/**'
       - 'tests/Yita.Native.Windows.Tests/**'
+      - 'tests/Yita.Native.Mac.Tests/**'
       - 'tests/Yita.Desktop.Tests/**'
       - 'tools/Yita.PlatformSmoke/**'
       - '.github/workflows/cross-platform.yml'
