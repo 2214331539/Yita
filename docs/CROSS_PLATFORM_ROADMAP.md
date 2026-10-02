@@ -19,10 +19,10 @@
 | 能力 | 当前证据 | 尚缺工作 |
 | --- | --- | --- |
 | Windows 取词与阅读 | UIA 隔离、原生控件、复制回退、浮窗与托盘已接入；本机 WPS PDF 等已验收；朋友验收了旧 WPF 安装版 | 新 Avalonia 版的多电脑、更多目标软件、安装后兼容性与长期运行 |
-| 平台宿主接入 | 功能分支已通过共享接口连接窗口、原生事件、托盘与启动项；跨平台单实例/唤醒有实现和 Windows 实测 | 合入主线、Mac 环境构建与实测、Mac 登录启动和原生取词服务 |
+| 平台宿主接入 | 功能分支已通过共享接口连接窗口、原生事件、托盘与启动项；单实例/唤醒通过 Windows 与 macOS CI 的跨进程检查 | 合入主线、Mac 桌面实测、Mac 登录启动和原生取词服务 |
 | 共享翻译与功能 | Core 复用原版提供器、SSE、取消、缓存、解释/问答和记录；Avalonia UI 已还原 | 保持回归，补齐跨平台宿主和存储依赖 |
 | Windows 分发 | 当前只能使用源码构建入口；旧 Release 是 WPF | Avalonia 自包含发布、helper 配套、新版 Setup、安装升级 |
-| macOS UI 与存储 | 项目与构建工作流已存在；Keychain 有待真机验证的实现 | 应用生命周期、原生取词、权限、菜单栏、修正数据加密 |
+| macOS UI 与存储 | 解决方案在 macOS CI 编译与自动化测试通过；Keychain 有待真机验证的实现 | 真实桌面生命周期、原生取词、权限、菜单栏、修正数据加密 |
 | macOS 划词 | `MacSelectionAdapter` 目前是占位实现 | AX、Cmd+C、全局输入、坐标与 Desktop 接入 |
 | 更新 | GitHub 已有旧版 Release | 新版发布流水线、版本检查、双端升级与回退 |
 | 许可分发 | 仓库保留 MIT、上游与字体声明；旧 Setup 有许可检查 | 新 Desktop 输出尚未复制声明；新增依赖也需随包附许可 |
@@ -96,7 +96,8 @@
 - 无原生输入服务时，可以从平台菜单手动翻译现有剪贴板，定位暂用主屏中心；没有实现 Mac 全局快捷键、自动复制或鼠标附近定位。暂停自动划词不影响手动翻译。
 - 非 Windows 菜单补充剪贴板翻译、诊断与关于入口并同步语言；没有输入服务时禁用自动划词菜单项，没有登录启动实现时禁用对应设置。
 - 本机 Release 构建通过；344 项自动化通过（Core 32、原版业务 258、Windows 适配 22、Desktop 32）。实际跨进程锁定与唤醒、真实 Windows UIA/Ctrl+C/剪贴板恢复/托盘/快捷键 smoke 通过；没有调用真实翻译 API。
-- 新增 `tools/Yita.PlatformSmoke`，Windows/macOS CI 执行不需要 GUI 授权的单实例跨进程检查。CI 结果需按实际运行状态记录，不替代 Mac 权限和桌面应用验收。
+- 新增 `tools/Yita.PlatformSmoke`，Windows/macOS CI 执行不需要 GUI 授权的单实例跨进程检查；修复 Unix 文件锁冲突返回原始 errno、与 Windows 错误码不同的问题，仅将明确的锁冲突识别为重复实例。
+- 2026-10-02，代码提交 `3d8b3ed` 的 [GitHub Actions #36969943525](https://github.com/2214331539/Yita/actions/runs/36969943525) 在 Windows/macOS 均通过：各自 Release 编译 0 警告/0 错误、344 项自动化测试及 6 项跨进程检查。此结果不替代 Mac Accessibility 权限、其他应用划词、Keychain 或真实桌面验收。
 
 下一批 B2：设置 schema 与迁移/降级保护、Mac Keychain 可靠性与修正数据保护、缺失平台能力的明确状态。B2 完成后再接入 AX/helper；本次没有将阶段 B 或 Mac 产品标记为全部完成。
 
