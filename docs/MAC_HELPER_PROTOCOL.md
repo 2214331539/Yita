@@ -99,3 +99,5 @@ self-test 不初始化 NSApplication、不检查真实桌面权限、不打开�
 新增 `--selection-self-test` 运行真实读取策略的可控 AX fixtures；另使用 `--self-test --selection-fixture range` 将固定合成选区经真实 Swift/C# 管道交换，覆盖范围回退、坐标、上下文选择和来源变化。fixture 参数仅在 `--self-test` 时启用，生产取词仍调用系统 AX API。两种模式均不读取真实桌面数据或申请授权。
 
 2026-10-02，提交 `f85a8d8` 的 [GitHub Actions #36973376654](https://github.com/2214331539/Yita/actions/runs/36973376654) 已通过 Windows/macOS 构建、各 398 项测试、可控子进程通信和 Mac 实际 Swift helper 的 5 项 self-test。Swift 管道读取使用 `Darwin.read`，每个短请求在 stdin 仍保持打开时即可返回，不等待缓冲区填满或 EOF。
+
+同日，AX 读取代码提交 `502d864` 的 [GitHub Actions #36974694338](https://github.com/2214331539/Yita/actions/runs/36974694338) 通过 Windows/macOS 构建、各 409 项测试，以及 Mac 实际 Swift helper 的 10 项管道检查、17 项 AX 策略 fixtures。真实 AX 权限、目标应用和屏幕坐标仍待真机验收。

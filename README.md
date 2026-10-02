@@ -206,7 +206,7 @@ dotnet run --project tools/Yita.PlatformSmoke/Yita.PlatformSmoke.csproj -c Relea
 
 GitHub Actions 的 `Cross-platform architecture` 工作流在 Windows/macOS runner 上构建当前解决方案并运行测试；`Legacy WPF regression` 在 Windows 上检查保留的 WPF 解决方案。macOS 构建通过只能证明共享代码可构建，不能证明 macOS 划词功能已实现。
 
-平台宿主功能分支还会在 Mac 构建 Swift 权限 helper，并验证 C#/Swift JSON 通信。CI 的 self-test 不请求桌面权限或读取真实选区；详细接口、开发签名和验证边界见 [Mac helper 协议](docs/MAC_HELPER_PROTOCOL.md)。
+平台宿主功能分支还会在 Mac 构建 Swift 权限/AX helper，并验证 C#/Swift JSON 通信、范围取词策略和结构化选区结果。AX 读取代码已实现，但 Desktop 自动触发、Cmd+C 回退和屏幕坐标转换仍待完成。CI 的 self-test 不请求桌面权限或读取真实选区；详细接口、开发签名和验证边界见 [Mac helper 协议](docs/MAC_HELPER_PROTOCOL.md)。
 
 下一阶段的交付顺序、平台边界和发布验收标准见 [跨平台产品开发路线图](docs/CROSS_PLATFORM_ROADMAP.md)。已有结果见 [Windows 验收说明](docs/WINDOWS_AVALONIA_ACCEPTANCE.md)；[还原开发计划](docs/WINDOWS_AVALONIA_PARITY_PLAN.md) 和 [首次迁移计划](docs/CROSS_PLATFORM_MIGRATION_PLAN.md) 保留为历史记录。
 
