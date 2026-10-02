@@ -238,8 +238,8 @@ Yita 是本地客户端，默认在线翻译不是离线模型。开启个人术
 
 新增平台能力应实现原生适配边界，保持 Core 不依赖平台 UI。macOS 后续工作包括 AXUIElement、Cmd+C 回退、选区坐标、Accessibility 权限、全局输入、菜单栏 helper 与真实设备验收。
 
-## 致谢与许可证
+## 许可证与来源
 
-Yita 基于 Frank Lai 的 [InstantTranslate](https://github.com/franklai-rise/InstantTranslate) v0.7.3 开发，在保留其业务机制的基础上调整品牌、阅读体验，并逐步迁移到共享 Core、Avalonia 和平台原生适配器。感谢上游及 Avalonia、.NET 等开源项目。
+Yita 包含源自 [InstantTranslate](https://github.com/franklai-rise/InstantTranslate) v0.7.3 的代码。当前架构采用共享 Core、Avalonia 界面和平台原生适配器，部分通用业务逻辑与 Windows 取词机制沿用并适配了原有实现。
 
 Yita 自有修改采用 [MIT License](LICENSE)。上游版权与完整许可保留在 [LICENSES/InstantTranslate-MIT.txt](LICENSES/InstantTranslate-MIT.txt)；字体和其他第三方声明见 [NOTICE.md](NOTICE.md)。品牌素材见 [assets/branding/yita/v1](assets/branding/yita/v1)，包含 PNG 与 ICO，不是 SVG 矢量源文件。
