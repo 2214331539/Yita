@@ -290,7 +290,9 @@ final class SystemAXSelectionAccess: AXSelectionAccess {
         guard remaining > 0 else { throw SelectionReadError.timeout }
         var pid: pid_t = 0
         guard AXUIElementGetPid(element, &pid) == .success, pid == targetPID else { throw SelectionReadError.targetChanged }
-        _ = AXUIElementSetMessagingTimeout(element, Float(min(0.15, remaining)))
+        guard AXUIElementSetMessagingTimeout(element, Float(min(0.15, remaining))) == .success else {
+            throw SelectionReadError.unavailable
+        }
     }
     private func attribute(_ element: AXUIElement, _ name: CFString) throws -> CFTypeRef? {
         try configure(element)
