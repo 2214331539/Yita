@@ -88,6 +88,21 @@ func runInputSelfTests() -> Int32 {
             let second = queue.drain(now: 10)
             try expect(!first.events.isEmpty && second.events.isEmpty && first.sequence == second.sequence, "single delivery")
         }
+        try test("Holding the shortcut produces one command until release") {
+            let input = NativeInputManager(ownerPID: 99, selfTest: true, fixture: nil)
+            input.receiveHotkey(pressed: true)
+            input.receiveHotkey(pressed: true)
+            input.receiveHotkey(pressed: false)
+            input.receiveHotkey(pressed: true)
+            let batch = input.queue.drain(now: ProcessInfo.processInfo.systemUptime)
+            try expect(batch.events.count == 2 && batch.events.allSatisfy { $0.kind == "translateClipboard" }, "shortcut repeat")
+        }
+        try test("Disabled synthetic mouse input still keeps the independent shortcut capability") {
+            let input = NativeInputManager(ownerPID: 99, selfTest: true, fixture: "drag")
+            input.configure(mouseEnabled: false)
+            let batch = input.poll()
+            try expect(!batch.mouseRunning && batch.hotkeyRunning && batch.events.allSatisfy { $0.kind == "cancel" }, "separate capabilities")
+        }
         print("Native input policy self-test passed. Synthetic input only; no event taps, hotkeys, clipboard or authorization access.")
         return 0
     } catch let error as Assertion { fputs("Input self-test failed: " + error.message + "\n", stderr) }

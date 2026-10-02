@@ -273,7 +273,7 @@ final class NativeInputManager {
         if !configured { diagnostic = "input-not-configured" }
         else if diagnostic == "input-not-configured" { diagnostic = nil }
         refresh()
-        if selfTest, fixture == "drag", configured, !fixtureEmitted {
+        if selfTest, fixture == "drag", configured, wanted, !fixtureEmitted {
             fixtureEmitted = true
             let now = ProcessInfo.processInfo.systemUptime
             queue.record("pointerDown", point: SelectionPoint(x: -800, y: 120), timestamp: now)
@@ -300,7 +300,7 @@ final class NativeInputManager {
             }
             return item
         }
-        return NativeInputSnapshot(mouseRunning: selfTest ? configured && fixture != nil : monitor?.isRunning == true,
+        return NativeInputSnapshot(mouseRunning: selfTest ? configured && wanted && fixture != nil : monitor?.isRunning == true,
             hotkeyRunning: selfTest ? configured && fixture != nil : hotkey != nil, sequence: batch.sequence, events: events)
     }
 
