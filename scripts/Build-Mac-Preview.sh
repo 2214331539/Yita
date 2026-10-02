@@ -75,7 +75,10 @@ while IFS= read -r -d '' binary; do
     mv "$binary.arm64" "$binary"
   fi
   chmod u+x "$binary"
-  codesign --force --sign - "$binary"
+  # Signing a bundle's main executable can also seal its parent bundle.
+  if [[ "$binary" != "$app/Contents/MacOS/Yita.Desktop" && "$binary" != "$helper_app/Contents/MacOS/Yita.Native.Mac.Helper" ]]; then
+    codesign --force --sign - "$binary"
+  fi
 done < <(find "$app" -type f -print0)
 codesign --force --sign - --identifier com.yita.desktop.native-helper "$helper_app"
 codesign --force --sign - --identifier com.yita.desktop "$app"
