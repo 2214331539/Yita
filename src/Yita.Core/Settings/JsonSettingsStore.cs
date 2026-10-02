@@ -118,6 +118,7 @@ public sealed class JsonSettingsStore : ISettingsStore
     {
         SchemaVersion = YitaSettings.CurrentSchemaVersion,
         PopupOffsetX = settings.PopupOffsetX, PopupOffsetY = settings.PopupOffsetY,
+        ReduceMotion = settings.ReduceMotion,
         UseClipboardFallback = settings.SelectionCompatibilityVersion < 1 || settings.UseClipboardFallback,
         SelectionCompatibilityVersion = 1,
     };

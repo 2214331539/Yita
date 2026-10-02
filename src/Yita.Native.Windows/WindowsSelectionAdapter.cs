@@ -560,9 +560,11 @@ public sealed class WindowsSelectionRuntime : ISelectionRuntime
             if (!WindowsNativeMethods.GetCursorPos(out var point)) return;
             using var pending = _requests.Begin();
             var request = new SelectionRequest(SelectionTrigger.TranslateShortcut, new ScreenPoint(point.X, point.Y));
+            var started = System.Diagnostics.Stopwatch.GetTimestamp();
             var result = await _reader.ReadAsync(request, pending.Token).ConfigureAwait(false);
+            var duration = System.Diagnostics.Stopwatch.GetElapsedTime(started);
             if (pending.IsCurrent)
-                SelectionCaptured?.Invoke(this, new SelectionCapturedEventArgs(request, result));
+                SelectionCaptured?.Invoke(this, new SelectionCapturedEventArgs(request, result, duration));
         }
         catch { }
     }
@@ -586,9 +588,11 @@ public sealed class WindowsSelectionRuntime : ISelectionRuntime
                 gesture.End,
                 GetProcessNameAt(gesture.End),
                 gesture.Bounds);
+            var started = System.Diagnostics.Stopwatch.GetTimestamp();
             var result = await _reader.ReadAsync(request, pending.Token).ConfigureAwait(false);
+            var duration = System.Diagnostics.Stopwatch.GetElapsedTime(started);
             if (_isEnabled && pending.IsCurrent)
-                SelectionCaptured?.Invoke(this, new SelectionCapturedEventArgs(request, result));
+                SelectionCaptured?.Invoke(this, new SelectionCapturedEventArgs(request, result, duration));
         }
         catch
         {

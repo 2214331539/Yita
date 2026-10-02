@@ -156,6 +156,9 @@ public sealed partial class MainWindow : Window
         SetCombo(ColorThemeComboBox, value.ColorTheme);
         CustomAccentColorTextBox.Text = value.CustomAccentColor;
         SetCombo(PopupVisualStyleComboBox, value.PopupVisualStyle);
+        ReduceMotionSwitch.IsChecked = _settings.ReduceMotion;
+        ReferenceMotion.SetReduceMotion(_settings.ReduceMotion);
+        RefreshMotionResources();
         DefaultFontSizeSlider.Value = value.DefaultTranslationFontSize;
         SetCombo(ProviderComboBox, value.ProviderId);
         ModelComboBox.Text = value.DeepSeekModel;
@@ -217,6 +220,7 @@ public sealed partial class MainWindow : Window
             EnglishTranslationFontFamily = ReadCombo(EnglishTranslationFontComboBox),
             ChineseTranslationFontFamily = ReadCombo(ChineseTranslationFontComboBox),
             ColorTheme = theme, CustomAccentColor = color, PopupVisualStyle = ReadCombo(PopupVisualStyleComboBox),
+            ReduceMotion = ReduceMotionSwitch.IsChecked == true,
             DefaultTranslationFontSize = Math.Round(DefaultFontSizeSlider.Value, 1),
             ProviderId = provider, DeepSeekEndpoint = endpoint, DeepSeekModel = model,
             AiHistoryEnabled = AiHistoryEnabledCheckBox.IsChecked == true, AiHistoryDirectory = folder,
@@ -273,6 +277,8 @@ public sealed partial class MainWindow : Window
 
     private void ApplyRuntimeSettings()
     {
+        ReferenceMotion.SetReduceMotion(_settings.ReduceMotion);
+        RefreshMotionResources();
         _selectionRuntime?.Configure(_settings.IsEnabled, _settings.UseClipboardFallback, _settings.SelectionDelayMilliseconds,
             _settings.UseWpsPdfCompatibility, _settings.UseSelectionContext);
         ReferenceTheme.Apply(Application.Current!.Resources, _settings.ToOriginal());
@@ -339,6 +345,9 @@ public sealed partial class MainWindow : Window
             ("bubble-v2", "Bubble 2.0", "气泡 2.0"), ("bubble-v3", "Bubble 3.0 · Glass", "气泡 3.0 · 液态玻璃"),
             ("bubble-v3-color", "Bubble 3.0 · Color Glass", "气泡 3.0 · 彩色玻璃")]);
         LocalizeCombo(ProviderComboBox, [("deepseek", "DeepSeek API", "DeepSeek API"), ("mock", "Mock · offline test", "Mock · 离线测试")]);
+        LocalizeFontOptions(EnglishTranslationFontComboBox);
+        LocalizeFontOptions(ChineseTranslationFontComboBox);
+        Avalonia.Automation.AutomationProperties.SetName(ReduceMotionSwitch, L("ReduceMotion"));
         ToolTip.SetTip(SelectionDelayTextBox, L("SelectionDelayTooltip"));
         ToolTip.SetTip(MaximumSelectionTextBox, L("MaximumSelectionTooltip"));
         ToolTip.SetTip(CustomAccentColorTextBox, L("CustomColorTooltip"));
@@ -349,6 +358,7 @@ public sealed partial class MainWindow : Window
         SaveSettingsButton.IsEnabled = _settingsFailure is null;
         UpdateInputAvailability();
         UpdatePermissionControls();
+        UpdateSelectionStatus();
         if (OperatingSystem.IsMacOS())
             TranslationServiceDescriptionText.Text = Localize("Your API key is stored in macOS Keychain on this device.", "API Key 保存在本机 macOS Keychain 中。");
         else if (!OperatingSystem.IsWindows())
@@ -392,6 +402,32 @@ public sealed partial class MainWindow : Window
     }
 
     private void ProviderComboBox_SelectionChanged(object? sender, SelectionChangedEventArgs e) { if (_ready) UpdateProviderFields(); }
+    private void LocalizeFontOptions(ComboBox combo)
+    {
+        if (OperatingSystem.IsWindows()) return;
+        LocalizeCombo(combo, combo.Items.OfType<ComboBoxItem>().Select(item =>
+        {
+            var id = item.Tag!.ToString()!;
+            var name = ReferenceTypography.CreateFont(id).Name;
+            if (id == "Source Sans Pro") name = id;
+            return (id, name, name);
+        }).ToArray());
+    }
+
+    private void ReduceMotionChanged(object? sender, RoutedEventArgs e)
+    {
+        if (!_ready) return;
+        ReferenceMotion.SetReduceMotion(ReduceMotionSwitch.IsChecked == true);
+        RefreshMotionResources();
+    }
+
+    internal void RefreshMotionResources()
+    {
+        if (Application.Current is { } app) ReferenceTheme.ApplyMotion(app.Resources);
+        ReferenceTheme.ApplyMotion(Resources);
+        foreach (var popup in _popups) ReferenceTheme.ApplyMotion(popup.Resources);
+        foreach (var conversation in _conversations) ReferenceTheme.ApplyMotion(conversation.Resources);
+    }
     private void ModelPickerArrowClick(object? sender, RoutedEventArgs e)
     {
         if (!ModelComboBox.IsEnabled || sender is not Button button) return;
@@ -540,7 +576,7 @@ public sealed partial class MainWindow : Window
     {
         var dialog = new Window { Title = "Yita", Width = 420, SizeToContent = SizeToContent.Height,
             CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            FontFamily = new FontFamily("Microsoft YaHei"), FontSize = 14,
+            FontFamily = DesktopFontResolver.InterfaceFont, FontSize = 14,
             Background = ReferenceTheme.Brush("#FFFCF7") };
         var stack = new StackPanel { Margin = new Thickness(24), Spacing = 18 };
         stack.Children.Add(new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap });

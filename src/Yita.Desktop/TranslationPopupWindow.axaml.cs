@@ -24,6 +24,7 @@ public sealed partial class TranslationPopupWindow : Window
     private string _translatedText = "正在翻译…";
     private bool _showOriginal;
     private bool _hasError;
+    private SelectionIssue? _selectionIssue;
     private bool _userSized;
     private bool _hasAnchor;
     private bool _translationComplete;
@@ -64,7 +65,7 @@ public sealed partial class TranslationPopupWindow : Window
         ApplyUiLanguage(settings.UiLanguage);
         TranslationText.FontSize = ExplanationText.FontSize = settings.DefaultTranslationFontSize;
         TranslationText.LineHeight = ExplanationText.LineHeight = Math.Round(settings.DefaultTranslationFontSize * 1.55, 2);
-        TranslationText.FontFamily = ExplanationText.FontFamily = new FontFamily(settings.EnglishTranslationFontFamily);
+        TranslationText.FontFamily = ExplanationText.FontFamily = ReferenceTypography.CreateFont(settings.EnglishTranslationFontFamily);
         BubbleTail.IsVisible = PopupVisualStyleCatalog.IsBubble(settings.PopupVisualStyle);
         var sculpted = PopupVisualStyleCatalog.IsBubbleV2(settings.PopupVisualStyle) || PopupVisualStyleCatalog.IsBubbleV3(settings.PopupVisualStyle);
         PopupSurface.Margin = BubbleTail.IsVisible ? new Thickness(sculpted ? 14 : 12, sculpted ? 4 : 3) : new Thickness(0);
@@ -76,6 +77,11 @@ public sealed partial class TranslationPopupWindow : Window
     {
         _settings = _settings with { UiLanguage = UiLanguageCatalog.Normalize(language) };
         var chinese = _settings.UiLanguage == "zh-CN";
+        if (_selectionIssue is { } issue)
+        {
+            _translatedText = SelectionFailureText.Message(issue, chinese);
+            RefreshText();
+        }
         OriginalButton.Content = chinese ? "原文" : "Source";
         TranslatedButton.Content = chinese ? "译文" : "Translation";
         ToolTip.SetTip(OriginalButton, chinese ? "显示原文" : "Show source");
@@ -115,6 +121,7 @@ public sealed partial class TranslationPopupWindow : Window
 
     public void BeginTranslation(string source)
     {
+        _selectionIssue = null;
         _translationComplete = false;
         _sourceText = source;
         _translatedText = _settings.UiLanguage == "zh-CN" ? "正在翻译…" : "Translating…";
@@ -138,6 +145,7 @@ public sealed partial class TranslationPopupWindow : Window
 
     public void SetText(string text)
     {
+        _selectionIssue = null;
         _translatedText = text;
         _hasError = false;
         LoadingPanel.IsVisible = false;
@@ -147,12 +155,19 @@ public sealed partial class TranslationPopupWindow : Window
 
     public void SetError(string text)
     {
+        _selectionIssue = null;
         _translatedText = text;
         _hasError = true;
         LoadingPanel.IsVisible = false;
         ReadingScroll.IsVisible = true;
         QuestionRow.IsVisible = false;
         RefreshText();
+    }
+
+    internal void SetSelectionError(SelectionIssue issue)
+    {
+        SetError(SelectionFailureText.Message(issue, _settings.UiLanguage == "zh-CN"));
+        _selectionIssue = issue;
     }
 
     internal void CompleteTranslation() { _translationComplete = true; QuestionRow.IsVisible = true; RefreshText(); }

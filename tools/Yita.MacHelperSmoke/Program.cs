@@ -11,6 +11,7 @@ public static class Program
 {
     public static async Task<int> Main(string[] args)
     {
+        if (args is ["--display-preferences"]) return VerifyDisplayPreferences();
         if (args.Length >= 2 && args[0] == "--peer") return await RunPeerAsync(args[1]);
         if (args.Length != 0 && args is not ["--helper", _]) return 2;
         try
@@ -52,6 +53,31 @@ public static class Program
         catch (Exception exception)
         {
             Console.Error.WriteLine("Mac helper smoke failed: " + exception.GetType().Name);
+            return 1;
+        }
+    }
+
+    private static int VerifyDisplayPreferences()
+    {
+        try
+        {
+            var reduced = MacDisplayPreferences.ReduceMotion;
+            Check(OperatingSystem.IsMacOS() || !reduced, "Display preference can be read on the entry thread");
+            if (OperatingSystem.IsMacOS())
+            {
+                var rejected = Task.Run(() =>
+                {
+                    try { _ = MacDisplayPreferences.ReduceMotion; return false; }
+                    catch (InvalidOperationException) { return true; }
+                }).GetAwaiter().GetResult();
+                Check(rejected, "Off-main-thread Cocoa preference access is rejected");
+            }
+            Console.WriteLine("Display preference smoke passed. No preference changes, GUI authorization or desktop text access.");
+            return 0;
+        }
+        catch (Exception exception)
+        {
+            Console.Error.WriteLine("Display preference smoke failed: " + exception.GetType().Name);
             return 1;
         }
     }

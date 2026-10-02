@@ -105,7 +105,8 @@ internal sealed class YitaTrayController : IDisposable
         var window = new Window
         {
             SystemDecorations = SystemDecorations.None, ShowInTaskbar = false, Topmost = true, CanResize = false,
-            WindowStartupLocation = WindowStartupLocation.Manual, FontFamily = new FontFamily("Microsoft YaHei UI"), FontSize = 40d / 3,
+            WindowStartupLocation = WindowStartupLocation.Manual, FontFamily = OperatingSystem.IsWindows()
+                ? new FontFamily("Microsoft YaHei UI") : DesktopFontResolver.InterfaceFont, FontSize = 40d / 3,
             Background = ReferenceTheme.Brush("#FFFCF7"), Foreground = ReferenceTheme.Brush("#302D29"),
         };
         RenderOptions.SetTextRenderingMode(window, TextRenderingMode.Antialias);
@@ -165,7 +166,14 @@ internal sealed class YitaTrayController : IDisposable
     private void Command(StackPanel stack, string label, Action action, bool check = false)
     {
         var content = new Grid { ColumnDefinitions = new ColumnDefinitions("20,*") };
-        if (check) content.Children.Add(new TextBlock { Text = "\uE73E", FontFamily = new FontFamily("Segoe Fluent Icons"), VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center });
+        if (check)
+        {
+            Control mark = OperatingSystem.IsWindows()
+                ? new TextBlock { Text = "\uE73E", FontFamily = new FontFamily("Segoe Fluent Icons"), VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center }
+                : new Avalonia.Controls.Shapes.Path { Data = Geometry.Parse("M2,6 L5,9 L11,2"), Stroke = ReferenceTheme.Brush("#302D29"),
+                    StrokeThickness = 1.5, Width = 12, Height = 12, Stretch = Stretch.Uniform, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center };
+            content.Children.Add(mark);
+        }
         var text = new TextBlock { Text = label, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center }; Grid.SetColumn(text, 1); content.Children.Add(text);
         var button = new Button { Content = content, Classes = { "tray-command" }, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch };
         button.Click += (_, _) => { _menu?.Close(); Execute(action); };

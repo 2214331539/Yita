@@ -102,8 +102,8 @@ public sealed class ReferenceLayoutTests
             popup.ApplySettings((YitaSettings.Default with { EnglishTranslationFontFamily = "Georgia", ChineseTranslationFontFamily = "SimHei" }).ToOriginal());
             popup.SetText("English 中文");
             var text = popup.FindControl<SelectableTextBlock>("TranslationText")!;
-            Assert.Equal("Georgia", ((Run)text.Inlines![0]).FontFamily!.Name);
-            Assert.Equal("SimHei", ((Run)text.Inlines[1]).FontFamily!.Name);
+            Assert.Equal(ReferenceTypography.CreateFont("Georgia").Name, ((Run)text.Inlines![0]).FontFamily!.Name);
+            Assert.Equal(ReferenceTypography.CreateFont("SimHei").Name, ((Run)text.Inlines[1]).FontFamily!.Name);
             text.SelectAll();
             Assert.Equal("English 中文", text.SelectedText);
         }
@@ -180,6 +180,7 @@ public sealed class ReferenceLayoutTests
             Assert.InRange(popup.Height, popup.MinHeight, popup.MaxHeight);
             if (Environment.GetEnvironmentVariable("YITA_PARITY_CAPTURE_DIRECTORY") is { Length: > 0 } directory)
             {
+                Directory.CreateDirectory(directory);
                 using var bitmap = new RenderTargetBitmap(new PixelSize((int)Math.Ceiling(popup.Width * scale), (int)Math.Ceiling(popup.Height * scale)), new Vector(96 * scale, 96 * scale));
                 bitmap.Render(popup);
                 bitmap.Save(Path.Combine(directory, $"avalonia-{theme}-{style}-scale-{scale:0.0}.png"));
@@ -199,7 +200,7 @@ public sealed class ReferenceLayoutTests
         {
             window.Show();
             await window.Initialization;
-            Assert.Equal("Microsoft YaHei", window.FontFamily.Name);
+            Assert.Equal(DesktopFontResolver.InterfaceFont.Name, window.FontFamily.Name);
             Assert.NotNull(window.GetVisualDescendants().OfType<Image>().Single().Source);
             Assert.Equal("今天", window.FindControl<ComboBox>("AiSummaryRangeComboBox")!.SelectionBoxItem);
             Assert.Equal("自动检测", window.FindControl<ComboBox>("SourceLanguageComboBox")!.SelectionBoxItem);
@@ -275,9 +276,16 @@ public sealed class ReferenceLayoutTests
     {
         if (Environment.GetEnvironmentVariable("YITA_PARITY_CAPTURE_DIRECTORY") is not { Length: > 0 } directory) return;
         Directory.CreateDirectory(directory);
-        using var bitmap = window.CaptureRenderedFrame();
-        Assert.NotNull(bitmap);
-        bitmap.Save(Path.Combine(directory, name + ".png"));
+        var motion = ReferenceMotion.Enabled;
+        try
+        {
+            ReferenceMotion.Enabled = false;
+            window.UpdateLayout(); Dispatcher.UIThread.RunJobs();
+            using var bitmap = window.CaptureRenderedFrame();
+            Assert.NotNull(bitmap);
+            bitmap.Save(Path.Combine(directory, name + ".png"));
+        }
+        finally { ReferenceMotion.Enabled = motion; }
         var metrics = window.GetVisualDescendants().OfType<Control>()
             .Where(control => control.IsEffectivelyVisible && (!string.IsNullOrEmpty(control.Name) || control.Tag is string))
             .Select(control =>

@@ -13,13 +13,19 @@ public sealed class App : Application
     private YitaTrayController? _tray;
     private bool _allowWindowClose;
     private MainWindow? _settingsWindow;
+    private Avalonia.Threading.DispatcherTimer? _displayPreferencesTimer;
 
-    public override void Initialize() => AvaloniaXamlLoader.Load(this);
+    public override void Initialize()
+    {
+        AvaloniaXamlLoader.Load(this);
+        Resources["InterfaceFont"] = DesktopFontResolver.InterfaceFont;
+    }
 
     public override void OnFrameworkInitializationCompleted()
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            RefreshDisplayPreferences();
             var platform = new DesktopPlatformServices();
             _singleInstance = platform.AcquireInstance(requestActivation:
                 desktop.Args?.Contains("--background", StringComparer.OrdinalIgnoreCase) != true);
@@ -43,6 +49,9 @@ public sealed class App : Application
 
             var mainWindow = new MainWindow(_selectionRuntime, startupRegistration: platform.Startup);
             _settingsWindow = mainWindow;
+            _displayPreferencesTimer = new() { Interval = TimeSpan.FromSeconds(2) };
+            _displayPreferencesTimer.Tick += (_, _) => RefreshDisplayPreferences();
+            _displayPreferencesTimer.Start();
             desktop.MainWindow = mainWindow;
             mainWindow.UiLanguageChanged += (_, language) => _tray?.ApplyUiLanguage(language);
             mainWindow.SettingsChanged += (_, _) =>
@@ -92,6 +101,7 @@ public sealed class App : Application
             _singleInstance?.StartActivationListener(() => Avalonia.Threading.Dispatcher.UIThread.Post(ShowMainWindow));
             desktop.Exit += (_, _) =>
             {
+                _displayPreferencesTimer?.Stop();
                 mainWindow.ShutdownServices();
                 _tray?.Dispose();
                 _tray = null;
@@ -100,6 +110,22 @@ public sealed class App : Application
             };
         }
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private void RefreshDisplayPreferences()
+    {
+        try
+        {
+            var enabled = DesktopDisplayPreferences.AnimationsEnabled;
+            if (enabled == ReferenceMotion.SystemAnimationsEnabled) return;
+            ReferenceMotion.SetSystemAnimations(enabled);
+            ReferenceTheme.ApplyMotion(Resources);
+            _settingsWindow?.RefreshMotionResources();
+        }
+        catch (Exception exception)
+        {
+            System.Diagnostics.Trace.TraceError("Display preference check failed: {0}", exception.GetType().Name);
+        }
     }
 
     private void ShowMainWindow()

@@ -49,7 +49,7 @@ public sealed partial class MainWindow
         Avalonia.Threading.Dispatcher.UIThread.Post(async () =>
         {
             if (_shuttingDown || !_desktopSessionActive || _selectionRuntime is IDesktopSessionRuntime { IsSessionActive: false }) return;
-            try { await ShowSelectionTranslationAsync(args.Request, args.Result); }
+            try { await ShowSelectionTranslationAsync(args.Request, args.Result, args.ReadDuration); }
             catch (Exception exception)
             {
                 System.Diagnostics.Trace.TraceError("Selection presentation failed: {0}", exception.GetType().Name);
@@ -66,7 +66,9 @@ public sealed partial class MainWindow
             if (_shuttingDown || !_desktopSessionActive) return;
             if (_selectionRuntime is not null) { _selectionRuntime.TranslateClipboard(); return; }
             using var pending = _clipboardRequests.Begin();
+            var started = System.Diagnostics.Stopwatch.GetTimestamp();
             var text = Clipboard is { } clipboard ? await clipboard.GetTextAsync() : null;
+            var duration = System.Diagnostics.Stopwatch.GetElapsedTime(started);
             if (_shuttingDown || !_desktopSessionActive || !pending.IsCurrent) return;
             var area = Screens.Primary?.WorkingArea;
             var pointer = area is { } screen
@@ -75,7 +77,7 @@ public sealed partial class MainWindow
             var result = string.IsNullOrWhiteSpace(text)
                 ? SelectionResult.Failed(SelectionFailureKind.Empty, "manual-clipboard-empty")
                 : new SelectionResult(text, SelectionSource.ManualClipboard);
-            await ShowSelectionTranslationAsync(new SelectionRequest(SelectionTrigger.TrayCommand, pointer), result);
+            await ShowSelectionTranslationAsync(new SelectionRequest(SelectionTrigger.TrayCommand, pointer), result, duration);
         }
         catch (Exception exception)
         {
@@ -88,9 +90,11 @@ public sealed partial class MainWindow
     private readonly Dictionary<TranslationPopupWindow, PopupSession> _sessions = new();
     private TranslationPopupWindow? _popup;
     private readonly TranslationPerformanceMonitor _performance = new();
+    private readonly SelectionDiagnostics _selectionDiagnostics = new();
+    internal SelectionDiagnostics SelectionDiagnostics => _selectionDiagnostics;
     internal IReadOnlyCollection<TranslationPopupWindow> TranslationPopups => _popups;
 
-    internal async Task ShowSelectionTranslationAsync(SelectionRequest request, SelectionResult result)
+    internal async Task ShowSelectionTranslationAsync(SelectionRequest request, SelectionResult result, TimeSpan? readDuration = null)
     {
         TranslationPopupWindow? popup = null;
         LatestRequestController.RequestLease? pending = null;
@@ -103,7 +107,10 @@ public sealed partial class MainWindow
             await InitializeAsync();
             if (_shuttingDown || !_desktopSessionActive || sessionGeneration != _desktopSessionGeneration
                 || (!_settings.IsEnabled && request.Trigger == SelectionTrigger.MouseGesture)) return;
+            var diagnostic = _selectionDiagnostics.Record(request.Trigger, result, readDuration);
+            UpdateSelectionStatus();
             if (!result.Succeeded && request.Trigger == SelectionTrigger.MouseGesture) return;
+            if (diagnostic.Issue == SelectionIssue.Cancelled) return;
             if (_popup is null || _popup.IsPinned) _popup = CreatePopup();
             popup = _popup;
             pending = popup.TranslationRequests.Begin();
@@ -115,7 +122,7 @@ public sealed partial class MainWindow
             if (!popup.IsVisible) popup.Show();
             if (!result.Succeeded)
             {
-                popup.SetError(Localize("No text captured. Copy text and try again.", "未读取到文字，请复制文字后重试。"));
+                popup.SetSelectionError(diagnostic.Issue);
                 outcome = TranslationOutcome.NoSelection;
                 return;
             }
@@ -248,6 +255,7 @@ public sealed partial class MainWindow
             if (Clipboard is { } clipboard)
                 await clipboard.SetTextAsync(CreatePlatformDiagnostics() + "\n\n"
                     + _performance.CreateReport(_settings.UiLanguage == "zh-CN") + "\n\n"
+                    + _selectionDiagnostics.CreateReport(_settings.UiLanguage == "zh-CN") + "\n\n"
                     + (_selectionRuntime?.CreateDiagnostics(_settings.UiLanguage == "zh-CN")
                     ?? Localize("Input capture is unavailable.", "划词捕获不可用。")));
         }
@@ -269,6 +277,14 @@ public sealed partial class MainWindow
         "Encrypted memory: " + (_memoryInitializationFailed || _memory?.LoadFailed == true ? "unreadable"
             : _memory is null ? "unavailable" : "available"),
     });
+
+    private void UpdateSelectionStatus()
+    {
+        var last = _selectionDiagnostics.LastMeaningful;
+        SelectionStatusText.IsVisible = last is not null && SelectionIssueClassifier.IsActionable(last.Issue);
+        SelectionStatusText.Text = last is not null
+            ? SelectionFailureText.Message(last.Issue, _uiLanguage == "zh-CN") : "";
+    }
 
     internal void DismissUnpinnedWindows()
     {

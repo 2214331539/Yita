@@ -16,10 +16,11 @@ public interface ISelectionRuntime : IDisposable
     string CreateDiagnostics(bool chinese);
 }
 
-public sealed class SelectionCapturedEventArgs(SelectionRequest request, SelectionResult result) : EventArgs
+public sealed class SelectionCapturedEventArgs(SelectionRequest request, SelectionResult result, TimeSpan? readDuration = null) : EventArgs
 {
     public SelectionRequest Request { get; } = request;
     public SelectionResult Result { get; } = result;
+    public TimeSpan? ReadDuration { get; } = readDuration;
 }
 
 public interface ISingleInstanceGuard : IDisposable

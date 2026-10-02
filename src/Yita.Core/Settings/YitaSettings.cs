@@ -24,6 +24,7 @@ public sealed record YitaSettings
     public string ColorTheme { get; init; } = "yita";
     public string CustomAccentColor { get; init; } = "#24756B";
     public string PopupVisualStyle { get; init; } = "minimal";
+    public bool ReduceMotion { get; init; }
     public double DefaultTranslationFontSize { get; init; } = 16.5;
     public string EnglishTranslationFontFamily { get; init; } = TranslationFontCatalog.DefaultEnglishFontFamily;
     public string ChineseTranslationFontFamily { get; init; } = TranslationFontCatalog.DefaultChineseFontFamily;

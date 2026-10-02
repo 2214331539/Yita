@@ -48,6 +48,7 @@ internal static class SettingsText
             ["AccentColor"] = ("Accent color", "强调色"),
             ["CustomColor"] = ("Custom color", "自定义颜色"),
             ["PopupVisualStyle"] = ("Popup style", "浮窗样式"),
+            ["ReduceMotion"] = ("Reduce motion", "减少动效"),
             ["PopupStyleMinimal"] = ("Minimal", "极简"),
             ["PopupStyleBubble"] = ("Bubble", "气泡"),
             ["PopupStyleBubbleV2"] = ("Bubble 2.0", "气泡 2.0"),

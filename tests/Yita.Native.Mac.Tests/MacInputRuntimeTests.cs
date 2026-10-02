@@ -31,6 +31,8 @@ public sealed class MacInputRuntimeTests
         Assert.False(helper.CopyAllowed);
         Assert.Equal(2, helper.Sequence);
         Assert.Equal(SelectionSource.Accessibility, selection.Result.Source);
+        Assert.NotNull(selection.ReadDuration);
+        Assert.True(selection.ReadDuration >= TimeSpan.Zero);
     }
 
     [Fact]
@@ -66,6 +68,7 @@ public sealed class MacInputRuntimeTests
         Assert.Equal(SelectionTrigger.TranslateShortcut, manual.Request.Trigger);
         Assert.Equal(new ScreenPoint(-500, 200), manual.Request.Pointer);
         Assert.False(helper.CopyAllowed);
+        Assert.NotNull(manual.ReadDuration);
     }
 
     [Fact]

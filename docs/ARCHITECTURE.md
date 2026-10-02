@@ -91,6 +91,8 @@ Mac 数据目录由 `Environment.SpecialFolder.LocalApplicationData` 解析，�
 
 ## 平台边界与发布
 
+字体通过 `DesktopFontResolver` 在渲染时按平台和安装情况解析，保留原设置 ID 与 Windows 字体；Mac 使用系统字体回退，问答按脚本混排。共享动效策略结合用户 `ReduceMotion` 与系统偏好，支持立即预览、取消恢复及正在运行动画的收尾。取词结果进入有界 `SelectionDiagnostics`，只保存枚举与读取耗时，不保存正文、来源应用、路径或原始诊断字符串；自动失败显示设置状态，手动失败显示可本地化的原因。规则及验证边界见 [字体、动效与诊断](CROSS_PLATFORM_APPEARANCE_DIAGNOSTICS.md)。
+
 Core 和 Desktop 可以在 Windows/macOS runner 上构建。功能分支通过 `MacSelectionRuntime` 将 Swift 鼠标/快捷键、AX 和显式启用的 Cmd+C 接入 Desktop；编译与合成测试通过仍不代表真实 Mac 划词已验收。
 
 功能分支已实现 Swift helper 的开发 `.app`、ad-hoc 签名、请求编号与版本校验、有限长度读写、超时/取消隔离、父进程监控和重启限频。Mac 设置页提供 Accessibility/Input Monitoring 的显式授权和系统设置入口；启动只检查、不自动请求授权。能力与实际监听状态分开；输入组件重建后重新配置。协议及非交互 self-test 见 [Mac helper 协议](MAC_HELPER_PROTOCOL.md)。

@@ -168,9 +168,11 @@ public sealed class MacSelectionRuntime : ISelectionRuntime, IPlatformPermission
                 || await _isOwnWindow(gesture.End, pending.Token).ConfigureAwait(false)) return;
             var request = new SelectionRequest(SelectionTrigger.MouseGesture, gesture.End, input.ForegroundApplication,
                 gesture.Bounds, settings.Context, input.ForegroundProcessId);
+            var started = System.Diagnostics.Stopwatch.GetTimestamp();
             var result = await _reader.ReadForInputAsync(request, settings.Copy, input.Sequence, pending.Token).ConfigureAwait(false);
+            var duration = System.Diagnostics.Stopwatch.GetElapsedTime(started);
             if (!_disposed && _sessionActive && pending.IsCurrent && settings.Enabled && settings == Volatile.Read(ref _configuration))
-                SelectionCaptured?.Invoke(this, new(request, result));
+                SelectionCaptured?.Invoke(this, new(request, result, duration));
         }
         catch { }
     }
@@ -183,11 +185,13 @@ public sealed class MacSelectionRuntime : ISelectionRuntime, IPlatformPermission
         {
             if (_disposed || !_sessionActive) return;
             using var pending = _requests.Begin();
+            var started = System.Diagnostics.Stopwatch.GetTimestamp();
             var exchange = await _helper.SendAsync("readClipboard", cancellationToken: pending.Token).ConfigureAwait(false);
+            var duration = System.Diagnostics.Stopwatch.GetElapsedTime(started);
             var request = new SelectionRequest(SelectionTrigger.TranslateShortcut, exchange.Response?.Pointer ?? _pointer);
             var result = exchange.Response is { Status: "ok", Selection: { } selection } ? selection
                 : SelectionResult.Failed(SelectionFailureKind.ClipboardUnavailable, exchange.DiagnosticCode);
-            if (!_disposed && _sessionActive && pending.IsCurrent) SelectionCaptured?.Invoke(this, new(request, result));
+            if (!_disposed && _sessionActive && pending.IsCurrent) SelectionCaptured?.Invoke(this, new(request, result, duration));
         }
         catch { }
     }

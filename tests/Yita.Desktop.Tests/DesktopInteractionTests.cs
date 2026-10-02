@@ -29,6 +29,91 @@ public static class TestAppBuilder
 public sealed class DesktopInteractionTests
 {
     [AvaloniaFact]
+    public async Task MotionPreviewCancelAndSaveRespectTheSystemPreference()
+    {
+        ReferenceMotion.Enabled = true;
+        ReferenceMotion.SetPreferences(false, true);
+        try
+        {
+            using var fixture = await Fixture.CreateAsync(new DelayedHandler(delayFirst: false));
+            await fixture.Window.ShowSelectionTranslationAsync(Request(100), Result("first"));
+            var popup = Assert.Single(fixture.Window.TranslationPopups);
+            var toggle = fixture.Window.FindControl<ToggleSwitch>("ReduceMotionSwitch")!;
+            toggle.IsChecked = true;
+            Assert.False(ReferenceMotion.CanAnimate);
+            Assert.Equal(TimeSpan.Zero, popup.Resources["SwitchMotionDuration"]);
+            fixture.Window.FindControl<ListBox>("SettingsNavigation")!.SelectedIndex = 2;
+            fixture.Window.UpdateLayout();
+            var scroll = fixture.Window.FindControl<ScrollViewer>("SettingsScrollViewer")!;
+            scroll.Offset = new Vector(0, scroll.Extent.Height);
+            fixture.Window.UpdateLayout(); Dispatcher.UIThread.RunJobs();
+            scroll.Offset = new Vector(0, scroll.Extent.Height);
+            ReferenceLayoutTests.Capture(fixture.Window, "avalonia-motion-preference");
+            Click(fixture.Window.GetLogicalDescendants().OfType<Button>().Single(button => button.Tag?.ToString() == "loc:Cancel"));
+            Assert.False(toggle.IsChecked);
+            Assert.False(fixture.Window.SavedSettings.ReduceMotion);
+            Assert.True(ReferenceMotion.CanAnimate);
+            ReferenceMotion.SetSystemAnimations(false);
+            fixture.Window.RefreshMotionResources();
+            Assert.False(ReferenceMotion.CanAnimate);
+            Assert.Equal(TimeSpan.Zero, popup.Resources["PressMotionDuration"]);
+            ReferenceMotion.SetSystemAnimations(true);
+            fixture.Window.Show();
+            toggle.IsChecked = true;
+            Click(fixture.Window.FindControl<Button>("SaveSettingsButton")!);
+            for (var attempt = 0; attempt < 100 && fixture.Window.IsVisible; attempt++) await Task.Delay(10);
+            Assert.False(fixture.Window.IsVisible);
+            Assert.True(fixture.Window.SavedSettings.ReduceMotion);
+            Assert.True((await fixture.Store.LoadAsync()).ReduceMotion);
+        }
+        finally { ReferenceMotion.SetPreferences(false, true); }
+    }
+
+    [AvaloniaFact]
+    public async Task FailedAutomaticReadsOnlyUpdateSanitizedStatusAndNeverCallTheProvider()
+    {
+        var handler = new DelayedHandler(delayFirst: false);
+        using var fixture = await Fixture.CreateAsync(handler);
+        var automatic = new SelectionRequest(SelectionTrigger.MouseGesture, new(100, 150), "private-app",
+            ForegroundProcessId: 987654);
+        await fixture.Window.ShowSelectionTranslationAsync(automatic,
+            SelectionResult.Failed(SelectionFailureKind.PermissionDenied, "private diagnostic"), TimeSpan.FromMilliseconds(25));
+        Assert.Empty(fixture.Window.TranslationPopups);
+        Assert.Empty(handler.AuthorizationValues);
+        var status = fixture.Window.FindControl<TextBlock>("SelectionStatusText")!;
+        Assert.True(status.IsVisible);
+        Assert.Contains("denied", status.Text);
+        Click(fixture.Window.FindControl<Button>("UiLanguageButton")!);
+        Assert.Contains("读取被拒绝", status.Text);
+        fixture.Window.UpdateLayout(); Dispatcher.UIThread.RunJobs();
+        ReferenceLayoutTests.Capture(fixture.Window, "avalonia-selection-failure");
+        var report = fixture.Window.SelectionDiagnostics.CreateReport(false);
+        Assert.DoesNotContain("private", report);
+        Assert.DoesNotContain("987654", report);
+        await fixture.Window.ShowSelectionTranslationAsync(automatic, SelectionResult.Failed(SelectionFailureKind.Empty));
+        Assert.True(status.IsVisible);
+        await fixture.Window.ShowSelectionTranslationAsync(automatic, Result("next"), TimeSpan.FromMilliseconds(15));
+        Assert.False(status.IsVisible);
+        Assert.Single(handler.AuthorizationValues);
+    }
+
+    [AvaloniaFact]
+    public async Task ManualFailureShowsLocalizedReasonAndCancelledReadStaysQuiet()
+    {
+        var handler = new DelayedHandler(delayFirst: false);
+        using var fixture = await Fixture.CreateAsync(handler);
+        await fixture.Window.ShowSelectionTranslationAsync(Request(100), SelectionResult.Failed(SelectionFailureKind.Cancelled));
+        Assert.Empty(fixture.Window.TranslationPopups);
+        Click(fixture.Window.FindControl<Button>("UiLanguageButton")!);
+        await fixture.Window.ShowSelectionTranslationAsync(Request(100), SelectionResult.Failed(SelectionFailureKind.Timeout));
+        var popup = Assert.Single(fixture.Window.TranslationPopups);
+        Assert.Contains("取词超时", ReferenceTypography.GetText(popup.FindControl<SelectableTextBlock>("TranslationText")!));
+        Click(fixture.Window.FindControl<Button>("UiLanguageButton")!);
+        Assert.Contains("timed out", ReferenceTypography.GetText(popup.FindControl<SelectableTextBlock>("TranslationText")!));
+        Assert.Empty(handler.AuthorizationValues);
+    }
+
+    [AvaloniaFact]
     public void TrayMenuMeasuresItsCommandsAndRefreshesLanguageWhileOpen()
     {
         using var tray = new YitaTrayController(() => { }, () => { }, () => { }, true, createIcon: false);
@@ -285,8 +370,9 @@ public sealed class DesktopInteractionTests
         private readonly string _directory;
         public MainWindow Window { get; }
         public JsonlTranslationHistoryStore History { get; }
-        private Fixture(MainWindow window, JsonlTranslationHistoryStore history, string directory) =>
-            (Window, History, _directory) = (window, history, directory);
+        public JsonSettingsStore Store { get; }
+        private Fixture(MainWindow window, JsonlTranslationHistoryStore history, string directory, JsonSettingsStore store) =>
+            (Window, History, _directory, Store) = (window, history, directory, store);
 
         public static async Task<Fixture> CreateAsync(HttpMessageHandler handler)
         {
@@ -298,7 +384,7 @@ public sealed class DesktopInteractionTests
             var window = new MainWindow(null, store, secrets, history, new HttpClient(handler));
             window.Show();
             await window.Initialization;
-            return new Fixture(window, history, directory);
+            return new Fixture(window, history, directory, store);
         }
 
         public void Dispose()

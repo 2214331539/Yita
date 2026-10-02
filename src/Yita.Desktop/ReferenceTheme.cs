@@ -18,12 +18,8 @@ internal static class ReferenceTheme
         var neutral = new[] { "#F5F5F7", "#FFFFFF", "#E5E5EA", "#F2F2F7", "#D1D1D6", "#1D1D1F", "#6E6E73", "#E9E9ED", "#DEDEE3", "#16784A", "#B42318" };
         var yita = new[] { "#F5F2EC", "#FFFCF7", "#E3DCD0", "#F4F0E8", "#C7BDAE", "#302D29", "#696158", "#E8EEE7", "#DCE7DE", "#24756B", "#A43E32" };
         for (var i = 0; i < keys.Length; i++) resources[keys[i]] = Brush(palette.PopupBackground == "#FFFCF7" ? yita[i] : neutral[i]);
-        resources["InterfaceFont"] = new FontFamily("Microsoft YaHei");
-        var motion = ReferenceMotion.Enabled && WindowsDisplayPreferences.AnimationsEnabled;
-        resources["PressMotionDuration"] = TimeSpan.FromMilliseconds(motion ? 140 : 0);
-        resources["SwitchMotionDuration"] = TimeSpan.FromMilliseconds(motion ? 200 : 0);
-        resources["PressedScale"] = motion ? Avalonia.Media.Transformation.TransformOperations.Parse("scale(0.96)")
-            : Avalonia.Media.Transformation.TransformOperations.Parse("scale(1)");
+        resources["InterfaceFont"] = DesktopFontResolver.InterfaceFont;
+        ApplyMotion(resources);
         resources["AccentBrush"] = Brush(palette.Accent);
         resources["AccentLightBrush"] = Brush(palette.AccentLight);
         resources["AccentTextBrush"] = Brushes.White;
@@ -75,6 +71,14 @@ internal static class ReferenceTheme
         resources["PopupGlassEnabled"] = false;
         resources["PopupTextSurfacePadding"] = new Thickness(0);
         foreach (var key in new[] { "PopupSurfaceCornerRadius", "PopupActionBarCornerRadius", "PopupButtonCornerRadius", "PopupTextSurfaceCornerRadius" }) resources[key] = new CornerRadius(0);
+    }
+
+    internal static void ApplyMotion(IResourceDictionary resources)
+    {
+        var motion = ReferenceMotion.CanAnimate;
+        resources["PressMotionDuration"] = TimeSpan.FromMilliseconds(motion ? 140 : 0);
+        resources["SwitchMotionDuration"] = TimeSpan.FromMilliseconds(motion ? 200 : 0);
+        resources["PressedScale"] = Avalonia.Media.Transformation.TransformOperations.Parse(motion ? "scale(0.96)" : "scale(1)");
     }
 
     internal static IBrush PreviewBrush(string style, ThemePalette palette)

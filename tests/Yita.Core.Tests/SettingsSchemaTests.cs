@@ -10,6 +10,29 @@ public sealed class SettingsSchemaTests : IDisposable
 
     public SettingsSchemaTests() => Directory.CreateDirectory(_directory);
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task MotionPreferenceSurvivesSaveAndNormalization(bool reduceMotion)
+    {
+        var store = new JsonSettingsStore(SettingsPath);
+        await store.SaveAsync(YitaSettings.Default with { ReduceMotion = reduceMotion, PopupOffsetX = -24, PopupOffsetY = 16 });
+        var loaded = await store.LoadAsync();
+        Assert.Equal(reduceMotion, loaded.ReduceMotion);
+        Assert.Equal(-24, loaded.PopupOffsetX);
+        Assert.Equal(16, loaded.PopupOffsetY);
+        Assert.Equal(YitaSettings.CurrentSchemaVersion, loaded.SchemaVersion);
+    }
+
+    [Fact]
+    public async Task ExistingSchemaWithoutMotionPreferenceRetainsDefaultMotion()
+    {
+        await File.WriteAllTextAsync(SettingsPath, "{\"schemaVersion\":1,\"uiLanguage\":\"zh-CN\"}");
+        var loaded = await new JsonSettingsStore(SettingsPath).LoadAsync();
+        Assert.False(loaded.ReduceMotion);
+        Assert.Equal("zh-CN", loaded.UiLanguage);
+    }
+
     [Fact]
     public async Task LegacySettingsAreBackedUpOnlyWhenTheFirstMigrationIsSaved()
     {

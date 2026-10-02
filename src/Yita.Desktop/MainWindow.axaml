@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Window x:Class="Yita.Desktop.MainWindow" Title="Yita Settings" Icon="avares://Yita.Desktop/Assets/Yita.ico" Width="980" Height="760" MinWidth="760" MinHeight="500" WindowStartupLocation="CenterScreen" ShowInTaskbar="True" UseLayoutRounding="True" FontFamily="Microsoft YaHei" FontSize="14" Background="{DynamicResource AppWindowBackgroundBrush}" Foreground="{DynamicResource AppTextBrush}" xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" CanResize="True" RenderOptions.TextRenderingMode="Antialias" x:CompileBindings="False">
+<Window x:Class="Yita.Desktop.MainWindow" Title="Yita Settings" Icon="avares://Yita.Desktop/Assets/Yita.ico" Width="980" Height="760" MinWidth="760" MinHeight="500" WindowStartupLocation="CenterScreen" ShowInTaskbar="True" UseLayoutRounding="True" FontFamily="{DynamicResource InterfaceFont}" FontSize="14" Background="{DynamicResource AppWindowBackgroundBrush}" Foreground="{DynamicResource AppTextBrush}" xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" CanResize="True" RenderOptions.TextRenderingMode="Antialias" x:CompileBindings="False">
   <Grid x:Name="SettingsRoot" Background="{DynamicResource AppWindowBackgroundBrush}">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
@@ -42,6 +42,7 @@
                 <TextBlock Tag="loc:GeneralTitle" Text="General" Classes="section" LineHeight="20" />
                 <TextBlock Margin="0,4,0,17" Tag="loc:GeneralDescription" Text="Control availability and selection behavior." Classes="supporting" LineHeight="20" />
                 <TextBlock x:Name="PlatformStatusText" Margin="0,0,0,14" TextWrapping="Wrap" IsVisible="False" Classes="supporting" LineHeight="20" />
+                <TextBlock x:Name="SelectionStatusText" Margin="0,0,0,14" TextWrapping="Wrap" IsVisible="False" Classes="supporting" LineHeight="20" />
                 <TextBlock x:Name="NativePermissionStatusText" TextWrapping="Wrap" IsVisible="False" Classes="supporting" LineHeight="20" />
                 <WrapPanel x:Name="PermissionActionsPanel" Margin="0,8,0,14" IsVisible="False">
                   <Button Margin="0,0,8,6" Content="Check permissions" Tag="loc:CheckPermissions" Click="CheckPermissions_Click" Classes="secondary" />
@@ -323,6 +324,10 @@
                       </Grid>
                     </Border>
                   </Grid>
+                </Grid>
+                <Grid Margin="0,17,0,0" ColumnDefinitions="*,Auto">
+                  <TextBlock Tag="loc:ReduceMotion" Text="Reduce motion" FontWeight="SemiBold" LineHeight="20" VerticalAlignment="Center" />
+                  <ToggleSwitch x:Name="ReduceMotionSwitch" Grid.Column="1" Classes="switch" AutomationProperties.Name="Reduce motion" IsCheckedChanged="ReduceMotionChanged" />
                 </Grid>
                 <Grid Margin="0,17,0,0" IsVisible="False">
                   <Grid.ColumnDefinitions>
