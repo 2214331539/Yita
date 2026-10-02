@@ -31,7 +31,7 @@ public sealed partial class MainWindow
             if (_popup is null || _popup.IsPinned) _popup = CreatePopup();
             popup = _popup;
             pending = popup.TranslationRequests.Begin();
-            var settings = _settings.ToOriginal(_savedApiKey);
+            var settings = _settings.ToOriginal(_savedApiKey) with { UiLanguage = _uiLanguage };
             performance = _performance.Begin(request.Trigger == SelectionTrigger.MouseGesture ? TranslationTrigger.Selection : TranslationTrigger.Clipboard, settings.ProviderId);
             popup.ApplySettings(settings);
             popup.PlaceNear(request, result, SavedPopupOffset());
@@ -205,7 +205,7 @@ public sealed partial class MainWindow
 
     private sealed class PopupSession(AppSettings settings, TranslationRequest request, AiHistoryContext context)
     {
-        internal AppSettings Settings { get; } = settings;
+        internal AppSettings Settings { get; set; } = settings;
         internal TranslationRequest Request { get; } = request;
         internal AiHistoryContext Context { get; } = context;
         internal string Translation { get; set; } = "";

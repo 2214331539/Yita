@@ -3,7 +3,7 @@ namespace Yita.Core.Selection;
 /// <summary>
 /// Tries selection readers in priority order. A reader may return a structured
 /// failure or throw for an unavailable provider; the next reader still gets a
-/// chance. Cancellation is the only condition that stops the pipeline.
+/// chance. Protected content and cancellation stop the pipeline.
 /// </summary>
 public sealed class SelectionReaderPipeline : ISelectionReader
 {
@@ -38,7 +38,7 @@ public sealed class SelectionReaderPipeline : ISelectionReader
                 result = SelectionResult.Failed(SelectionFailureKind.Unknown, "reader-exception");
             }
 
-            if (result.Succeeded) return result;
+            if (result.Succeeded || result.Failure is SelectionFailureKind.ProtectedContent or SelectionFailureKind.Cancelled) return result;
             lastFailure = result;
         }
 

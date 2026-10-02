@@ -16,7 +16,7 @@ namespace Yita.Desktop;
 
 internal sealed partial class QuestionAnswerWindow : Window
 {
-    private readonly AppSettings _settings;
+    private AppSettings _settings;
     private readonly string _source;
     private readonly string _translation;
     private readonly string _explanation;
@@ -29,6 +29,7 @@ internal sealed partial class QuestionAnswerWindow : Window
     private string _question = "";
     private bool _closed;
     private bool _streaming;
+    private bool _waitingForAnswer;
     private string _transcript = "";
     private bool _savingRecord;
     private int _recordedTurnCount;
@@ -42,22 +43,8 @@ internal sealed partial class QuestionAnswerWindow : Window
             (settings, source, translation, explanation, kind, runtime, records, context);
         InitializeComponent();
         ReferenceTheme.Apply(Resources, settings);
-        var chinese = settings.UiLanguage == "zh-CN";
-        TitleText.Text = kind == QuestionContextKind.GeneralChat ? "DeepSeek" : chinese ? "AI 问答" : "Ask AI";
-        CopyButton.Content = chinese ? "复制" : "Copy";
-        RecordButton.Content = chinese ? "记录" : "Record";
-        StopButton.Content = chinese ? "停止" : "Stop";
-        RetryButton.Content = chinese ? "重试" : "Retry";
-        SendButton.Content = chinese ? "提问" : "Ask";
+        ApplyUiLanguage(settings.UiLanguage);
         var chat = kind == QuestionContextKind.GeneralChat;
-        EmptyStateText.Text = chat
-            ? chinese ? "输入一个简单问题，DeepSeek 会直接回答。" : "Ask a quick question and get a direct DeepSeek answer."
-            : chinese ? "可以继续追问当前内容。" : "Ask a follow-up about the current content.";
-        QuestionInputTextBox.Watermark = chat
-            ? chinese ? "问 DeepSeek…" : "Ask DeepSeek…"
-            : chinese ? "继续提问…" : "Ask a follow-up…";
-        TranscriptText.FontFamily = ReferenceTypography.CreateFont(chinese ? settings.ChineseTranslationFontFamily : settings.EnglishTranslationFontFamily);
-        SizePresetBar.ApplyUiLanguage(settings.UiLanguage);
         SizePresetBar.TextSizeChanged += (_, size) => { TranscriptText.FontSize = size; RenderTranscript(); };
         SizePresetBar.ConfigureTextSize(12, 32, 15.5);
         SizePresetBar.PresetSelected += (_, preset) => WindowSizePresetBar.ApplyConversationPreset(this, preset);
@@ -65,6 +52,32 @@ internal sealed partial class QuestionAnswerWindow : Window
         SizeChanged += (_, _) => UpdateSurfaceClip();
         Opened += (_, _) => { WindowSizePresetBar.Constrain(this); ReferenceMotion.Reveal(Surface); };
         Closed += (_, _) => { _closed = true; _requests.Dispose(); };
+    }
+
+    internal void ApplyUiLanguage(string language)
+    {
+        _settings = _settings with { UiLanguage = UiLanguageCatalog.Normalize(language) };
+        var chinese = _settings.UiLanguage == "zh-CN";
+        TitleText.Text = _kind == QuestionContextKind.GeneralChat ? "DeepSeek" : chinese ? "AI 问答" : "Ask AI";
+        CopyButton.Content = chinese ? "复制" : "Copy";
+        RecordButton.Content = chinese ? "记录" : "Record";
+        StopButton.Content = chinese ? "停止" : "Stop";
+        RetryButton.Content = chinese ? "重试" : "Retry";
+        SendButton.Content = chinese ? "提问" : "Ask";
+        var chat = _kind == QuestionContextKind.GeneralChat;
+        EmptyStateText.Text = chat
+            ? chinese ? "输入一个简单问题，DeepSeek 会直接回答。" : "Ask a quick question and get a direct DeepSeek answer."
+            : chinese ? "可以继续追问当前内容。" : "Ask a follow-up about the current content.";
+        QuestionInputTextBox.Watermark = chat
+            ? chinese ? "问 DeepSeek…" : "Ask DeepSeek…"
+            : chinese ? "继续提问…" : "Ask a follow-up…";
+        ToolTip.SetTip(PinButton, chinese ? "固定窗口" : "Keep window");
+        ToolTip.SetTip(CloseButton, chinese ? "关闭" : "Close");
+        TranscriptText.FontFamily = ReferenceTypography.CreateFont(chinese ? _settings.ChineseTranslationFontFamily : _settings.EnglishTranslationFontFamily);
+        SizePresetBar.ApplyUiLanguage(_settings.UiLanguage);
+        if (_waitingForAnswer) _pendingAnswer = chinese ? "正在回答…" : "Answering…";
+        UpdateRecordState();
+        RenderTranscript();
     }
 
     internal async Task AskAsync(string question)
@@ -75,6 +88,7 @@ internal sealed partial class QuestionAnswerWindow : Window
         using var pending = _requests.Begin();
         _question = question;
         _streaming = true;
+        _waitingForAnswer = true;
         _recordError = null;
         StopButton.IsVisible = true;
         RetryButton.IsVisible = false;
@@ -92,6 +106,7 @@ internal sealed partial class QuestionAnswerWindow : Window
             await foreach (var output in _runtime.AnswerAsync(request, _settings, pending.Token))
             {
                 if (!pending.IsCurrent) return;
+                _waitingForAnswer = false;
                 answer = output;
                 RenderPending(question, output);
             }
@@ -212,6 +227,7 @@ internal sealed partial class QuestionAnswerWindow : Window
     private void SetIdle()
     {
         _streaming = false;
+        _waitingForAnswer = false;
         StopButton.IsVisible = false;
         SendButton.IsEnabled = true;
         QuestionInputTextBox.IsEnabled = true;

@@ -29,6 +29,7 @@ public sealed partial class TranslationPopupWindow : Window
     private AppSettings _settings = AppSettings.Default;
     private ExplanationAction? _lastExplanation;
     private bool _explanationComplete;
+    private bool _waitingForExplanation;
     private int _explanationVersion;
     private int _recordedExplanationVersion;
     private bool _savingExplanation;
@@ -58,9 +59,25 @@ public sealed partial class TranslationPopupWindow : Window
     {
         _settings = settings;
         ReferenceTheme.Apply(Resources, settings);
-        var chinese = settings.UiLanguage == "zh-CN";
+        ApplyUiLanguage(settings.UiLanguage);
+        TranslationText.FontSize = ExplanationText.FontSize = settings.DefaultTranslationFontSize;
+        TranslationText.LineHeight = ExplanationText.LineHeight = Math.Round(settings.DefaultTranslationFontSize * 1.55, 2);
+        TranslationText.FontFamily = ExplanationText.FontFamily = new FontFamily(settings.EnglishTranslationFontFamily);
+        BubbleTail.IsVisible = PopupVisualStyleCatalog.IsBubble(settings.PopupVisualStyle);
+        var sculpted = PopupVisualStyleCatalog.IsBubbleV2(settings.PopupVisualStyle) || PopupVisualStyleCatalog.IsBubbleV3(settings.PopupVisualStyle);
+        PopupSurface.Margin = BubbleTail.IsVisible ? new Thickness(sculpted ? 14 : 12, sculpted ? 4 : 3) : new Thickness(0);
+        BubbleTail.Data = Geometry.Parse(sculpted ? "M0,8 C4,5 8,2 16,0 C13,5 13,11 16,16 C8,14 4,11 0,8 Z" : "M0,0 L18,8 L0,16 Z");
+        RefreshText();
+    }
+
+    internal void ApplyUiLanguage(string language)
+    {
+        _settings = _settings with { UiLanguage = UiLanguageCatalog.Normalize(language) };
+        var chinese = _settings.UiLanguage == "zh-CN";
         OriginalButton.Content = chinese ? "原文" : "Source";
         TranslatedButton.Content = chinese ? "译文" : "Translation";
+        ToolTip.SetTip(OriginalButton, chinese ? "显示原文" : "Show source");
+        ToolTip.SetTip(TranslatedButton, chinese ? "显示译文" : "Show translation");
         ToolTip.SetTip(PinButton, chinese ? "固定窗口" : "Keep window");
         ToolTip.SetTip(CloseButton, chinese ? "关闭翻译" : "Close");
         ToolTip.SetTip(DragHandle, chinese ? "拖动窗口" : "Drag to move");
@@ -79,13 +96,19 @@ public sealed partial class TranslationPopupWindow : Window
         EditMenu.Header = chinese ? "修改并保存译文" : "Edit and save correction";
         SaveCorrectionButton.Content = chinese ? "保存" : "Save";
         CancelCorrectionButton.Content = chinese ? "取消" : "Cancel";
-        TranslationText.FontSize = ExplanationText.FontSize = settings.DefaultTranslationFontSize;
-        TranslationText.LineHeight = ExplanationText.LineHeight = Math.Round(settings.DefaultTranslationFontSize * 1.55, 2);
-        TranslationText.FontFamily = ExplanationText.FontFamily = new FontFamily(settings.EnglishTranslationFontFamily);
-        BubbleTail.IsVisible = PopupVisualStyleCatalog.IsBubble(settings.PopupVisualStyle);
-        var sculpted = PopupVisualStyleCatalog.IsBubbleV2(settings.PopupVisualStyle) || PopupVisualStyleCatalog.IsBubbleV3(settings.PopupVisualStyle);
-        PopupSurface.Margin = BubbleTail.IsVisible ? new Thickness(sculpted ? 14 : 12, sculpted ? 4 : 3) : new Thickness(0);
-        BubbleTail.Data = Geometry.Parse(sculpted ? "M0,8 C4,5 8,2 16,0 C13,5 13,11 16,16 C8,14 4,11 0,8 Z" : "M0,0 L18,8 L0,16 Z");
+        if (LoadingPanel.IsVisible)
+        {
+            LoadingText.Text = _translatedText = chinese ? "正在翻译…" : "Translating…";
+            RefreshText();
+        }
+        if (_waitingForExplanation)
+        {
+            ReferenceTypography.SetText(ExplanationText, chinese ? "正在解释…" : "Explaining…", _settings);
+            RefreshText();
+        }
+        ExplanationRecordButton.Content = _savingExplanation ? (chinese ? "保存中…" : "Saving…")
+            : _explanationComplete && _recordedExplanationVersion == _explanationVersion
+                ? (chinese ? "已保存" : "Saved") : (chinese ? "记录" : "Record");
     }
 
     public void BeginTranslation(string source)
@@ -99,6 +122,7 @@ public sealed partial class TranslationPopupWindow : Window
         _explanationVersion++;
         _savingExplanation = false;
         _explanationComplete = false;
+        _waitingForExplanation = false;
         ExplanationOverlay.IsVisible = CorrectionPanel.IsVisible = QuestionRow.IsVisible = NoticeText.IsVisible = false;
         LoadingText.Text = _translatedText;
         LoadingPanel.IsVisible = true;
@@ -253,10 +277,11 @@ public sealed partial class TranslationPopupWindow : Window
         _explanationVersion++;
         _savingExplanation = false;
         _explanationComplete = false;
+        _waitingForExplanation = true;
         ExplanationRecordButton.Content = _settings.UiLanguage == "zh-CN" ? "记录" : "Record";
         SelectionExplainButton.IsVisible = false;
         ExplanationOverlay.IsVisible = true;
-        ExplanationText.Text = _settings.UiLanguage == "zh-CN" ? "正在解释…" : "Explaining…";
+        ReferenceTypography.SetText(ExplanationText, _settings.UiLanguage == "zh-CN" ? "正在解释…" : "Explaining…", _settings);
         ExplanationRecordButton.IsEnabled = false;
         ExplanationRetryButton.IsVisible = false;
         RefreshText();
@@ -275,7 +300,7 @@ public sealed partial class TranslationPopupWindow : Window
         });
     }
 
-    internal void SetExplanation(string text) { ReferenceTypography.SetText(ExplanationText, text, _settings); RefreshText(); }
+    internal void SetExplanation(string text) { _waitingForExplanation = false; ReferenceTypography.SetText(ExplanationText, text, _settings); RefreshText(); }
     internal void CompleteExplanation() { _explanationComplete = true; ExplanationRecordButton.IsEnabled = true; }
     internal int BeginExplanationRecord()
     {

@@ -22,7 +22,7 @@ internal static class SettingsText
             ["ClipboardFallback"] = ("Compatibility clipboard fallback", "兼容性剪贴板回退"),
             ["WpsPdfCompatibility"] = ("WPS PDF compatibility", "WPS PDF 兼容取词"),
             ["WpsPdfCompatibilityDescription"] = ("When WPS PDF exposes no selection, copy it and restore the clipboard where possible. Disable if copying is affected.", "WPS PDF 无法直接取词时自动复制，并尽量还原剪贴板；如影响复制可关闭。"),
-            ["ClipboardFallbackDescription"] = ("For other apps without accessible text: try copying the selection and restore the clipboard where possible.", "用于其他无法直接取词的软件：尝试复制选区，并尽量还原剪贴板；仅在需要时开启。"),
+            ["ClipboardFallbackDescription"] = ("When accessible text is unavailable, copy the selection and restore the clipboard where possible. Disable if copying is affected.", "无法直接取词时自动复制选区，并尽量还原剪贴板；如影响复制可关闭。"),
             ["SelectionDelay"] = ("Trigger delay · ms", "触发等待 · 毫秒"),
             ["MaximumSelection"] = ("Selection limit · characters", "最大选区 · 字符"),
             ["TranslationAppearanceTitle"] = ("Translation & appearance", "翻译与外观"),

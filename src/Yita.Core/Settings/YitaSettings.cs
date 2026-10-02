@@ -9,7 +9,8 @@ public sealed record YitaSettings
     public bool IsEnabled { get; init; } = true;
     public bool StartWithSystem { get; init; }
     public string UiLanguage { get; init; } = "en";
-    public bool UseClipboardFallback { get; init; }
+    public bool UseClipboardFallback { get; init; } = true;
+    public int SelectionCompatibilityVersion { get; init; }
     public bool UseWpsPdfCompatibility { get; init; } = true;
     public bool UseSelectionContext { get; init; }
     public int SelectionDelayMilliseconds { get; init; } = 80;
@@ -34,7 +35,7 @@ public sealed record YitaSettings
     public string ProviderId { get; init; } = "deepseek";
     public string DeepSeekEndpoint { get; init; } = "https://api.deepseek.com";
     public string DeepSeekModel { get; init; } = "deepseek-v4-flash";
-    public static YitaSettings Default { get; } = new();
+    public static YitaSettings Default { get; } = new() { SelectionCompatibilityVersion = 1 };
 
     internal AppSettings ToOriginal(string apiKey = "") => SettingsStore.NormalizeSettings(new AppSettings
     {
@@ -136,12 +137,19 @@ public sealed class JsonSettingsStore : ISettingsStore
                 return YitaSettings.FromOriginal(SettingsStore.NormalizeSettings(original)) with
                 {
                     AiHistoryEnabled = false, AiHistoryDirectory = string.Empty, StartWithSystem = false,
+                    UseClipboardFallback = true, SelectionCompatibilityVersion = 1,
                 };
             }
             var settings = await JsonSerializer.DeserializeAsync<YitaSettings>(stream, JsonOptions, cancellationToken)
                 ?? YitaSettings.Default;
             return YitaSettings.FromOriginal(settings.ToOriginal()) with
-            { PopupOffsetX = settings.PopupOffsetX, PopupOffsetY = settings.PopupOffsetY };
+            {
+                PopupOffsetX = settings.PopupOffsetX, PopupOffsetY = settings.PopupOffsetY,
+                // Upgrade the preview's old opt-in default once. A later explicit
+                // opt-out is persisted with this version and remains respected.
+                UseClipboardFallback = settings.SelectionCompatibilityVersion < 1 || settings.UseClipboardFallback,
+                SelectionCompatibilityVersion = 1,
+            };
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
         {

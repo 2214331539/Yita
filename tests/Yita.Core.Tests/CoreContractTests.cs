@@ -8,6 +8,22 @@ namespace Yita.Core.Tests;
 public sealed class CoreContractTests
 {
     [Fact]
+    public async Task CompatibilityUpgradeEnablesCopyFallbackOnceAndKeepsLaterOptOut()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "yita-compat-" + Guid.NewGuid().ToString("N"), "settings.json");
+        try
+        {
+            var store = new JsonSettingsStore(path);
+            await store.SaveAsync(YitaSettings.Default with { SelectionCompatibilityVersion = 0, UseClipboardFallback = false });
+            var upgraded = await store.LoadAsync();
+            Assert.True(upgraded.UseClipboardFallback);
+            Assert.Equal(1, upgraded.SelectionCompatibilityVersion);
+            await store.SaveAsync(upgraded with { UseClipboardFallback = false });
+            Assert.False((await store.LoadAsync()).UseClipboardFallback);
+        }
+        finally { if (Directory.Exists(Path.GetDirectoryName(path))) Directory.Delete(Path.GetDirectoryName(path)!, true); }
+    }
+    [Fact]
     public void PopupOffsetIsRelativeToTheCurrentSelectionAnchor()
     {
         var first = PopupPlacementResolver.Resolve(

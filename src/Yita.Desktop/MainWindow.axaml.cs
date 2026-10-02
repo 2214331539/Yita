@@ -42,6 +42,7 @@ public sealed partial class MainWindow : Window
 
     public bool IsSelectionTranslationEnabled => _settings.IsEnabled;
     public event EventHandler? SettingsChanged;
+    internal event EventHandler<string>? UiLanguageChanged;
     internal Task Initialization => InitializeAsync();
     internal YitaSettings SavedSettings => _settings;
 
@@ -205,6 +206,8 @@ public sealed partial class MainWindow : Window
         _windowsRuntime?.Configure(_settings.IsEnabled, _settings.UseClipboardFallback, _settings.SelectionDelayMilliseconds,
             _settings.UseWpsPdfCompatibility, _settings.UseSelectionContext);
         ReferenceTheme.Apply(Application.Current!.Resources, _settings.ToOriginal());
+        foreach (var popup in _popups) popup.ApplySettings(_settings.ToOriginal(_savedApiKey));
+        SynchronizeWindowLanguage();
         SettingsChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -270,6 +273,15 @@ public sealed partial class MainWindow : Window
         ToolTip.SetTip(CustomAccentColorTextBox, L("CustomColorTooltip"));
         UpdateMemoryStatus();
         UpdateThemePreview();
+        SynchronizeWindowLanguage();
+        UiLanguageChanged?.Invoke(this, _uiLanguage);
+    }
+
+    private void SynchronizeWindowLanguage()
+    {
+        foreach (var popup in _popups) popup.ApplyUiLanguage(_uiLanguage);
+        foreach (var conversation in _conversations) conversation.ApplyUiLanguage(_uiLanguage);
+        foreach (var session in _sessions.Values) session.Settings = session.Settings with { UiLanguage = _uiLanguage };
     }
 
     private void LocalizeCombo(ComboBox combo, (string Value, string English, string Chinese)[] labels)

@@ -17,7 +17,7 @@
               <ToggleButton x:Name="PinButton" Classes="reading-action" Width="34" Height="28" Margin="4,0,0,0" ToolTip.Tip="Keep this answer">
                 <TextBlock FontFamily="Segoe Fluent Icons" FontSize="11.5" FontWeight="SemiBold" Text="&#xE718;" />
               </ToggleButton>
-              <Button Classes="reading-action" Width="34" Height="28" Margin="4,0,0,0" ToolTip.Tip="Close" Click="CloseClick">
+              <Button x:Name="CloseButton" Classes="reading-action" Width="34" Height="28" Margin="4,0,0,0" ToolTip.Tip="Close" Click="CloseClick">
                 <TextBlock FontFamily="Segoe Fluent Icons" FontSize="11.5" FontWeight="SemiBold" Text="&#xE711;" />
               </Button>
             </StackPanel>

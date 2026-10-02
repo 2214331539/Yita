@@ -29,6 +29,73 @@ public static class TestAppBuilder
 public sealed class DesktopInteractionTests
 {
     [AvaloniaFact]
+    public void TrayMenuMeasuresItsCommandsAndRefreshesLanguageWhileOpen()
+    {
+        using var tray = new YitaTrayController(() => { }, () => { }, () => { }, true, createIcon: false);
+        tray.ApplyUiLanguage("en");
+        tray.ShowMenu(new ScreenPoint(900, 700));
+        var menu = tray.MenuWindow!;
+        menu.UpdateLayout();
+        Assert.True(menu.IsVisible);
+        Assert.True(menu.Width >= 260);
+        Assert.True(menu.Height > 200);
+        Assert.Contains("Settings…", Labels());
+        tray.ApplyUiLanguage("zh-CN");
+        menu.UpdateLayout();
+        Assert.Same(menu, tray.MenuWindow);
+        Assert.Contains("设置…", Labels());
+        Assert.DoesNotContain("Settings…", Labels());
+        tray.SetEnabled(false);
+        Assert.Contains("Yita · 已暂停", Labels());
+        string[] Labels() => menu.GetVisualDescendants().OfType<TextBlock>().Select(text => text.Text ?? "").ToArray();
+    }
+    [AvaloniaFact]
+    public async Task LanguagePreviewSaveAndCancelSynchronizeExistingAndFuturePopups()
+    {
+        using var fixture = await Fixture.CreateAsync(new DelayedHandler(delayFirst: false));
+        await fixture.Window.ShowSelectionTranslationAsync(Request(100), Result("first"));
+        var popup = Assert.Single(fixture.Window.TranslationPopups);
+        popup.FindControl<ToggleButton>("PinButton")!.IsChecked = true;
+        var text = ReferenceTypography.GetText(popup.FindControl<SelectableTextBlock>("TranslationText")!);
+        var languages = new List<string>();
+        fixture.Window.UiLanguageChanged += (_, language) => languages.Add(language);
+        Click(fixture.Window.FindControl<Button>("UiLanguageButton")!);
+        Assert.Equal("zh-CN", Assert.Single(languages));
+        Assert.Equal("原文", popup.FindControl<Button>("OriginalButton")!.Content);
+        Assert.Equal(text, ReferenceTypography.GetText(popup.FindControl<SelectableTextBlock>("TranslationText")!));
+        await fixture.Window.ShowSelectionTranslationAsync(Request(500), Result("second"));
+        var nextPopup = fixture.Window.TranslationPopups.Single(window => !ReferenceEquals(window, popup));
+        Assert.Equal("译文", nextPopup.FindControl<Button>("TranslatedButton")!.Content);
+        Click(fixture.Window.GetLogicalDescendants().OfType<Button>().Single(button => button.Tag?.ToString() == "loc:Cancel"));
+        Assert.Equal("en", languages.Last());
+        Assert.Equal("Source", popup.FindControl<Button>("OriginalButton")!.Content);
+        Assert.Equal("Translation", nextPopup.FindControl<Button>("TranslatedButton")!.Content);
+        fixture.Window.Show();
+        Click(fixture.Window.FindControl<Button>("UiLanguageButton")!);
+        Click(fixture.Window.GetLogicalDescendants().OfType<Button>().Single(button => button.Tag?.ToString() == "loc:SaveSettings"));
+        for (var attempt = 0; attempt < 100 && fixture.Window.IsVisible; attempt++) await Task.Delay(10);
+        Assert.False(fixture.Window.IsVisible);
+        Assert.Equal("zh-CN", fixture.Window.SavedSettings.UiLanguage);
+        Assert.Equal("原文", popup.FindControl<Button>("OriginalButton")!.Content);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(1.5)]
+    [InlineData(2)]
+    public void TrayMenuFitsAboveTheBottomRightAnchorAtDifferentDpi(double scale)
+    {
+        var area = new PixelRect(-1920, 0, 1920, 1040);
+        var anchor = new ScreenPoint(-40, 1070);
+        var size = new Size(280, 320);
+        var position = YitaTrayController.ResolveMenuPosition(anchor, size, area, scale);
+        Assert.InRange(position.X, area.X, area.Right - (int)Math.Ceiling(size.Width * scale));
+        Assert.InRange(position.Y, area.Y, area.Bottom - (int)Math.Ceiling(size.Height * scale));
+        Assert.True(position.Y + size.Height * scale < anchor.Y);
+        var topPosition = YitaTrayController.ResolveMenuPosition(new ScreenPoint(-1880, 0), size, area, scale);
+        Assert.True(topPosition.Y > 0);
+    }
+    [AvaloniaFact]
     public async Task ConnectionTestAlwaysReachesTheProviderAndUsesTheCurrentUnsavedKey()
     {
         var handler = new DelayedHandler(delayFirst: false);

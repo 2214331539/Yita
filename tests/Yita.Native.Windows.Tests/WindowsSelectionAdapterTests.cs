@@ -6,6 +6,85 @@ namespace Yita.Native.Windows.Tests;
 public sealed class WindowsSelectionAdapterTests
 {
     [Fact]
+    public async Task CopyablePdfUsesClipboardFallbackWhenAccessibilityIsEmpty()
+    {
+        var accessible = new StubReader(SelectionResult.Failed(SelectionFailureKind.Empty));
+        var clipboard = new StubReader(new SelectionResult("PDF selection", SelectionSource.ClipboardFallback));
+        using var adapter = new WindowsSelectionAdapter(accessible, clipboard);
+        var result = await adapter.ReadAsync(new SelectionRequest(SelectionTrigger.MouseGesture, new ScreenPoint(10, 20), "AcroRd32"));
+        Assert.Equal("PDF selection", result.Text);
+        Assert.Equal(1, accessible.ReadCount);
+        Assert.Equal(1, clipboard.ReadCount);
+        adapter.UseClipboardFallback = false;
+        Assert.False((await adapter.ReadAsync(new SelectionRequest(SelectionTrigger.MouseGesture, new ScreenPoint(10, 20)))).Succeeded);
+        Assert.Equal(1, clipboard.ReadCount);
+    }
+
+    [Theory]
+    [InlineData(SelectionFailureKind.ProtectedContent)]
+    [InlineData(SelectionFailureKind.Cancelled)]
+    public async Task ProtectedOrCancelledSelectionsNeverFallThroughToCopy(SelectionFailureKind failure)
+    {
+        var clipboard = new StubReader(new SelectionResult("must not copy", SelectionSource.ClipboardFallback));
+        var safePipeline = new SelectionReaderPipeline(new ISelectionReader[]
+        {
+            new StubReader(SelectionResult.Failed(failure)), clipboard,
+        });
+        using var adapter = new WindowsSelectionAdapter(safePipeline, clipboard);
+        var result = await adapter.ReadAsync(new SelectionRequest(SelectionTrigger.MouseGesture, new ScreenPoint(10, 20)));
+        Assert.Equal(failure, result.Failure);
+        Assert.Equal(0, clipboard.ReadCount);
+    }
+
+    [Fact]
+    public async Task WpsCompatibilityCopiesFirstEvenWhenGenericFallbackIsDisabled()
+    {
+        var accessible = new StubReader(SelectionResult.Failed(SelectionFailureKind.Empty));
+        var clipboard = new StubReader(new SelectionResult("WPS PDF selection", SelectionSource.ClipboardFallback));
+        using var adapter = new WindowsSelectionAdapter(accessible, clipboard, _ => true) { UseClipboardFallback = false };
+        Assert.True((await adapter.ReadAsync(new SelectionRequest(SelectionTrigger.MouseGesture, new ScreenPoint(10, 20)))).Succeeded);
+        Assert.Equal(0, accessible.ReadCount);
+        Assert.Equal(1, clipboard.ReadCount);
+    }
+
+    [Fact]
+    public async Task BrowserWaitsForAccessibilitySelectionToStabilizeBeforeCopying()
+    {
+        var reads = 0;
+        var accessible = new DelegateSelectionReader((_, _) => Task.FromResult(++reads == 1
+            ? SelectionResult.Failed(SelectionFailureKind.Empty) : new SelectionResult("stabilized", SelectionSource.Accessibility)));
+        var clipboard = new StubReader(SelectionResult.Failed(SelectionFailureKind.Empty));
+        using var adapter = new WindowsSelectionAdapter(accessible, clipboard);
+        var result = await adapter.ReadAsync(new SelectionRequest(SelectionTrigger.MouseGesture, new ScreenPoint(10, 20), "chrome"));
+        Assert.Equal("stabilized", result.Text);
+        Assert.Equal(2, reads);
+        Assert.Equal(0, clipboard.ReadCount);
+    }
+
+    [Theory]
+    [InlineData("wpspdf", "Document", true)]
+    [InlineData("kpdf", "Document", true)]
+    [InlineData("WPS", "Document.PDF", true)]
+    [InlineData("wps", "pdf notes.docx", false)]
+    [InlineData("chrome", "Document.pdf", false)]
+    public void WpsPdfDetectionMatchesTheOriginalIncludingEmbeddedRenderers(string process, string title, bool expected) =>
+        Assert.Equal(expected, WindowsClipboardSelectionReader.IsWpsPdfProcess(process, title));
+
+    [Theory]
+    [InlineData("WindowsTerminal", false)]
+    [InlineData("pwsh", false)]
+    [InlineData("wpspdf", true)]
+    [InlineData("AcroRd32", true)]
+    public void CopyFallbackAvoidsSendingInterruptCommandsToTerminals(string process, bool expected) =>
+        Assert.Equal(expected, WindowsClipboardSelectionReader.IsClipboardFallbackProcessAllowed(process));
+
+    private sealed class StubReader(SelectionResult result) : ISelectionReader
+    {
+        internal int ReadCount { get; private set; }
+        public Task<SelectionResult> ReadAsync(SelectionRequest request, CancellationToken cancellationToken = default)
+        { ReadCount++; return Task.FromResult(result); }
+    }
+    [Fact]
     public async Task ASecondLaunchActivatesTheExistingOwnerWithoutTakingItsMutex()
     {
         if (!OperatingSystem.IsWindows()) return;

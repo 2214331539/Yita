@@ -47,6 +47,7 @@ public sealed class App : Application
             var mainWindow = new MainWindow(_windowsRuntime);
             _settingsWindow = mainWindow;
             desktop.MainWindow = mainWindow;
+            mainWindow.UiLanguageChanged += (_, language) => _tray?.ApplyUiLanguage(language);
             mainWindow.SettingsChanged += (_, _) =>
             {
                 _tray?.SetEnabled(mainWindow.IsSelectionTranslationEnabled);

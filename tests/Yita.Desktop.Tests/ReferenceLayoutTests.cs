@@ -48,6 +48,13 @@ public sealed class ReferenceLayoutTests
             conversation.UpdateLayout();
             Assert.Equal(transcriptHeight, transcript.TextLayout.Height);
             transcript.ClearSelection();
+            conversation.ApplyUiLanguage("en");
+            Assert.Equal("Ask AI", conversation.FindControl<TextBlock>("TitleText")!.Text);
+            Assert.Equal("Copy", conversation.FindControl<Button>("CopyButton")!.Content);
+            Assert.Contains("You", ReferenceTypography.GetText(transcript));
+            Assert.Contains("它表示你可以在工作时随时阅读英文", ReferenceTypography.GetText(transcript));
+            conversation.ApplyUiLanguage("zh-CN");
+            Assert.Equal("AI 问答", conversation.FindControl<TextBlock>("TitleText")!.Text);
             Capture(conversation, "avalonia-question-answer");
         }
         finally { conversation.Close(); ReferenceMotion.Enabled = true; }
