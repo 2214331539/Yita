@@ -1,4 +1,4 @@
-name: Build
+name: Legacy WPF regression
 
 on:
   push:

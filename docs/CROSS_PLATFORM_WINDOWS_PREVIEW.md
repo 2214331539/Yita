@@ -1,5 +1,7 @@
 # Windows 跨平台迁移预览
 
+> 历史阶段说明：本文记录早期 `codex/cross-platform-migration` 的行为，部分快捷键、记录和设置说明已经过时。当前 Avalonia 架构已提升为 main，请使用 [README](../README.md)、[架构说明](ARCHITECTURE.md) 与 [Windows 验收说明](WINDOWS_AVALONIA_ACCEPTANCE.md)。
+
 本说明适用于 `codex/cross-platform-migration` 分支的 Avalonia 桌面壳。正式 Windows 下载仍使用 WPF 版本；当前预览没有单独发布 Setup，也没有 macOS 原生取词实现。
 
 ## 构建与启动
