@@ -174,10 +174,10 @@ scripts/ · packaging/windows/       旧 WPF 打包流程与开发辅助脚本
 | `main` | 当前 C#/.NET/Avalonia 架构的主开发分支 |
 | `codex/csharp-wpf-legacy` | 切换前 GitHub main 的完整 Yita WPF 快照，保留旧源码、README 与打包流程 |
 | `codex/csharp-wpf-upstream-baseline` | 切换前本地 main 的上游 WPF 基线，单独保留其历史 |
-| `codex/windows-avalonia-parity` | Avalonia Windows 还原与修复的阶段性基准 |
-| `codex/cross-platform-migration` | 早期跨平台迁移的阶段性基准 |
 
 旧 WPF 与新 Avalonia 都使用 C#，旧分支名中的 `csharp-wpf` 用来区分界面与原生组织方式。已有版本标签与 Release 资产保留，不重写历史。
+
+早期迁移和 Windows 还原的提交均已包含在 `main` 中。当前远程保留上表三条分支；后续功能从最新 `main` 创建独立分支，验收后通过 Pull Request 合入。
 
 ## 开发与测试
 
@@ -197,7 +197,7 @@ dotnet run --project tools/Yita.WindowsSmoke/Yita.WindowsSmoke.csproj -c Release
 
 GitHub Actions 的 `Cross-platform architecture` 工作流在 Windows/macOS runner 上构建当前解决方案并运行测试；`Legacy WPF regression` 在 Windows 上检查保留的 WPF 解决方案。macOS 构建通过只能证明共享代码可构建，不能证明 macOS 划词功能已实现。
 
-详见 [Windows 验收说明](docs/WINDOWS_AVALONIA_ACCEPTANCE.md) 和 [还原开发计划](docs/WINDOWS_AVALONIA_PARITY_PLAN.md)。
+下一阶段的交付顺序、平台边界和发布验收标准见 [跨平台产品开发路线图](docs/CROSS_PLATFORM_ROADMAP.md)。已有结果见 [Windows 验收说明](docs/WINDOWS_AVALONIA_ACCEPTANCE.md)；[还原开发计划](docs/WINDOWS_AVALONIA_PARITY_PLAN.md) 和 [首次迁移计划](docs/CROSS_PLATFORM_MIGRATION_PLAN.md) 保留为历史记录。
 
 ### 安装包与更新
 

@@ -1,5 +1,7 @@
 # Windows Avalonia 原版还原计划
 
+> 历史文档：还原及后续修复已进入 `main`，原本地 `codex/windows-avalonia-parity` 分支已删除，提交历史仍保留。本文的基准和约束描述当时的还原阶段；当前状态见 [Windows 验收记录](WINDOWS_AVALONIA_ACCEPTANCE.md)，下一步以 [跨平台产品开发路线图](CROSS_PLATFORM_ROADMAP.md) 为准。
+
 ## 分支与基准
 
 - 开发分支：`codex/windows-avalonia-parity`，从 `ae024e3` 的跨平台预览创建。

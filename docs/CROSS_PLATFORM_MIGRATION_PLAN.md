@@ -1,5 +1,7 @@
 # Yita 跨平台迁移开发计划
 
+> 历史文档：本文记录最初的迁移方案和预览阶段状态，部分入口、记录实现与待办已被后续 Windows 还原工作替代。2026-10-02，Avalonia 版本已提升为 `main`，远程 `codex/cross-platform-migration` 已删除，其提交历史保留在 `main`。当前实施顺序和完成定义以 [跨平台产品开发路线图](CROSS_PLATFORM_ROADMAP.md) 为准，不以本文的历史勾选状态判断当前产品能力。
+
 ## 目标
 
 在保留当前 Windows 版本稳定性的前提下，将 Yita 演进为同时支持 Windows 10/11 x64、macOS Intel 和 Apple Silicon 的桌面应用。核心体验保持一致：用户在任意支持文本选择的应用中划词后，使用 Yita 快捷键或划词触发翻译，Yita 在选区附近显示可拖拽、可调整大小并支持流式输出的翻译浮窗。
