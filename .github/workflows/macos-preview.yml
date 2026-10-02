@@ -1,0 +1,50 @@
+name: Apple Silicon preview package
+
+on:
+  push:
+    branches: ['codex/platform-host-services']
+    paths:
+      - '.github/workflows/macos-preview.yml'
+      - 'scripts/Build-Mac-Preview.sh'
+      - 'scripts/Verify-Mac-Package.sh'
+      - 'scripts/Collect-DesktopLicenses.ps1'
+      - 'packaging/macos/**'
+      - 'LICENSES/**'
+      - 'docs/MAC_PREVIEW_TESTING.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-preview-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Require Apple Silicon runner
+        run: test "$(uname -m)" = arm64
+      - name: Build and test cross-platform solution
+        run: |
+          dotnet build Yita.CrossPlatform.sln -c Release
+          dotnet test Yita.CrossPlatform.sln -c Release --no-build --logger "console;verbosity=minimal"
+      - name: Check single instance and native helper protocol
+        run: |
+          dotnet run --project tools/Yita.PlatformSmoke/Yita.PlatformSmoke.csproj -c Release --no-build
+          dotnet run --project tools/Yita.MacHelperSmoke/Yita.MacHelperSmoke.csproj -c Release --no-build
+      - name: Publish, sign for testing, package and validate
+        run: bash scripts/Build-Mac-Preview.sh "$GITHUB_WORKSPACE/artifacts/macos-preview" "${{ github.run_number }}"
+      - name: Upload internal test packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: Yita-macos-preview-${{ github.run_number }}-osx-arm64
+          path: artifacts/macos-preview/*
+          if-no-files-found: error
+          retention-days: 30

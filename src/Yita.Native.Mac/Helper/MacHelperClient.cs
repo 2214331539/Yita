@@ -224,10 +224,21 @@ internal sealed class MacHelperClient : IMacHelperClient
     private static ProcessStartInfo? FindStartInfo()
     {
         if (!OperatingSystem.IsMacOS()) return null;
-        var configured = Environment.GetEnvironmentVariable("YITA_MAC_HELPER_PATH");
-        var path = !string.IsNullOrWhiteSpace(configured) ? Path.GetFullPath(configured) : Path.Combine(
-            AppContext.BaseDirectory, "Yita.Native.Mac.Helper.app", "Contents", "MacOS", "Yita.Native.Mac.Helper");
+        var path = ResolveHelperPath(AppContext.BaseDirectory, Environment.GetEnvironmentVariable("YITA_MAC_HELPER_PATH"));
         return File.Exists(path) ? new ProcessStartInfo(path) : null;
+    }
+
+    internal static string ResolveHelperPath(string baseDirectory, string? configured = null)
+    {
+        if (!string.IsNullOrWhiteSpace(configured)) return Path.GetFullPath(configured);
+        var directory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(baseDirectory));
+        var contents = Path.GetDirectoryName(directory);
+        var app = contents is null ? null : Path.GetDirectoryName(contents);
+        // Installed bundles keep nested executables outside the managed runtime directory.
+        var root = Path.GetFileName(directory) == "MacOS" && Path.GetFileName(contents) == "Contents"
+            && app?.EndsWith(".app", StringComparison.Ordinal) == true
+            ? Path.Combine(contents!, "Helpers") : directory;
+        return Path.Combine(root, "Yita.Native.Mac.Helper.app", "Contents", "MacOS", "Yita.Native.Mac.Helper");
     }
 
     public void Dispose()

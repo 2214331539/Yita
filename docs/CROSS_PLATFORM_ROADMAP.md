@@ -1,6 +1,6 @@
 # Yita 跨平台产品开发路线图
 
-更新日期：2026-10-02。状态：`codex/platform-host-services` 已完成阶段 B 宿主/存储与阶段 C 的 helper、权限、AX/Cmd+C、全局输入、Desktop 触发、菜单栏、登录项和睡眠恢复代码，尚未合入 `main`。Mac Keychain、外部取词、真实登录和窗口行为仍待真机验证。维护者确认朋友已验收旧 WPF 安装版的安装与取词，并要求暂缓新版打包、优先继续平台开发。该反馈不作为 Avalonia Setup 的验收证据。当前代码事实见 [技术架构](ARCHITECTURE.md)，已完成的 Windows 验收见 [验收记录](WINDOWS_AVALONIA_ACCEPTANCE.md)。
+更新日期：2026-10-02。状态：`codex/platform-host-services` 已完成阶段 B 宿主/存储与阶段 C 的 helper、权限、AX/Cmd+C、全局输入、Desktop 触发、菜单栏、登录项和睡眠恢复代码，尚未合入 `main`。Mac Keychain、外部取词、真实登录和窗口行为仍待真机验证。维护者最新要求仅支持 Apple Silicon，并授权先制作 macOS 内部试用包供同学测试；Windows 新版 Setup 和公共 Release 仍暂缓。朋友此前验收的是旧 WPF 安装版，不作为 Avalonia Setup 的验收证据。当前代码事实见 [技术架构](ARCHITECTURE.md)，已完成的 Windows 验收见 [验收记录](WINDOWS_AVALONIA_ACCEPTANCE.md)。
 
 ## 产品目标与边界
 
@@ -8,7 +8,7 @@
 
 核心流程为：拖选文本 -> 读取选区 -> 在附近显示浮窗 -> 增量显示译文。读取失败时保留“手动复制后翻译”的入口；失败、取消与权限不足不能导致程序退出或破坏正常复制。
 
-- 首要支持 Windows x64、macOS Apple Silicon；macOS Intel 单独构建和验收后列入正式支持。Windows ARM64 与 Linux 不属于本轮交付范围。
+- 目标平台为 Windows x64、macOS Apple Silicon；按维护者要求不制作 Intel Mac 包。Windows ARM64 与 Linux 不属于本轮交付范围。
 - 保持现有设置、阅读浮窗、解释/问答、术语、修正、AI 记录、语言切换与 Yita 品牌风格。Mac 使用系统可用字体和原生菜单规则，保持相同信息结构与功能，不要求两种系统逐像素一致。
 - 优先覆盖网页、Markdown、代码编辑器、Office 和可复制 PDF。拖选自动触发为主要入口；双击选词、键盘扩选在完成主链路后补充。
 - 不加入 OCR、截图翻译、账号系统或云端同步，不为本轮重新更换语言或 UI 框架。
@@ -48,7 +48,7 @@
 | D | 双端兼容性与阅读体验达到试用标准 | `codex/cross-platform-polish` | C 已在交互式 Mac 环境实际运行 |
 | E | 双端安装、版本检查、升级及正式 Release | `codex/cross-platform-distribution` | D 的核心场景通过，签名与分发条件就绪 |
 
-这是默认实施顺序，不是固定日期承诺。按维护者最新安排，阶段 A 的打包与发布暂缓，先推进 B；阶段 A 的正式支持工具链、许可与安装验收要求仍需在正式分发前完成。Mac 环境和签名条件未满足时，可继续共享接口及协议测试，但不能宣称 Mac 原生功能已完成。
+这是默认实施顺序，不是固定日期承诺。阶段 A 的 Windows 打包与发布仍暂缓。最新授权将 E 的 Apple Silicon 内部打包提前，以便同学真机测试；此试用包使用现有 .NET 8 和 ad-hoc 签名。正式分发前仍需完成受支持的 LTS、签名公证与安装验收。没有真实桌面证据时不能宣称 Mac 已正式支持。
 
 ## 阶段 A：Windows 安装与发布基线
 
@@ -233,7 +233,7 @@ NSPasteboard 不能原子比较序列并写入，也没有可验证的复制所�
 
 ## 阶段 E：双端分发与更新
 
-- Windows 输出自包含 Setup；Mac 首先输出独立 `osx-arm64` 的 `.app` 与 DMG，再加入经验证的 `osx-x64` 包，不把多个 .NET 包简单合并就宣称 Universal。
+- Windows 输出自包含 Setup；Mac 仅输出 `osx-arm64` 的 `.app`、DMG 与备用 ZIP，不提供 Intel 或 Universal 下载。
 - 最低 macOS 版本按所用 .NET、Avalonia、原生 API 及实际验收环境的交集确定，并写入 Release 和包元数据。
 - Mac 正式公开包使用 Developer ID、Hardened Runtime、notarization 与 stapling，按正确次序签名嵌套 helper、原生库和主应用；窗口权限不依赖随意启用的 entitlement。
 - 签名、公证需要维护者的 Apple 开发者账号与证书条件；Windows 公共分发的代码签名同样需要对应证书。尚未具备时只能准确标注内部试用状态。
@@ -252,7 +252,7 @@ NSPasteboard 不能原子比较序列并写入，也没有可验证的复制所�
 - GitHub macOS runner 用于编译 Swift/C#、核心测试、打包与允许的原生检查。托管 runner 的 GUI 与 TCC 授权条件不能替代用户桌面验收。
 - Mac 首次授权、授权撤销、全局鼠标、其他应用选区、Spaces、复制恢复和升级后权限，需要可交互 Mac 或具备对应条件的自托管环境。
 - 维护者此前暂缓 Mac 真机验证；当前推进 helper 协议、权限入口和 CI 编译检查，真实桌面验收仍待恢复，不以 CI 通过替代授权及外部划词验收。
-- Apple Silicon 与 Intel 的构建、运行和应用兼容性分别记录。只验证一种架构时，另一种保留为待验收。
+- 本轮只记录 Apple Silicon 构建、运行和应用兼容性；Intel 不在支持范围内。
 
 ## 近期执行清单
 
@@ -274,6 +274,7 @@ NSPasteboard 不能原子比较序列并写入，也没有可验证的复制所�
 - [x] D 准备代码：平台字体、减少动效、失败原因反馈及有界隐私诊断；本机及双端 CI 各 487 项通过，实际 Cocoa 偏好 probe 通过。
 - [ ] D：双端兼容性矩阵、性能与阅读体验。
 - [ ] E：双端签名安装包、版本检查、升级与公开 Release。
+- [ ] E 试用包：Apple Silicon 自包含 `.app`、DMG/ZIP、完整许可、包内 helper 启动与封装校验；通过 CI 后记录实际产物。真机验收见 [同学测试清单](MAC_PREVIEW_TESTING.md)。
 
 ## 跨平台产品完成定义
 
@@ -281,7 +282,7 @@ NSPasteboard 不能原子比较序列并写入，也没有可验证的复制所�
 
 1. 字体、动效偏好与取词诊断准备代码已完成。下一批在现有 Windows 条件下完善可重复的应用兼容性记录与连续请求/长时运行检查；继续区分可控测试和真实有效选区数据，不扩大未测平台的支持声明。
 2. 恢复 Mac 条件后执行阶段 B/C 的真机清单和应用兼容性矩阵，根据焦点、授权、全屏等实测结果调整原生实现；只有实际通过才标记支持。
-3. 恢复分发工作时先完成 .NET LTS 与 Windows Avalonia 安装基线，再推进 Mac `.app`、签名/公证、版本检查和更新。当前不创建新版 Setup 或公开 Release。
+3. 当前先生成 Apple Silicon 内部试用包供同学测试，不创建 Windows 新版 Setup 或公共 Release。正式分发阶段继续完成 .NET LTS、Windows 安装基线、Mac 签名/公证、版本检查和更新。
 
 只有同时满足以下条件，才将下载入口和 README 标记为 Windows/macOS 均可用：
 

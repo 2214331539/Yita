@@ -6,6 +6,22 @@ namespace Yita.Native.Mac.Tests;
 
 public sealed class MacHelperTests
 {
+    [Fact]
+    public void HelperDiscoverySupportsSourceOutputAndInstalledBundles()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "Yita package with spaces");
+        var source = Path.Combine(root, "bin", "Release", "net8.0");
+        var bundle = Path.Combine(root, "Yita.app", "Contents", "MacOS");
+        var suffix = Path.Combine("Yita.Native.Mac.Helper.app", "Contents", "MacOS", "Yita.Native.Mac.Helper");
+        Assert.Equal(Path.Combine(source, suffix), MacHelperClient.ResolveHelperPath(source));
+        Assert.Equal(Path.Combine(root, "Yita.app", "Contents", "Helpers", suffix),
+            MacHelperClient.ResolveHelperPath(bundle + Path.DirectorySeparatorChar));
+        var overridePath = Path.Combine(root, "custom-helper");
+        Assert.Equal(overridePath, MacHelperClient.ResolveHelperPath(bundle, overridePath));
+        Assert.Equal(Path.Combine(root, "unrelated", "Contents", "MacOS", suffix),
+            MacHelperClient.ResolveHelperPath(Path.Combine(root, "unrelated", "Contents", "MacOS")));
+    }
+
     private static string RuntimeConfig => Path.ChangeExtension(typeof(MacHelperTests).Assembly.Location, ".runtimeconfig.json");
     private static MacHelperClient Client(string mode, TimeSpan? timeout = null) =>
         new(() => Peer.CreatePeerStartInfo(mode, RuntimeConfig), timeout);
