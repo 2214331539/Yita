@@ -19,14 +19,19 @@ public sealed class MacSelectionAdapter : ISelectionReader, IPlatformPermissionS
         CancellationToken cancellationToken = default) => ReadAsync(request, false, cancellationToken);
 
     public async Task<SelectionResult> ReadAsync(SelectionRequest request, bool allowClipboardFallback,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        await ReadForInputAsync(request, allowClipboardFallback, null, cancellationToken).ConfigureAwait(false);
+
+    internal async Task<SelectionResult> ReadForInputAsync(SelectionRequest request, bool allowClipboardFallback,
+        long? sequence, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (!_isMac()) return SelectionResult.Failed(SelectionFailureKind.UnsupportedApplication, "macos-only");
         if (!request.Pointer.IsFinite || request.GestureBounds is { IsValid: false }
             || request.ForegroundProcessId is <= 1)
             return SelectionResult.Failed(SelectionFailureKind.Unknown, "mac-invalid-selection-coordinates");
-        var result = await _helper.SendAsync("readSelection", request, cancellationToken, allowClipboardFallback).ConfigureAwait(false);
+        var result = await _helper.SendAsync("readSelection", request, cancellationToken, allowClipboardFallback,
+            sequence is { } value ? new MacInputOptions(Sequence: value) : null).ConfigureAwait(false);
         if (result.State != NativeServiceState.Available)
             return SelectionResult.Failed(result.State == NativeServiceState.Timeout ? SelectionFailureKind.Timeout
                 : SelectionFailureKind.Unknown, result.DiagnosticCode);
@@ -67,6 +72,12 @@ public sealed class MacSelectionAdapter : ISelectionReader, IPlatformPermissionS
 
     public Task OpenAccessibilitySettingsAsync(CancellationToken cancellationToken = default) =>
         ExecuteActionAsync("openAccessibilitySettings", cancellationToken);
+
+    public Task RequestInputMonitoringPermissionAsync(CancellationToken cancellationToken = default) =>
+        ExecuteActionAsync("requestInputMonitoring", cancellationToken);
+
+    public Task OpenInputMonitoringSettingsAsync(CancellationToken cancellationToken = default) =>
+        ExecuteActionAsync("openInputMonitoringSettings", cancellationToken);
 
     private async Task ExecuteActionAsync(string command, CancellationToken cancellationToken)
     {

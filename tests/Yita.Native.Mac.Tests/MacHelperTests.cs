@@ -271,7 +271,7 @@ public sealed class MacHelperTests
     private sealed class PermissionHelper(bool posting) : IMacHelperClient
     {
         public Task<MacHelperExchange> SendAsync(string command, SelectionRequest? selection = null,
-            CancellationToken cancellationToken = default, bool allowClipboardFallback = false) => Task.FromResult(new MacHelperExchange(
+            CancellationToken cancellationToken = default, bool allowClipboardFallback = false, MacInputOptions? input = null) => Task.FromResult(new MacHelperExchange(
                 NativeServiceState.Available, new MacHelperResponse
                 {
                     Version = MacHelperProtocol.Version, Id = "test", Status = "ok",
@@ -286,7 +286,7 @@ public sealed class MacHelperTests
         public SelectionRequest? Request { get; private set; }
         public bool ClipboardAllowed { get; private set; }
         public Task<MacHelperExchange> SendAsync(string command, SelectionRequest? selection = null, CancellationToken cancellationToken = default,
-            bool allowClipboardFallback = false)
+            bool allowClipboardFallback = false, MacInputOptions? input = null)
         {
             Request = selection;
             ClipboardAllowed = allowClipboardFallback;

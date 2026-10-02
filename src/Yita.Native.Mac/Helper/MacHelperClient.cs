@@ -30,9 +30,10 @@ internal sealed class MacHelperClient : IMacHelperClient
     }
 
     public async Task<MacHelperExchange> SendAsync(string command, SelectionRequest? selection = null,
-        CancellationToken cancellationToken = default, bool allowClipboardFallback = false)
+        CancellationToken cancellationToken = default, bool allowClipboardFallback = false, MacInputOptions? input = null)
     {
-        if (command is not ("permissions" or "requestAccessibility" or "openAccessibilitySettings" or "readSelection"))
+        if (command is not ("permissions" or "requestAccessibility" or "openAccessibilitySettings" or "readSelection"
+            or "requestInputMonitoring" or "openInputMonitoringSettings" or "configureInput" or "pollInput" or "readClipboard"))
             throw new ArgumentException("Unsupported helper command.", nameof(command));
         if (allowClipboardFallback && command != "readSelection") throw new ArgumentException("Clipboard fallback requires a selection request.");
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -50,7 +51,7 @@ internal sealed class MacHelperClient : IMacHelperClient
             acquired = true;
             worker = await EnsureWorkerAsync(deadline.Token).ConfigureAwait(false);
             id = Guid.NewGuid().ToString("N");
-            var request = JsonSerializer.SerializeToUtf8Bytes(new MacHelperRequest(MacHelperProtocol.Version, id, command, selection, allowClipboardFallback),
+            var request = JsonSerializer.SerializeToUtf8Bytes(new MacHelperRequest(MacHelperProtocol.Version, id, command, selection, allowClipboardFallback, input),
                 MacHelperProtocol.JsonOptions);
             if (request.Length > MacHelperProtocol.MaximumRequestBytes) throw new ArgumentException("Helper request exceeded the limit.");
             deadline.Token.ThrowIfCancellationRequested();

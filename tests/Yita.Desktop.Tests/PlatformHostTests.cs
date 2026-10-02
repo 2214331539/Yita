@@ -13,6 +13,44 @@ namespace Yita.Desktop.Tests;
 public sealed class PlatformHostTests
 {
     [AvaloniaFact]
+    public async Task NativeRuntimeReusesPermissionServiceAndMonitoringRequiresAnExplicitAction()
+    {
+        using var runtime = new TestPermissionRuntime();
+        using var fixture = await Fixture.CreateAsync(runtime);
+        Assert.Equal(1, runtime.Permissions.Checks);
+        Assert.Equal(0, runtime.Permissions.InputRequests);
+        Assert.True(fixture.Window.FindControl<Button>("RequestInputMonitoringButton")!.IsEnabled);
+        Assert.True(fixture.Window.FindControl<ToggleSwitch>("EnabledCheckBox")!.IsEnabled);
+        Assert.True(fixture.Window.FindControl<TextBlock>("PlatformStatusText")!.IsVisible);
+        await fixture.Window.RefreshPlatformPermissionsAsync(MainWindow.PermissionAction.RequestInputMonitoring);
+        Assert.Equal(1, runtime.Permissions.InputRequests);
+        Assert.False(fixture.Window.FindControl<Button>("RequestInputMonitoringButton")!.IsEnabled);
+        Assert.False(fixture.Window.FindControl<TextBlock>("PlatformStatusText")!.IsVisible);
+        await fixture.Window.RefreshPlatformPermissionsAsync(MainWindow.PermissionAction.OpenInputSettings);
+        Assert.Equal(1, runtime.Permissions.InputSettingsOpened);
+        Click(fixture.Window.FindControl<Button>("UiLanguageButton")!);
+        Assert.Equal("允许输入监控", fixture.Window.FindControl<Button>("RequestInputMonitoringButton")!.Content);
+        fixture.Window.ShutdownServices();
+        Assert.True(runtime.Permissions.Disposed);
+    }
+
+    [AvaloniaFact]
+    public void OwnWindowHitTestingUsesScreenCoordinatesAndIgnoresHiddenWindows()
+    {
+        var window = new Window { Width = 400, Height = 200, Position = new(-800, -300) };
+        window.Show();
+        try
+        {
+            Assert.True(DesktopPlatformServices.ContainsScreenPoint(window, new(-700, -250)));
+            Assert.False(DesktopPlatformServices.ContainsScreenPoint(window, new(700, 250)));
+            Assert.False(DesktopPlatformServices.ContainsScreenPoint(window, new(double.NaN, 0)));
+            window.Hide();
+            Assert.False(DesktopPlatformServices.ContainsScreenPoint(window, new(-700, -250)));
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
     public async Task PermissionActionsAreExplicitLocalizedAndDoNotEnableUnimplementedInput()
     {
         var permissions = new TestPermissionService();
@@ -217,14 +255,14 @@ public sealed class PlatformHostTests
         Assert.True(condition());
     }
 
-    private sealed class TestSelectionRuntime : ISelectionRuntime
+    private class TestSelectionRuntime : ISelectionRuntime
     {
         public event EventHandler<SelectionCapturedEventArgs>? SelectionCaptured;
         public event EventHandler<ScreenPoint>? ExternalPointerPressed;
         public int SelectionSubscribers => SelectionCaptured?.GetInvocationList().Length ?? 0;
         public int PointerSubscribers => ExternalPointerPressed?.GetInvocationList().Length ?? 0;
         public bool Enabled { get; private set; }
-        public bool IsRunning => true;
+        public virtual bool IsRunning => true;
         public bool IsHotkeyRunning => true;
         public int ClipboardRequests { get; private set; }
         public void Start() { }
@@ -237,7 +275,20 @@ public sealed class PlatformHostTests
             new SelectionRequest(SelectionTrigger.MouseGesture, new ScreenPoint(100, 150)),
             new SelectionResult(text, SelectionSource.Accessibility)));
         public void PointerPressed() => ExternalPointerPressed?.Invoke(this, new ScreenPoint(400, 500));
-        public void Dispose() { }
+        public virtual void Dispose() { }
+    }
+
+    private sealed class TestPermissionRuntime : TestSelectionRuntime, IPlatformPermissionService
+    {
+        public TestPermissionService Permissions { get; } = new() { GlobalInput = true };
+        public override bool IsRunning => Permissions.InputRequests > 0;
+        public Task<PermissionState> GetStateAsync(CancellationToken cancellationToken = default) => Permissions.GetStateAsync(cancellationToken);
+        public Task<PlatformPermissionStatus> GetStatusAsync(CancellationToken cancellationToken = default) => Permissions.GetStatusAsync(cancellationToken);
+        public Task RequestAccessibilityPermissionAsync(CancellationToken cancellationToken = default) => Permissions.RequestAccessibilityPermissionAsync(cancellationToken);
+        public Task OpenAccessibilitySettingsAsync(CancellationToken cancellationToken = default) => Permissions.OpenAccessibilitySettingsAsync(cancellationToken);
+        public Task RequestInputMonitoringPermissionAsync(CancellationToken cancellationToken = default) => Permissions.RequestInputMonitoringPermissionAsync(cancellationToken);
+        public Task OpenInputMonitoringSettingsAsync(CancellationToken cancellationToken = default) => Permissions.OpenInputMonitoringSettingsAsync(cancellationToken);
+        public override void Dispose() => Permissions.Dispose();
     }
 
     private sealed class TestStartupRegistration : IStartupRegistration
@@ -252,6 +303,9 @@ public sealed class PlatformHostTests
         public int Checks { get; private set; }
         public int Requests { get; private set; }
         public int SettingsOpened { get; private set; }
+        public int InputRequests { get; private set; }
+        public int InputSettingsOpened { get; private set; }
+        public bool GlobalInput { get; init; }
         public bool Disposed { get; private set; }
         public Task<PlatformPermissionStatus>? Next { get; set; }
         public Task<PermissionState> GetStateAsync(CancellationToken cancellationToken = default) =>
@@ -260,12 +314,16 @@ public sealed class PlatformHostTests
         {
             Checks++;
             if (Next is { } next) { Next = null; return next; }
-            return Task.FromResult(new PlatformPermissionStatus(NativeServiceState.Available, new(Requests > 0, false, false)));
+            return Task.FromResult(new PlatformPermissionStatus(NativeServiceState.Available, new(Requests > 0, InputRequests > 0, false), GlobalInputSupported: GlobalInput));
         }
         public Task RequestAccessibilityPermissionAsync(CancellationToken cancellationToken = default)
         { Requests++; return Task.CompletedTask; }
         public Task OpenAccessibilitySettingsAsync(CancellationToken cancellationToken = default)
         { SettingsOpened++; return Task.CompletedTask; }
+        public Task RequestInputMonitoringPermissionAsync(CancellationToken cancellationToken = default)
+        { InputRequests++; return Task.CompletedTask; }
+        public Task OpenInputMonitoringSettingsAsync(CancellationToken cancellationToken = default)
+        { InputSettingsOpened++; return Task.CompletedTask; }
         public void Dispose() => Disposed = true;
     }
 

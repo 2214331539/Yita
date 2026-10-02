@@ -3,11 +3,11 @@ import ApplicationServices
 import Darwin
 import Foundation
 
-private let protocolVersion = 2
+private let protocolVersion = 3
 private let bundleIdentifier = "com.yita.desktop.native-helper"
 private let maximumRequestBytes = 64_000
 private let arguments = CommandLine.arguments
-private let requests = HelperRequestRegistry()
+private let requests = HelperRequestRegistry(onIdleShutdown: { code in nativeInput.stop(); exit(code) })
 private let selfTest = arguments.contains("--self-test")
 private let selectionFixture: String? = {
     guard selfTest, let index = arguments.firstIndex(of: "--selection-fixture"), index + 1 < arguments.count else { return nil }
@@ -17,6 +17,11 @@ private let parentPID: Int32? = {
     guard let index = arguments.firstIndex(of: "--parent-pid"), index + 1 < arguments.count else { return nil }
     return Int32(arguments[index + 1])
 }()
+private let inputFixture: String? = {
+    guard selfTest, let index = arguments.firstIndex(of: "--input-fixture"), index + 1 < arguments.count else { return nil }
+    return arguments[index + 1]
+}()
+private let nativeInput = NativeInputManager(ownerPID: parentPID, selfTest: selfTest, fixture: inputFixture)
 
 private struct Request: Decodable {
     let version: Int
@@ -24,6 +29,7 @@ private struct Request: Decodable {
     let command: String
     let selection: NativeSelectionRequest?
     let allowClipboardFallback: Bool?
+    let input: NativeInputOptions?
 }
 
 private struct Permissions: Encodable {
@@ -35,7 +41,7 @@ private struct Permissions: Encodable {
 private struct Capabilities: Encodable {
     let selection = true
     let clipboardFallback = true
-    let globalInput = false
+    let globalInput = true
 }
 
 private struct Response: Encodable {
@@ -48,6 +54,8 @@ private struct Response: Encodable {
     var capabilities: Capabilities?
     var diagnosticCode: String?
     var selection: NativeSelection?
+    var input: NativeInputSnapshot?
+    var pointer: SelectionPoint?
 }
 
 private func emit(_ response: Response) {
@@ -81,11 +89,42 @@ private func permissions() -> Permissions {
               NSWorkspace.shared.open(url) else {
             emit(Response(id: request.id, status: "error", diagnosticCode: "open-settings-failed")); return
         }
+    case "requestInputMonitoring":
+        if selfTest { emit(Response(id: request.id, status: "error", diagnosticCode: "self-test-action-disabled")); return }
+        _ = CGRequestListenEventAccess()
+        response.permissions = permissions()
+        response.capabilities = Capabilities()
+    case "openInputMonitoringSettings":
+        if selfTest { emit(Response(id: request.id, status: "error", diagnosticCode: "self-test-action-disabled")); return }
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"),
+              NSWorkspace.shared.open(url) else {
+            emit(Response(id: request.id, status: "error", diagnosticCode: "open-settings-failed")); return
+        }
+    case "configureInput":
+        guard let input = request.input else {
+            emit(Response(id: request.id, status: "error", diagnosticCode: "unsupported-command")); return
+        }
+        nativeInput.configure(mouseEnabled: input.mouseEnabled)
+        response.input = nativeInput.poll()
+        response.diagnosticCode = nativeInput.diagnostic
+    case "pollInput":
+        response.input = nativeInput.poll()
+        response.diagnosticCode = nativeInput.diagnostic
+    case "readClipboard":
+        let text = selfTest ? "fixture clipboard" : NSPasteboard.general.string(forType: .string)
+        response.pointer = nativeInput.pointer
+        if let text = text, text.utf16.count <= 20_000, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            response.selection = NativeSelection(text: text, source: "manualClipboard")
+        } else {
+            response.selection = NativeSelection(source: "manualClipboard", failure: "clipboardUnavailable", diagnosticCode: "clipboard-no-text")
+        }
     case "readSelection":
         guard let selection = request.selection else {
             response.selection = .failed(.invalidRequest)
             emit(response); return
         }
+        let isInputCurrent = { request.input?.sequence == nil || request.input?.sequence == nativeInput.sequence }
+        guard isInputCurrent() else { response.selection = .failed(.cancelled); emit(response); return }
         if selfTest, let fixture = selectionFixture, fixture.hasPrefix("clipboard") {
             response.selection = await readClipboardFixture(fixture, request: selection,
                 allowClipboardFallback: request.allowClipboardFallback == true, control: control)
@@ -93,7 +132,8 @@ private func permissions() -> Permissions {
         else if selfTest, let fixture = selectionFixture { response.selection = readSelectionFixture(fixture, request: selection) }
         else if selfTest { response.selection = .failed(.permissionDenied) }
         else { response.selection = await readNativeSelection(selection, allowClipboardFallback: request.allowClipboardFallback == true,
-            ownerPID: parentPID, control: control) }
+            ownerPID: parentPID, control: control, isInputCurrent: isInputCurrent) }
+        if !isInputCurrent() { response.selection = .failed(.cancelled) }
     default:
         emit(Response(id: request.id, status: "error", diagnosticCode: "unsupported-command")); return
     }
@@ -111,7 +151,7 @@ private func enqueue(_ data: Data) -> Bool {
     DispatchQueue.main.async {
         Task { @MainActor in
             await handle(request, control: control)
-            if let code = requests.finish(request.id) { exit(code) }
+            if let code = requests.finish(request.id) { nativeInput.stop(); exit(code) }
         }
     }
     return true
@@ -147,6 +187,7 @@ private func readRequests() {
 if arguments.contains("--selection-self-test") {
     exit(runSelectionSelfTests())
 }
+if arguments.contains("--input-self-test") { exit(runInputSelfTests()) }
 if arguments.contains("--clipboard-self-test") {
     Task { @MainActor in exit(await runClipboardSelfTests()) }
     dispatchMain()

@@ -17,6 +17,8 @@ final class HelperRequestRegistry {
     private let lock = NSLock()
     private var requests: [String: HelperRequestControl] = [:]
     private var closing: Int32?
+    private let onIdleShutdown: (Int32) -> Void
+    init(onIdleShutdown: @escaping (Int32) -> Void = { exit($0) }) { self.onIdleShutdown = onIdleShutdown }
 
     func register(_ id: String) -> HelperRequestControl? {
         lock.lock(); defer { lock.unlock() }
@@ -38,6 +40,6 @@ final class HelperRequestRegistry {
         lock.lock(); defer { lock.unlock() }
         closing = closing ?? code
         for control in requests.values { control.cancel() }
-        if requests.isEmpty { DispatchQueue.main.async { exit(code) } }
+        if requests.isEmpty { DispatchQueue.main.async { self.onIdleShutdown(code) } }
     }
 }

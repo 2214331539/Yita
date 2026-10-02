@@ -207,7 +207,7 @@ enum ClipboardReadError: Error {
 
 @MainActor final class SystemClipboardSelectionAccess: ClipboardSelectionAccess {
     private let pasteboard = NSPasteboard.general
-    static let injectedEventMarker: Int64 = 0x59495441434F5059
+    nonisolated static let injectedEventMarker: Int64 = 0x59495441434F5059
     func canPostEvents() -> Bool { CGPreflightPostEventAccess() }
     func hasPressedModifiers() -> Bool {
         !CGEventSource.flagsState(.hidSystemState).intersection([.maskCommand, .maskControl, .maskShift, .maskAlternate]).isEmpty
@@ -277,11 +277,12 @@ enum ClipboardReadError: Error {
 }
 
 @MainActor func readNativeSelection(_ request: NativeSelectionRequest, allowClipboardFallback: Bool,
-    ownerPID: Int32?, control: HelperRequestControl) async -> NativeSelection {
+    ownerPID: Int32?, control: HelperRequestControl, isInputCurrent: @escaping () -> Bool = { true }) async -> NativeSelection {
     let ax = SystemAXSelectionAccess(ownerPID: ownerPID)
-    let result = AXSelectionReader(access: ax, isCancelled: { control.isCancelled }).read(request)
+    let cancelled = { control.isCancelled || !isInputCurrent() }
+    let result = AXSelectionReader(access: ax, isCancelled: cancelled).read(request)
     guard allowClipboardFallback, ["empty", "unsupportedApplication"].contains(result.failure),
-          result.diagnosticCode != "ax-target-unavailable", !control.isCancelled else { return result }
+          result.diagnosticCode != "ax-target-unavailable", !cancelled() else { return result }
     return await ClipboardSelectionReader(ax: ax, clipboard: SystemClipboardSelectionAccess(),
-        isCancelled: { control.isCancelled }).read(request)
+        isCancelled: cancelled).read(request)
 }

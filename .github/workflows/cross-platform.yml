@@ -68,3 +68,7 @@ jobs:
       - name: Verify clipboard transactions without touching the system pasteboard
         if: runner.os == 'macOS'
         run: src/Yita.Desktop/bin/Release/net8.0/Yita.Native.Mac.Helper.app/Contents/MacOS/Yita.Native.Mac.Helper --clipboard-self-test
+
+      - name: Verify native input queue without desktop permissions
+        if: runner.os == 'macOS'
+        run: src/Yita.Desktop/bin/Release/net8.0/Yita.Native.Mac.Helper.app/Contents/MacOS/Yita.Native.Mac.Helper --input-self-test

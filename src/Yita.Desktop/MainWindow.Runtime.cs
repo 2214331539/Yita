@@ -220,7 +220,7 @@ public sealed partial class MainWindow
     internal string CreatePlatformDiagnostics() => string.Join("\n", new[]
     {
         "Yita " + _platform.PlatformName + " Avalonia preview",
-        "Automatic selection: " + (_selectionRuntime is null ? "not implemented" : "available"),
+        "Automatic selection: " + (_selectionRuntime is null ? "not implemented" : _selectionRuntime.IsRunning ? "running" : "unavailable"),
         "Global shortcut: " + (_selectionRuntime?.IsHotkeyRunning == true ? "running" : "unavailable"),
         "Login startup: " + (_startupRegistration.IsSupported ? "available" : "not implemented"),
         "Settings schema: " + _settings.SchemaVersion,
@@ -255,6 +255,7 @@ public sealed partial class MainWindow
         {
             _selectionRuntime.SelectionCaptured -= OnSelectionCaptured;
             _selectionRuntime.ExternalPointerPressed -= OnExternalPointerPressed;
+            if (_selectionRuntime is Yita.Native.Mac.MacSelectionRuntime mac) mac.StatusChanged -= OnNativeInputStatusChanged;
         }
         _connectionRequests.Dispose();
         _summaryRequests.Dispose();

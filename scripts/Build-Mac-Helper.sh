@@ -17,8 +17,10 @@ xcrun swiftc -swift-version 5 -O -warnings-as-errors -sdk "$sdk_path" \
   "$repo_root/src/Yita.Native.Mac.Helper/ClipboardSelectionReader.swift" \
   "$repo_root/src/Yita.Native.Mac.Helper/ClipboardSelfTests.swift" \
   "$repo_root/src/Yita.Native.Mac.Helper/HelperRequestControl.swift" \
+  "$repo_root/src/Yita.Native.Mac.Helper/NativeInput.swift" \
+  "$repo_root/src/Yita.Native.Mac.Helper/InputSelfTests.swift" \
   "$repo_root/src/Yita.Native.Mac.Helper/main.swift" -o "$helper_binary" \
-  -framework AppKit -framework ApplicationServices
+  -framework AppKit -framework ApplicationServices -framework Carbon
 plutil -lint "$helper_app/Contents/Info.plist"
 codesign --force --sign - --identifier com.yita.desktop.native-helper "$helper_app"
 codesign --verify --strict "$helper_app"

@@ -9,13 +9,28 @@ public sealed partial class MainWindow
     private readonly LatestRequestController _permissionRequests = new();
     private PlatformPermissionStatus? _permissionStatus;
     internal PlatformPermissionStatus? PermissionStatus => _permissionStatus;
-    internal enum PermissionAction { Check, RequestAccessibility, OpenSettings }
+    internal enum PermissionAction { Check, RequestAccessibility, OpenSettings, RequestInputMonitoring, OpenInputSettings }
 
     private async void CheckPermissions_Click(object? sender, RoutedEventArgs e) => await RefreshPlatformPermissionsAsync();
     private async void RequestAccessibility_Click(object? sender, RoutedEventArgs e) =>
         await RefreshPlatformPermissionsAsync(PermissionAction.RequestAccessibility);
     private async void OpenPermissionSettings_Click(object? sender, RoutedEventArgs e) =>
         await RefreshPlatformPermissionsAsync(PermissionAction.OpenSettings);
+    private async void RequestInputMonitoring_Click(object? sender, RoutedEventArgs e) =>
+        await RefreshPlatformPermissionsAsync(PermissionAction.RequestInputMonitoring);
+    private async void OpenInputSettings_Click(object? sender, RoutedEventArgs e) =>
+        await RefreshPlatformPermissionsAsync(PermissionAction.OpenInputSettings);
+
+    private void OnNativeInputStatusChanged(object? sender, EventArgs e) =>
+        Avalonia.Threading.Dispatcher.UIThread.Post(() => { if (!_shuttingDown) UpdateInputAvailability(); });
+
+    private void UpdateInputAvailability()
+    {
+        PlatformStatusText.IsVisible = _selectionRuntime?.IsRunning != true;
+        PlatformStatusText.Text = _selectionRuntime is null
+            ? Localize("Automatic selection and global shortcuts are unavailable in this preview. Clipboard translation remains available from the menu.", "此预览版尚未提供自动划词和全局快捷键，可通过菜单手动翻译剪贴板内容。")
+            : Localize("Input capture is not running. Check permissions or repair input capture from the menu.", "输入捕获尚未运行，请检查权限或通过菜单修复输入捕获。");
+    }
 
     internal async Task RefreshPlatformPermissionsAsync(PermissionAction action = PermissionAction.Check)
     {
@@ -28,6 +43,10 @@ public sealed partial class MainWindow
                 await _permissionService.RequestAccessibilityPermissionAsync(pending.Token);
             else if (action == PermissionAction.OpenSettings)
                 await _permissionService.OpenAccessibilitySettingsAsync(pending.Token);
+            else if (action == PermissionAction.RequestInputMonitoring)
+                await _permissionService.RequestInputMonitoringPermissionAsync(pending.Token);
+            else if (action == PermissionAction.OpenInputSettings)
+                await _permissionService.OpenInputMonitoringSettingsAsync(pending.Token);
             var status = await _permissionService.GetStatusAsync(pending.Token);
             if (!_shuttingDown && pending.IsCurrent) _permissionStatus = status;
         }
@@ -65,6 +84,9 @@ public sealed partial class MainWindow
         };
         RequestAccessibilityButton.IsEnabled = _permissionStatus is { Service: NativeServiceState.Available, Permissions.Accessibility: false };
         OpenPermissionSettingsButton.IsEnabled = _permissionStatus?.Service == NativeServiceState.Available;
+        RequestInputMonitoringButton.IsEnabled = _permissionStatus is { Service: NativeServiceState.Available, GlobalInputSupported: true, Permissions.InputMonitoring: false };
+        OpenInputSettingsButton.IsEnabled = _permissionStatus is { Service: NativeServiceState.Available, GlobalInputSupported: true };
+        UpdateInputAvailability();
     }
 
     private string Granted(bool value) => value ? Localize("granted", "已授权") : Localize("not granted", "未授权");

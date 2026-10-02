@@ -63,7 +63,7 @@ public sealed partial class MainWindow : Window
         _selectionRuntime = selectionRuntime;
         var platform = _platform;
         _startupRegistration = startupRegistration ?? platform.Startup;
-        _permissionService = permissionService ?? platform.CreatePermissionService();
+        _permissionService = permissionService ?? selectionRuntime as IPlatformPermissionService ?? platform.CreatePermissionService();
         var directory = platform.DataDirectory;
         _settingsStore = settingsStore ?? new JsonSettingsStore(Path.Combine(directory, "desktop-settings.json"),
             Path.Combine(directory, "settings.json"));
@@ -82,6 +82,7 @@ public sealed partial class MainWindow : Window
         {
             _selectionRuntime.SelectionCaptured += OnSelectionCaptured;
             _selectionRuntime.ExternalPointerPressed += OnExternalPointerPressed;
+            if (_selectionRuntime is Yita.Native.Mac.MacSelectionRuntime mac) mac.StatusChanged += OnNativeInputStatusChanged;
         }
     }
 
@@ -331,8 +332,7 @@ public sealed partial class MainWindow : Window
             ? Localize("These settings require a newer Yita version. Editing is disabled; the file has been preserved.", "设置来自更高版本的 Yita，已禁止保存并保留原文件，请更新软件。")
             : Localize("Settings could not be read. Saving is disabled; the file has been preserved.", "无法读取设置，已禁止保存并保留原文件。请检查或恢复设置文件。");
         SaveSettingsButton.IsEnabled = _settingsFailure is null;
-        PlatformStatusText.IsVisible = _selectionRuntime is null;
-        PlatformStatusText.Text = Localize("Automatic selection and global shortcuts are unavailable in this preview. Clipboard translation remains available from the menu.", "此预览版尚未提供自动划词和全局快捷键，可通过菜单手动翻译剪贴板内容。");
+        UpdateInputAvailability();
         UpdatePermissionControls();
         if (OperatingSystem.IsMacOS())
             TranslationServiceDescriptionText.Text = Localize("Your API key is stored in macOS Keychain on this device.", "API Key 保存在本机 macOS Keychain 中。");

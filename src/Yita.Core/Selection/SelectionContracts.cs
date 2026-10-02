@@ -155,6 +155,12 @@ public interface IPlatformPermissionService
         OpenAccessibilitySettingsAsync(cancellationToken);
 
     Task OpenAccessibilitySettingsAsync(CancellationToken cancellationToken = default);
+
+    Task RequestInputMonitoringPermissionAsync(CancellationToken cancellationToken = default) =>
+        throw new PlatformNotSupportedException("Input monitoring permission is unavailable.");
+
+    Task OpenInputMonitoringSettingsAsync(CancellationToken cancellationToken = default) =>
+        OpenAccessibilitySettingsAsync(cancellationToken);
 }
 
 public enum NativeServiceState

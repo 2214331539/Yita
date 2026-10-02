@@ -47,6 +47,8 @@
                   <Button Margin="0,0,8,6" Content="Check permissions" Tag="loc:CheckPermissions" Click="CheckPermissions_Click" Classes="secondary" />
                   <Button x:Name="RequestAccessibilityButton" Margin="0,0,8,6" Content="Grant access" Tag="loc:RequestAccessibility" Click="RequestAccessibility_Click" Classes="secondary" />
                   <Button x:Name="OpenPermissionSettingsButton" Margin="0,0,0,6" Content="System settings" Tag="loc:OpenPermissionSettings" Click="OpenPermissionSettings_Click" Classes="secondary" />
+                  <Button x:Name="RequestInputMonitoringButton" Margin="0,0,8,6" Content="Allow input monitoring" Tag="loc:RequestInputMonitoring" Click="RequestInputMonitoring_Click" Classes="secondary" />
+                  <Button x:Name="OpenInputSettingsButton" Margin="0,0,0,6" Content="Input settings" Tag="loc:OpenInputSettings" Click="OpenInputSettings_Click" Classes="secondary" />
                 </WrapPanel>
                 <Grid>
                   <Grid.ColumnDefinitions>

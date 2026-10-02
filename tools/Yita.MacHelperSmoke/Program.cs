@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using Yita.Core.Platform;
 using Yita.Core.Selection;
 using Yita.Native.Mac;
 
@@ -29,8 +30,8 @@ public static class Program
             if (status.Service != NativeServiceState.Available)
                 Console.Error.WriteLine($"Helper status: {status.Service}; diagnostic: {status.DiagnosticCode}");
             Check(status.Service == NativeServiceState.Available, "Versioned handshake and permission response accepted");
-            Check(status.SelectionSupported == (args.Length != 0) && !status.GlobalInputSupported && !status.Permissions.CanAttemptSelection,
-                "AX implementation, pending global input and denied self-test permissions are separate");
+            Check(status.SelectionSupported == (args.Length != 0) && status.GlobalInputSupported == (args.Length != 0) && !status.Permissions.CanAttemptSelection,
+                "Implemented native capabilities are separate from denied self-test permissions");
             var again = await adapter.GetStatusAsync();
             Check(again.Service == NativeServiceState.Available && starts == 1, "Multiple requests reuse one helper");
             var selection = await adapter.ReadAsync(new SelectionRequest(SelectionTrigger.TranslateShortcut, new ScreenPoint(10, 20)));
@@ -42,6 +43,7 @@ public static class Program
             {
                 await VerifySwiftSelectionFixtureAsync(args[1]);
                 await VerifySwiftClipboardFixtureAsync(args[1]);
+                await VerifySwiftInputFixtureAsync(args[1]);
             }
             Console.WriteLine("Mac helper protocol smoke passed. No desktop selection, GUI authorization, clipboard, Keychain or API access.");
             return 0;
@@ -184,6 +186,42 @@ public static class Program
         info.ArgumentList.Add("--peer");
         info.ArgumentList.Add(mode);
         return info;
+    }
+
+    private static async Task VerifySwiftInputFixtureAsync(string path)
+    {
+        ProcessStartInfo Start()
+        {
+            var info = new ProcessStartInfo(path);
+            foreach (var argument in new[] { "--self-test", "--selection-fixture", "range", "--input-fixture", "drag" })
+                info.ArgumentList.Add(argument);
+            return info;
+        }
+        using var client = new MacHelperClient(Start);
+        using var runtime = new MacSelectionRuntime(client);
+        var exchange = await client.SendAsync("configureInput", input: new(MouseEnabled: true));
+        Check(exchange.Response?.Input is { MouseRunning: true, HotkeyRunning: true, Events.Length: 3 },
+            "Swift synthetic drag crosses the bounded input protocol");
+        var batch = exchange.Response!.Input!;
+        var captured = new TaskCompletionSource<SelectionCapturedEventArgs>(TaskCreationOptions.RunContinuationsAsynchronously);
+        runtime.SelectionCaptured += (_, item) => captured.TrySetResult(item);
+        runtime.Configure(true, true, 0);
+        await runtime.HandleInputAsync(batch);
+        var result = await captured.Task.WaitAsync(TimeSpan.FromSeconds(3));
+        Check(result.Request.Trigger == SelectionTrigger.MouseGesture && result.Request.ForegroundProcessId == 42
+            && result.Result.Succeeded && result.Result.Text == "hello world", "Swift input drives the shared AX selection runtime");
+        Check(result.Request.GestureBounds == new SelectionBounds(-800, 120, 100, 30),
+            "Native input keeps Quartz points without multiplying Retina render scale");
+        var stale = await client.SendAsync("readSelection", result.Request, input: new(Sequence: batch.Sequence - 1));
+        Check(stale.Response?.Selection is { Failure: SelectionFailureKind.Cancelled, Text: null },
+            "A superseded input generation cannot read another selection");
+        var empty = await client.SendAsync("pollInput");
+        Check(empty.Response?.Input?.Events.Length == 0, "Polling never repeats a delivered native gesture");
+        var manual = await client.SendAsync("readClipboard");
+        Check(manual.Response?.Selection is { Source: SelectionSource.ManualClipboard, Text: "fixture clipboard" }
+            && manual.Response.Pointer == new ScreenPoint(-700, 150), "Manual clipboard translation uses the current pointer without simulated copy");
+        var action = await client.SendAsync("requestInputMonitoring");
+        Check(action.DiagnosticCode == "mac-helper-self-test-action-disabled", "Input fixtures never request system authorization");
     }
 
     private static async Task<int> RunPeerAsync(string mode)
