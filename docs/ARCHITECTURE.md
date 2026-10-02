@@ -2,17 +2,31 @@
 
 本文描述 `main` 当前代码的实际组织。主应用使用 C#、.NET 8 和 Avalonia 11.2.6；Windows 已实现划词翻译，macOS 原生取词仍待完成。旧 WPF 产品的完整快照保留在 `codex/csharp-wpf-legacy`。
 
+本文的平台宿主接口说明对应 `codex/platform-host-services` 功能分支，尚未合入 `main`。该分支保持 Windows 取词实现，新增非 Windows 单实例与手动剪贴板入口；不代表 macOS 自动划词已完成。
+
 ## 模块边界
 
 | 模块 | 入口与主要职责 |
 | --- | --- |
-| `Yita.Core` | `Parity/ReferenceTranslationRuntime.cs` 编排当前翻译；`Settings/YitaSettings.cs` 保存偏好；`LatestRequestController.cs` 管理取消和版本；`Placement/PopupPlacement.cs` 处理位置 |
-| `Yita.Desktop` | `App.axaml.cs` 管理生命周期与原生服务；`MainWindow` 管理设置和阅读会话；`TranslationPopupWindow`、`QuestionAnswerWindow` 呈现翻译与问答 |
+| `Yita.Core` | `Parity/ReferenceTranslationRuntime.cs` 编排当前翻译；`Settings/YitaSettings.cs` 保存偏好；`LatestRequestController.cs` 管理取消和版本；`Placement/PopupPlacement.cs` 处理位置；`Platform` 定义宿主契约和可移植单实例 |
+| `Yita.Desktop` | `App.axaml.cs` 管理生命周期；`Platform/DesktopPlatformServices.cs` 创建系统实现；`MainWindow` 订阅共享输入事件并管理设置和阅读会话；`TranslationPopupWindow`、`QuestionAnswerWindow` 呈现翻译与问答 |
 | `Yita.Native.Windows` | `WindowsSelectionRuntime` 接收鼠标/快捷键；`WindowsSelectionAdapter` 组织取词；剪贴板、托盘、凭据、启动项与显示偏好各自独立 |
 | `Yita.Native.Windows.UIA.Worker` | Windows 专属 helper，独立访问 UI Automation provider |
 | `Yita.Native.Mac` | 选区与权限契约、Keychain 适配器；AX 和全局输入 helper 尚未实现 |
 
-Desktop 当前使用 XAML 与窗口 code-behind/partial class 配合独立业务服务，不宣称已经完成完整 MVVM 或平台无关宿主抽象。它通过操作系统判断接入 Windows runtime；macOS 仍需补齐对应接入点。
+Desktop 当前使用 XAML 与窗口 code-behind/partial class 配合独立业务服务，不宣称已经完成完整 MVVM。App、设置和托盘已通过共享宿主接口接入，系统实现选择集中在工厂；字体/动效的显示偏好仍有 Windows 专属调用。macOS 的 `ISelectionRuntime` 与登录启动尚未实现，安全存储和窗口原生行为仍需补齐。
+
+## 平台宿主接口
+
+`ISelectionRuntime` 提供启用配置、选区和外部点击事件、手动剪贴板翻译、修复及诊断。Windows 使用原 `WindowsSelectionRuntime` 实现；未来 Mac helper 通过同一事件模型连接设置和阅读浮窗。WPS 兼容参数为 Windows 特有偏好，Mac 不应将其视作自己的复制策略。
+
+原生事件可能来自后台线程，`MainWindow` 负责派发到 Avalonia UI 线程。关闭服务时解除事件订阅，已排队的回调再次检查关闭状态；runtime 生命周期仍由 App 管理，窗口不自行销毁输入服务。
+
+`ISingleInstanceGuard` 将实例归属和唤醒分离：Windows 沿用原互斥量/事件实现；非 Windows 使用文件独占句柄和当前用户专用管道。锁文件在退出时不删除，避免不同 inode 造成两个实例同时拥有锁。新进程发送有时限的一字节唤醒消息，主实例在设置窗口建立前保留待唤醒状态；后台启动不发送消息。
+
+`IStartupRegistration` 明确是否支持启动项，未实现的平台禁用开关。`IStatusIcon` 提供原生图标事件；Windows 保持自绘 Yita 菜单，其他平台先使用 Avalonia NativeMenu。菜单手动翻译可以通过 Avalonia 剪贴板工作，但此时还没有 Mac 全局快捷键或选区锚点，只以主屏中心放置浮窗。
+
+系统凭据和 Windows 修正数据保护的创建也移至平台工厂。Mac Keychain 实现和修正数据加密仍需进一步验证；没有增加明文持久化替代。
 
 ## 原版代码复用
 
@@ -68,7 +82,7 @@ Windows 构建自动将 `Yita.UIA.Worker.exe` 及其依赖放在 Desktop 输出�
 
 ## 平台边界与发布
 
-Core 和 Desktop 可以在 Windows/macOS runner 上构建。macOS 已有 Keychain 适配代码，但 `MacSelectionAdapter` 尚未真正读取 AX 选区、请求权限或执行 Cmd+C，Desktop 也尚未注册 macOS 全局输入。因此编译成功不代表 macOS 功能完成。
+Core 和 Desktop 可以在 Windows/macOS runner 上构建。macOS 已有 Keychain 适配代码及非 Windows 宿主入口，但 `MacSelectionAdapter` 尚未真正读取 AX 选区、请求权限或执行 Cmd+C，Desktop 也尚未注册 macOS 全局输入。因此编译成功或单实例检查通过不代表 macOS 划词功能完成。
 
 下一步 macOS 需要实现和接入签名原生 helper：AXUIElement、选区坐标、Cmd+C/NSPasteboard、全局快捷键与鼠标、Accessibility/Input Monitoring、NSStatusItem，以及超时恢复和真机验收。Linux 当前不在交付范围。
 

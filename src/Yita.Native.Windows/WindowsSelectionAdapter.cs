@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Text;
 using Yita.Core;
+using Yita.Core.Platform;
 using Yita.Core.Selection;
 using Yita.Services;
 
@@ -477,7 +478,7 @@ public sealed class WindowsGlobalHotkeyService : IWindowsHotkeyService
     }
 }
 
-public sealed class WindowsSelectionRuntime : IDisposable
+public sealed class WindowsSelectionRuntime : ISelectionRuntime
 {
     public event EventHandler<ScreenPoint>? ExternalPointerPressed;
     private readonly WindowsGlobalHotkeyService _hotkey = new();
@@ -662,10 +663,4 @@ public sealed class WindowsSelectionRuntime : IDisposable
         _mouse.Dispose();
         _reader.Dispose();
     }
-}
-
-public sealed class SelectionCapturedEventArgs(SelectionRequest request, SelectionResult result) : EventArgs
-{
-    public SelectionRequest Request { get; } = request;
-    public SelectionResult Result { get; } = result;
 }

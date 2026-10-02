@@ -8,11 +8,10 @@ using Avalonia.LogicalTree;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Yita.Core;
+using Yita.Core.Platform;
 using Yita.Core.Parity;
 using Yita.Core.Settings;
 using Yita.Core.Translation;
-using Yita.Native.Mac;
-using Yita.Native.Windows;
 using Yita.Services;
 using Yita.Settings;
 using Yita.Translation;
@@ -23,7 +22,8 @@ public sealed partial class MainWindow : Window
 {
     private readonly ISettingsStore _settingsStore;
     private readonly ISecretStore _secretStore;
-    private readonly WindowsSelectionRuntime? _windowsRuntime;
+    private readonly ISelectionRuntime? _selectionRuntime;
+    private readonly IStartupRegistration _startupRegistration;
     private readonly ITranslationProviderFactory _providerFactory;
     private readonly ReferenceTranslationRuntime _translationRuntime;
     private readonly TranslationMemoryStore? _memory;
@@ -48,20 +48,22 @@ public sealed partial class MainWindow : Window
 
     public MainWindow() : this(null) { }
 
-    public MainWindow(WindowsSelectionRuntime? windowsRuntime, ISettingsStore? settingsStore = null,
-        ISecretStore? secretStore = null, JsonlTranslationHistoryStore? historyStore = null, HttpClient? httpClient = null)
+    public MainWindow(ISelectionRuntime? selectionRuntime, ISettingsStore? settingsStore = null,
+        ISecretStore? secretStore = null, JsonlTranslationHistoryStore? historyStore = null, HttpClient? httpClient = null,
+        IStartupRegistration? startupRegistration = null)
     {
-        _windowsRuntime = windowsRuntime;
-        var directory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Yita");
+        _selectionRuntime = selectionRuntime;
+        var platform = new DesktopPlatformServices();
+        _startupRegistration = startupRegistration ?? platform.Startup;
+        var directory = platform.DataDirectory;
         _settingsStore = settingsStore ?? new JsonSettingsStore(Path.Combine(directory, "desktop-settings.json"),
             Path.Combine(directory, "settings.json"));
-        _secretStore = secretStore ?? (OperatingSystem.IsWindows() ? SecretStoreFactory.CreateDefault()
-            : OperatingSystem.IsMacOS() ? new MacKeychainSecretStore() : new MemorySecretStore());
+        _secretStore = secretStore ?? platform.CreateSecretStore();
         _injectedClient = httpClient;
         _providerFactory = httpClient is null ? new TranslationProviderFactory() : new InjectedTranslationProviderFactory(httpClient);
-        if (OperatingSystem.IsWindows() && settingsStore is null)
+        if (settingsStore is null && platform.CreateMemoryProtector() is { } protector)
             _memory = new TranslationMemoryStore(Path.Combine(directory, "desktop-translation-memory.dat"),
-                new WindowsTranslationMemoryProtector());
+                protector);
         _translationRuntime = new ReferenceTranslationRuntime(_providerFactory, _memory);
         InitializeComponent();
         _ready = true;
@@ -69,6 +71,11 @@ public sealed partial class MainWindow : Window
         AiHistoryEnabledCheckBox.IsCheckedChanged += (_, _) => UpdateAiHistoryControls();
         Opened += async (_, _) => { await InitializeAsync(); ReferenceMotion.Reveal(SettingsRoot); };
         Closed += (_, _) => ShutdownServices();
+        if (_selectionRuntime is not null)
+        {
+            _selectionRuntime.SelectionCaptured += OnSelectionCaptured;
+            _selectionRuntime.ExternalPointerPressed += OnExternalPointerPressed;
+        }
     }
 
     private Task InitializeAsync() => _initialization ??= LoadSettingsAsync();
@@ -93,6 +100,7 @@ public sealed partial class MainWindow : Window
         var value = _settings.ToOriginal(_savedApiKey);
         EnabledCheckBox.IsChecked = value.IsEnabled;
         StartWithWindowsCheckBox.IsChecked = value.StartWithWindows;
+        StartWithWindowsCheckBox.IsEnabled = _startupRegistration.IsSupported;
         ClipboardFallbackCheckBox.IsChecked = value.UseClipboardFallback;
         WpsPdfCompatibilityCheckBox.IsChecked = value.UseWpsPdfCompatibility;
         UseSelectionContextCheckBox.IsChecked = value.UseSelectionContext;
@@ -157,7 +165,7 @@ public sealed partial class MainWindow : Window
         return _settings with
         {
             UiLanguage = _uiLanguage, IsEnabled = EnabledCheckBox.IsChecked == true,
-            StartWithSystem = StartWithWindowsCheckBox.IsChecked == true,
+            StartWithSystem = _startupRegistration.IsSupported && StartWithWindowsCheckBox.IsChecked == true,
             UseClipboardFallback = ClipboardFallbackCheckBox.IsChecked == true,
             UseWpsPdfCompatibility = WpsPdfCompatibilityCheckBox.IsChecked == true,
             UseSelectionContext = UseSelectionContextCheckBox.IsChecked == true,
@@ -192,7 +200,7 @@ public sealed partial class MainWindow : Window
                 _savedApiKey = key;
             }
             finally { _settingsGate.Release(); }
-            if (OperatingSystem.IsWindows() && _windowsRuntime is not null) WindowsStartupRegistration.Apply(_settings.StartWithSystem);
+            if (_startupRegistration.IsSupported && _selectionRuntime is not null) _startupRegistration.Apply(_settings.StartWithSystem);
             ApplyRuntimeSettings();
             Hide();
         }
@@ -203,7 +211,7 @@ public sealed partial class MainWindow : Window
 
     private void ApplyRuntimeSettings()
     {
-        _windowsRuntime?.Configure(_settings.IsEnabled, _settings.UseClipboardFallback, _settings.SelectionDelayMilliseconds,
+        _selectionRuntime?.Configure(_settings.IsEnabled, _settings.UseClipboardFallback, _settings.SelectionDelayMilliseconds,
             _settings.UseWpsPdfCompatibility, _settings.UseSelectionContext);
         ReferenceTheme.Apply(Application.Current!.Resources, _settings.ToOriginal());
         foreach (var popup in _popups) popup.ApplySettings(_settings.ToOriginal(_savedApiKey));
@@ -271,6 +279,8 @@ public sealed partial class MainWindow : Window
         ToolTip.SetTip(SelectionDelayTextBox, L("SelectionDelayTooltip"));
         ToolTip.SetTip(MaximumSelectionTextBox, L("MaximumSelectionTooltip"));
         ToolTip.SetTip(CustomAccentColorTextBox, L("CustomColorTooltip"));
+        if (!_startupRegistration.IsSupported)
+            ToolTip.SetTip(StartWithWindowsCheckBox, Localize("Login startup is not available on this platform yet.", "此平台尚未支持登录时启动。"));
         UpdateMemoryStatus();
         UpdateThemePreview();
         SynchronizeWindowLanguage();

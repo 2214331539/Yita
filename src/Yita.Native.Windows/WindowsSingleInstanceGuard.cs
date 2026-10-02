@@ -3,7 +3,7 @@ using System.Threading;
 namespace Yita.Native.Windows;
 
 /// <summary>Prevents two cross-platform Yita shells from owning the global hooks.</summary>
-public sealed class WindowsSingleInstanceGuard : IDisposable
+public sealed class WindowsSingleInstanceGuard : Yita.Core.Platform.ISingleInstanceGuard
 {
     private Mutex? _mutex;
     private EventWaitHandle? _activation;

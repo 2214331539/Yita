@@ -174,10 +174,11 @@ scripts/ · packaging/windows/       旧 WPF 打包流程与开发辅助脚本
 | `main` | 当前 C#/.NET/Avalonia 架构的主开发分支 |
 | `codex/csharp-wpf-legacy` | 切换前 GitHub main 的完整 Yita WPF 快照，保留旧源码、README 与打包流程 |
 | `codex/csharp-wpf-upstream-baseline` | 切换前本地 main 的上游 WPF 基线，单独保留其历史 |
+| `codex/platform-host-services` | 当前开发中的共享宿主接口、单实例与平台接入，尚未合入 main |
 
 旧 WPF 与新 Avalonia 都使用 C#，旧分支名中的 `csharp-wpf` 用来区分界面与原生组织方式。已有版本标签与 Release 资产保留，不重写历史。
 
-早期迁移和 Windows 还原的提交均已包含在 `main` 中。当前远程保留上表三条分支；后续功能从最新 `main` 创建独立分支，验收后通过 Pull Request 合入。
+早期迁移和 Windows 还原的提交均已包含在 `main` 中。历史分支保持参考用途；后续功能从最新 `main` 创建独立分支，验收后通过 Pull Request 合入。
 
 ## 开发与测试
 
@@ -194,6 +195,14 @@ dotnet run --project tools/Yita.WindowsSmoke/Yita.WindowsSmoke.csproj -c Release
 ```
 
 原生 smoke 需要可交互桌面，并且应先退出正在运行的 Yita，释放全局快捷键。它使用独立测试编辑器，保存并恢复剪贴板，不请求在线服务、不写产品设置。修改源码后重新构建，再退出并启动新进程；正在运行的 EXE 不会自动热更新。
+
+平台宿主分支还提供不依赖 GUI 权限的跨进程单实例与唤醒检查，使用临时目录，不修改产品设置或剪贴板：
+
+```powershell
+dotnet run --project tools/Yita.PlatformSmoke/Yita.PlatformSmoke.csproj -c Release
+```
+
+维护者已确认朋友电脑上的旧 WPF 安装版安装与取词通过。新版 Avalonia Setup 仍未生成，按当前开发安排暂缓打包，优先完善平台宿主和 macOS 原生链路；两者验收记录分开。
 
 GitHub Actions 的 `Cross-platform architecture` 工作流在 Windows/macOS runner 上构建当前解决方案并运行测试；`Legacy WPF regression` 在 Windows 上检查保留的 WPF 解决方案。macOS 构建通过只能证明共享代码可构建，不能证明 macOS 划词功能已实现。
 

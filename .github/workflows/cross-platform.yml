@@ -4,8 +4,7 @@ on:
   push:
     branches:
       - main
-      - codex/cross-platform-migration
-      - codex/windows-avalonia-parity
+      - 'codex/**'
   pull_request:
     paths:
       - 'Yita.CrossPlatform.sln'
@@ -19,6 +18,7 @@ on:
       - 'tests/Yita.Core.Parity.Tests/**'
       - 'tests/Yita.Native.Windows.Tests/**'
       - 'tests/Yita.Desktop.Tests/**'
+      - 'tools/Yita.PlatformSmoke/**'
       - '.github/workflows/cross-platform.yml'
   workflow_dispatch:
 
@@ -46,3 +46,6 @@ jobs:
 
       - name: Run Core, native adapter and desktop interaction tests
         run: dotnet test Yita.CrossPlatform.sln --configuration Release --no-build --logger "console;verbosity=minimal"
+
+      - name: Verify cross-process single instance and activation
+        run: dotnet run --project tools/Yita.PlatformSmoke/Yita.PlatformSmoke.csproj --configuration Release --no-build

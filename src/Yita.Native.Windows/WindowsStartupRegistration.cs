@@ -2,6 +2,12 @@ using Microsoft.Win32;
 
 namespace Yita.Native.Windows;
 
+public sealed class WindowsStartupService : Yita.Core.Platform.IStartupRegistration
+{
+    public bool IsSupported => OperatingSystem.IsWindows();
+    public void Apply(bool enabled) => WindowsStartupRegistration.Apply(enabled);
+}
+
 /// <summary>
 /// Registers Yita for the current Windows user without requiring elevation.
 /// </summary>

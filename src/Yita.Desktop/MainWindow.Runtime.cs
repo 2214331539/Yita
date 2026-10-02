@@ -1,4 +1,5 @@
 using Yita.Core;
+using Yita.Core.Platform;
 using Yita.Core.Placement;
 using Yita.Core.Selection;
 using Yita.Services;
@@ -9,6 +10,45 @@ namespace Yita.Desktop;
 
 public sealed partial class MainWindow
 {
+    private readonly LatestRequestController _clipboardRequests = new();
+    private void OnSelectionCaptured(object? sender, SelectionCapturedEventArgs args) =>
+        Avalonia.Threading.Dispatcher.UIThread.Post(async () =>
+        {
+            if (_shuttingDown) return;
+            try { await ShowSelectionTranslationAsync(args.Request, args.Result); }
+            catch (Exception exception)
+            {
+                System.Diagnostics.Trace.TraceError("Selection presentation failed: {0}", exception.GetType().Name);
+            }
+        });
+
+    private void OnExternalPointerPressed(object? sender, ScreenPoint point) =>
+        Avalonia.Threading.Dispatcher.UIThread.Post(DismissUnpinnedWindows);
+
+    internal async void TranslateClipboardFromTray()
+    {
+        try
+        {
+            if (_shuttingDown) return;
+            if (_selectionRuntime is not null) { _selectionRuntime.TranslateClipboard(); return; }
+            using var pending = _clipboardRequests.Begin();
+            var text = Clipboard is { } clipboard ? await clipboard.GetTextAsync() : null;
+            if (_shuttingDown || !pending.IsCurrent) return;
+            var area = Screens.Primary?.WorkingArea;
+            var pointer = area is { } screen
+                ? new ScreenPoint(screen.X + screen.Width / 2d, screen.Y + screen.Height / 2d)
+                : new ScreenPoint(Position.X, Position.Y);
+            var result = string.IsNullOrWhiteSpace(text)
+                ? SelectionResult.Failed(SelectionFailureKind.Empty, "manual-clipboard-empty")
+                : new SelectionResult(text, SelectionSource.ManualClipboard);
+            await ShowSelectionTranslationAsync(new SelectionRequest(SelectionTrigger.TrayCommand, pointer), result);
+        }
+        catch (Exception exception)
+        {
+            System.Diagnostics.Trace.TraceError("Clipboard translation failed: {0}", exception.GetType().Name);
+        }
+    }
+
     private readonly HashSet<TranslationPopupWindow> _popups = new();
     private readonly HashSet<QuestionAnswerWindow> _conversations = new();
     private readonly Dictionary<TranslationPopupWindow, PopupSession> _sessions = new();
@@ -170,7 +210,7 @@ public sealed partial class MainWindow
         {
             if (Clipboard is { } clipboard)
                 await clipboard.SetTextAsync(_performance.CreateReport(_settings.UiLanguage == "zh-CN") + "\n\n"
-                    + (_windowsRuntime?.CreateDiagnostics(_settings.UiLanguage == "zh-CN")
+                    + (_selectionRuntime?.CreateDiagnostics(_settings.UiLanguage == "zh-CN")
                     ?? Localize("Input capture is unavailable.", "划词捕获不可用。")));
         }
         catch { }
@@ -185,7 +225,8 @@ public sealed partial class MainWindow
 
     internal async void ShowAbout()
     {
-        try { await ShowMessageAsync("Yita · 译獭\n" + Localize("Windows Avalonia preview", "Windows Avalonia 预览版")); }
+        try { await ShowMessageAsync("Yita · 译獭\n" + new DesktopPlatformServices().PlatformName
+            + Localize(" Avalonia preview", " Avalonia 预览版")); }
         catch { }
     }
 
@@ -193,8 +234,14 @@ public sealed partial class MainWindow
     {
         if (_shuttingDown) return;
         _shuttingDown = true;
+        if (_selectionRuntime is not null)
+        {
+            _selectionRuntime.SelectionCaptured -= OnSelectionCaptured;
+            _selectionRuntime.ExternalPointerPressed -= OnExternalPointerPressed;
+        }
         _connectionRequests.Dispose();
         _summaryRequests.Dispose();
+        _clipboardRequests.Dispose();
         foreach (var popup in _popups.ToArray()) popup.Close();
         foreach (var conversation in _conversations.ToArray()) conversation.Close();
         (_providerFactory as IDisposable)?.Dispose();

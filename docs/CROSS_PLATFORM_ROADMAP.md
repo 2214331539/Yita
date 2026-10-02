@@ -1,6 +1,6 @@
 # Yita 跨平台产品开发路线图
 
-更新日期：2026-10-02。状态：计划已制定；以下未完成阶段尚未实施。当前代码事实见 [技术架构](ARCHITECTURE.md)，已完成的 Windows 验收见 [验收记录](WINDOWS_AVALONIA_ACCEPTANCE.md)。
+更新日期：2026-10-02。状态：`codex/platform-host-services` 已完成阶段 B 的宿主接口与单实例接入，尚未合入 `main`；平台安全存储和 Mac 原生取词仍待完成。维护者确认朋友已验收旧 WPF 安装版的安装与取词，并要求暂缓新版打包、优先继续平台开发。该反馈不作为 Avalonia Setup 的验收证据。当前代码事实见 [技术架构](ARCHITECTURE.md)，已完成的 Windows 验收见 [验收记录](WINDOWS_AVALONIA_ACCEPTANCE.md)。
 
 ## 产品目标与边界
 
@@ -18,7 +18,8 @@
 
 | 能力 | 当前证据 | 尚缺工作 |
 | --- | --- | --- |
-| Windows 取词与阅读 | UIA 隔离、原生控件、复制回退、浮窗与托盘已接入；本机 WPS PDF 等已验收 | 多电脑、更多目标软件、安装后兼容性与长期运行 |
+| Windows 取词与阅读 | UIA 隔离、原生控件、复制回退、浮窗与托盘已接入；本机 WPS PDF 等已验收；朋友验收了旧 WPF 安装版 | 新 Avalonia 版的多电脑、更多目标软件、安装后兼容性与长期运行 |
+| 平台宿主接入 | 功能分支已通过共享接口连接窗口、原生事件、托盘与启动项；跨平台单实例/唤醒有实现和 Windows 实测 | 合入主线、Mac 环境构建与实测、Mac 登录启动和原生取词服务 |
 | 共享翻译与功能 | Core 复用原版提供器、SSE、取消、缓存、解释/问答和记录；Avalonia UI 已还原 | 保持回归，补齐跨平台宿主和存储依赖 |
 | Windows 分发 | 当前只能使用源码构建入口；旧 Release 是 WPF | Avalonia 自包含发布、helper 配套、新版 Setup、安装升级 |
 | macOS UI 与存储 | 项目与构建工作流已存在；Keychain 有待真机验证的实现 | 应用生命周期、原生取词、权限、菜单栏、修正数据加密 |
@@ -47,7 +48,7 @@
 | D | 双端兼容性与阅读体验达到试用标准 | `codex/cross-platform-polish` | C 已在交互式 Mac 环境实际运行 |
 | E | 双端安装、版本检查、升级及正式 Release | `codex/cross-platform-distribution` | D 的核心场景通过，签名与分发条件就绪 |
 
-这是实施顺序，不是固定日期承诺。Mac 环境和签名条件未满足时，可继续 Windows 分发、共享接口及协议测试，但不能宣称 Mac 原生功能已完成。
+这是默认实施顺序，不是固定日期承诺。按维护者最新安排，阶段 A 的打包与发布暂缓，先推进 B；阶段 A 的正式支持工具链、许可与安装验收要求仍需在正式分发前完成。Mac 环境和签名条件未满足时，可继续共享接口及协议测试，但不能宣称 Mac 原生功能已完成。
 
 ## 阶段 A：Windows 安装与发布基线
 
@@ -84,6 +85,20 @@
 - 设置增加 schema 版本和迁移测试，保存保持原子性；不同平台的数据目录、启动项和支持状态明确。双端使用不等于将 Windows DPAPI 文件复制到 Mac 后即可解密。
 
 验收：Windows 原有链路和 UI 回归通过；Desktop 可用可控的原生事件驱动同一浮窗；不支持的服务返回可读状态，而非假装成功。
+
+### B1. 宿主与单实例检查点
+
+`codex/platform-host-services` 的本批交付：
+
+- Core 增加 `ISelectionRuntime`、共享选区事件、`ISingleInstanceGuard`、`IStartupRegistration` 与 `IStatusIcon`。现有 Windows 实现遵循这些接口，不改写 UIA、复制或鼠标手势算法。
+- Desktop 通过 `DesktopPlatformServices` 选择平台实现。设置窗口直接订阅共享输入事件，将后台事件派发到 UI，并在退出时解除订阅；排队的旧事件无法重新打开已关闭的服务。
+- 非 Windows 宿主接入 `PortableSingleInstanceGuard`，使用保留的锁文件与当前用户专用的命名管道。接收通道在创建时开始监听，窗口尚未准备好时保留待唤醒状态，发送/读取均有超时。
+- 无原生输入服务时，可以从平台菜单手动翻译现有剪贴板，定位暂用主屏中心；没有实现 Mac 全局快捷键、自动复制或鼠标附近定位。暂停自动划词不影响手动翻译。
+- 非 Windows 菜单补充剪贴板翻译、诊断与关于入口并同步语言；没有输入服务时禁用自动划词菜单项，没有登录启动实现时禁用对应设置。
+- 本机 Release 构建通过；344 项自动化通过（Core 32、原版业务 258、Windows 适配 22、Desktop 32）。实际跨进程锁定与唤醒、真实 Windows UIA/Ctrl+C/剪贴板恢复/托盘/快捷键 smoke 通过；没有调用真实翻译 API。
+- 新增 `tools/Yita.PlatformSmoke`，Windows/macOS CI 执行不需要 GUI 授权的单实例跨进程检查。CI 结果需按实际运行状态记录，不替代 Mac 权限和桌面应用验收。
+
+下一批 B2：设置 schema 与迁移/降级保护、Mac Keychain 可靠性与修正数据保护、缺失平台能力的明确状态。B2 完成后再接入 AX/helper；本次没有将阶段 B 或 Mac 产品标记为全部完成。
 
 ## 阶段 C：macOS 原生链路
 
@@ -169,7 +184,8 @@
 - [ ] A1：在 `codex/windows-avalonia-release` 完成 .NET 10 LTS 升级及相关回归。
 - [ ] A2：新版自包含 publish、helper、许可清单与 Yita Setup。
 - [ ] A3：干净 Windows 安装/升级/卸载和不同电脑的划词验证。
-- [ ] B：平台宿主与安全存储接入，Windows 行为不回退。
+- [x] B1：宿主接口、Windows 接入、跨平台单实例及手动剪贴板回退；本机自动化和原生 smoke 通过。
+- [ ] B2：设置迁移、Mac 安全存储与平台能力状态；整个阶段 B 尚未完成。
 - [ ] C：具备 Mac 条件后实现原生链路并完成真实桌面验收。
 - [ ] D：双端兼容性矩阵、性能与阅读体验。
 - [ ] E：双端签名安装包、版本检查、升级与公开 Release。

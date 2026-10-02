@@ -2,14 +2,14 @@ using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
-using Yita.Native.Windows;
+using Yita.Core.Platform;
 
 namespace Yita.Desktop;
 
 public sealed class App : Application
 {
-    private WindowsSelectionRuntime? _windowsRuntime;
-    private WindowsSingleInstanceGuard? _singleInstance;
+    private ISelectionRuntime? _selectionRuntime;
+    private ISingleInstanceGuard? _singleInstance;
     private YitaTrayController? _tray;
     private bool _allowWindowClose;
     private MainWindow? _settingsWindow;
@@ -20,31 +20,28 @@ public sealed class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            if (OperatingSystem.IsWindows())
+            var platform = new DesktopPlatformServices();
+            _singleInstance = platform.AcquireInstance(requestActivation:
+                desktop.Args?.Contains("--background", StringComparer.OrdinalIgnoreCase) != true);
+            if (!_singleInstance.IsOwner)
             {
-                _singleInstance = new WindowsSingleInstanceGuard(requestActivation:
-                    desktop.Args?.Contains("--background", StringComparer.OrdinalIgnoreCase) != true);
-                if (!_singleInstance.IsOwner)
-                {
-                    desktop.Shutdown(0);
-                    return;
-                }
-
-                try
-                {
-                    _windowsRuntime = new WindowsSelectionRuntime();
-                    _windowsRuntime.Start();
-                }
-                catch
-                {
-                    // Another Yita instance may own Ctrl+Shift+T. The UI must
-                    // still open so the user can configure or diagnose it.
-                    _windowsRuntime?.Dispose();
-                    _windowsRuntime = null;
-                }
+                _singleInstance.Dispose();
+                _singleInstance = null;
+                desktop.Shutdown(0);
+                return;
+            }
+            try
+            {
+                _selectionRuntime = platform.CreateSelectionRuntime();
+                _selectionRuntime?.Start();
+            }
+            catch
+            {
+                _selectionRuntime?.Dispose();
+                _selectionRuntime = null;
             }
 
-            var mainWindow = new MainWindow(_windowsRuntime);
+            var mainWindow = new MainWindow(_selectionRuntime, startupRegistration: platform.Startup);
             _settingsWindow = mainWindow;
             desktop.MainWindow = mainWindow;
             mainWindow.UiLanguageChanged += (_, language) => _tray?.ApplyUiLanguage(language);
@@ -61,23 +58,6 @@ public sealed class App : Application
                 args.Cancel = true;
                 mainWindow.Hide();
             };
-            if (_windowsRuntime is not null)
-            {
-                _windowsRuntime.ExternalPointerPressed += (_, _) =>
-                    Avalonia.Threading.Dispatcher.UIThread.Post(mainWindow.DismissUnpinnedWindows);
-                _windowsRuntime.SelectionCaptured += (_, args) =>
-                    Avalonia.Threading.Dispatcher.UIThread.Post(
-                        async () =>
-                        {
-                            try { await mainWindow.ShowSelectionTranslationAsync(args.Request, args.Result); }
-                            catch (Exception exception)
-                            {
-                                // Native events enter through async void; presentation failures
-                                // must not escape onto the UI dispatcher or log selected text.
-                                System.Diagnostics.Trace.TraceError("Selection presentation failed: {0}", exception.GetType().Name);
-                            }
-                        });
-            }
             try
             {
                 _tray = new YitaTrayController(
@@ -92,8 +72,10 @@ public sealed class App : Application
                         _allowWindowClose = true;
                         desktop.Shutdown(0);
                     },
-                    mainWindow.IsSelectionTranslationEnabled, _windowsRuntime,
-                    mainWindow.CopyDiagnostics, mainWindow.ShowAbout);
+                    mainWindow.IsSelectionTranslationEnabled, _selectionRuntime,
+                    mainWindow.CopyDiagnostics, mainWindow.ShowAbout,
+                    translateClipboard: mainWindow.TranslateClipboardFromTray,
+                    createStatusIcon: platform.CreateStatusIcon);
             }
             catch
             {
@@ -113,7 +95,7 @@ public sealed class App : Application
                 mainWindow.ShutdownServices();
                 _tray?.Dispose();
                 _tray = null;
-                _windowsRuntime?.Dispose();
+                _selectionRuntime?.Dispose();
                 _singleInstance?.Dispose();
             };
         }
