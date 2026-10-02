@@ -64,3 +64,7 @@ jobs:
       - name: Verify AX selection policy against deterministic fixtures
         if: runner.os == 'macOS'
         run: src/Yita.Desktop/bin/Release/net8.0/Yita.Native.Mac.Helper.app/Contents/MacOS/Yita.Native.Mac.Helper --selection-self-test
+
+      - name: Verify clipboard transactions without touching the system pasteboard
+        if: runner.os == 'macOS'
+        run: src/Yita.Desktop/bin/Release/net8.0/Yita.Native.Mac.Helper.app/Contents/MacOS/Yita.Native.Mac.Helper --clipboard-self-test

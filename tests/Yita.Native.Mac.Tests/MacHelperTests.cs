@@ -134,10 +134,11 @@ public sealed class MacHelperTests
 
     [Theory]
     [InlineData("{\"id\":\"r\",\"status\":\"ok\"}")]
-    [InlineData("{\"version\":1,\"id\":\"r\",\"status\":\"ok\",\"permissions\":{},\"capabilities\":{}}")]
-    [InlineData("{\"version\":1,\"id\":\"r\",\"status\":\"ok\",\"selection\":{\"source\":99}}")]
-    [InlineData("{\"version\":1,\"id\":\"r\",\"status\":\"ok\",\"selection\":{\"text\":\"private\",\"failure\":\"none\"}}")]
-    [InlineData("{\"version\":1,\"id\":\"r\",\"status\":\"ok\",\"selection\":{\"source\":\"accessibility\"}}")]
+    [InlineData("{\"version\":2,\"id\":\"r\",\"status\":\"ok\",\"permissions\":{},\"capabilities\":{}}")]
+    [InlineData("{\"version\":2,\"id\":\"r\",\"status\":\"ok\",\"selection\":{\"source\":99}}")]
+    [InlineData("{\"version\":2,\"id\":\"r\",\"status\":\"ok\",\"selection\":{\"text\":\"private\",\"failure\":\"none\"}}")]
+    [InlineData("{\"version\":2,\"id\":\"r\",\"status\":\"ok\",\"selection\":{\"source\":\"accessibility\"}}")]
+    [InlineData("{\"version\":2,\"id\":\"r\",\"status\":\"ok\",\"permissions\":{\"accessibility\":true,\"inputMonitoring\":false}}")]
     [InlineData("null")]
     [InlineData("[]")]
     public void MissingVersionPermissionFieldsAndUnknownEnumValuesAreRejected(string json)
@@ -148,7 +149,7 @@ public sealed class MacHelperTests
     [Fact]
     public void MissingSelectionInvalidBoundsAndManualClipboardSourcesAreRejected()
     {
-        var response = new MacHelperResponse { Version = 1, Id = "request", Status = "ok" };
+        var response = new MacHelperResponse { Version = MacHelperProtocol.Version, Id = "request", Status = "ok" };
         Assert.Throws<MacHelperProtocolException>(() => MacHelperProtocol.ValidateResponse(response, "request", "readSelection"));
         foreach (var selection in new[]
         {
@@ -194,14 +195,103 @@ public sealed class MacHelperTests
         Assert.Null(helper.Request);
     }
 
+    [Theory]
+    [InlineData("copy-pending")]
+    [InlineData("copy-partial")]
+    public async Task ClipboardCancellationDrainsTheOriginalFrameAndReusesTheCleanHelper(string mode)
+    {
+        var starts = 0;
+        using var client = new MacHelperClient(() => { starts++; return Peer.CreatePeerStartInfo(mode, RuntimeConfig); });
+        Assert.Equal(NativeServiceState.Available, (await client.SendAsync("permissions")).State);
+        using var cancel = new CancellationTokenSource(TimeSpan.FromMilliseconds(150));
+        var request = new SelectionRequest(SelectionTrigger.MouseGesture, new ScreenPoint(10, 20));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => client.SendAsync("readSelection", request, cancel.Token, allowClipboardFallback: true));
+        Assert.Equal(NativeServiceState.Available, (await client.SendAsync("permissions")).State);
+        Assert.Equal(1, starts);
+    }
+
+    [Fact]
+    public async Task ClipboardTimeoutWaitsForCancellationCleanupBeforeTheNextRequest()
+    {
+        using var client = Client("copy-pending", TimeSpan.FromMilliseconds(800));
+        Assert.Equal(NativeServiceState.Available, (await client.SendAsync("permissions")).State);
+        var result = await client.SendAsync("readSelection", new(SelectionTrigger.MouseGesture, new ScreenPoint(10, 20)), allowClipboardFallback: true);
+        Assert.Equal(NativeServiceState.Timeout, result.State);
+        Assert.Equal(NativeServiceState.Available, (await client.SendAsync("permissions")).State);
+    }
+
+    [Fact]
+    public async Task DisposalDuringClipboardWorkSignalsEOFAndCompletesPendingCalls()
+    {
+        using var client = Client("copy-pending");
+        Assert.Equal(NativeServiceState.Available, (await client.SendAsync("permissions")).State);
+        var pending = client.SendAsync("readSelection", new(SelectionTrigger.MouseGesture, new ScreenPoint(10, 20)), allowClipboardFallback: true);
+        await Task.Delay(50);
+        client.Dispose();
+        Assert.Equal(NativeServiceState.Unavailable, (await pending.WaitAsync(TimeSpan.FromSeconds(3))).State);
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => client.SendAsync("permissions"));
+    }
+
+    [Fact]
+    public async Task AdapterRequiresExplicitClipboardFallbackOptIn()
+    {
+        using var helper = new SelectionHelper(new SelectionResult("copied text", SelectionSource.ClipboardFallback));
+        using var adapter = new MacSelectionAdapter(helper);
+        var request = new SelectionRequest(SelectionTrigger.MouseGesture, new ScreenPoint(10, 20));
+        Assert.False((await adapter.ReadAsync(request)).Succeeded);
+        Assert.False(helper.ClipboardAllowed);
+        Assert.True((await adapter.ReadAsync(request, allowClipboardFallback: true)).Succeeded);
+        Assert.True(helper.ClipboardAllowed);
+    }
+
+    [Fact]
+    public void ClipboardResponsesCannotClaimContextOrUseAnUnrequestedCopy()
+    {
+        var response = new MacHelperResponse
+        {
+            Version = MacHelperProtocol.Version, Id = "request", Status = "ok",
+            Selection = new SelectionResult("text", SelectionSource.ClipboardFallback),
+        };
+        Assert.Throws<MacHelperProtocolException>(() => MacHelperProtocol.ValidateResponse(response, "request", "readSelection"));
+        MacHelperProtocol.ValidateResponse(response, "request", "readSelection", allowClipboardFallback: true);
+        Assert.Throws<MacHelperProtocolException>(() => MacHelperProtocol.ValidateResponse(response with
+        { Selection = response.Selection with { Context = "unrelated" } }, "request", "readSelection", allowClipboardFallback: true));
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    public async Task ClipboardPermissionRequiresEventPosting(bool posting, bool expected)
+    {
+        using var helper = new PermissionHelper(posting);
+        using var adapter = new MacSelectionAdapter(helper);
+        Assert.Equal(expected, (await adapter.GetStatusAsync()).Permissions.ClipboardFallback);
+    }
+
+    private sealed class PermissionHelper(bool posting) : IMacHelperClient
+    {
+        public Task<MacHelperExchange> SendAsync(string command, SelectionRequest? selection = null,
+            CancellationToken cancellationToken = default, bool allowClipboardFallback = false) => Task.FromResult(new MacHelperExchange(
+                NativeServiceState.Available, new MacHelperResponse
+                {
+                    Version = MacHelperProtocol.Version, Id = "test", Status = "ok",
+                    Permissions = new MacHelperPermissions { Accessibility = true, InputMonitoring = false, EventPosting = posting },
+                    Capabilities = new MacHelperCapabilities { Selection = true, ClipboardFallback = true, GlobalInput = false },
+                }));
+        public void Dispose() { }
+    }
+
     private sealed class SelectionHelper(SelectionResult result) : IMacHelperClient
     {
         public SelectionRequest? Request { get; private set; }
-        public Task<MacHelperExchange> SendAsync(string command, SelectionRequest? selection = null, CancellationToken cancellationToken = default)
+        public bool ClipboardAllowed { get; private set; }
+        public Task<MacHelperExchange> SendAsync(string command, SelectionRequest? selection = null, CancellationToken cancellationToken = default,
+            bool allowClipboardFallback = false)
         {
             Request = selection;
+            ClipboardAllowed = allowClipboardFallback;
             return Task.FromResult(new MacHelperExchange(NativeServiceState.Available,
-                new MacHelperResponse { Version = 1, Id = "test", Status = "ok", Selection = result }));
+                new MacHelperResponse { Version = MacHelperProtocol.Version, Id = "test", Status = "ok", Selection = result }));
         }
         public void Dispose() { }
     }

@@ -14,10 +14,11 @@ Swift/AppKit helper 已在 `../Yita.Native.Mac.Helper` 实现权限检查和授�
 
 后续通过同一 helper 接入：
 
-1. 读取失败后以 Cmd+C + NSPasteboard changeCount 执行安全回退；
-2. 使用 Carbon/CGEvent 处理全局快捷键和鼠标事件；
-3. 坐标转换、来源身份和 `ISelectionRuntime` 接入 Desktop；
-4. 使用 NSStatusItem 提供菜单栏入口；
-5. 检查 Accessibility 与 Input Monitoring 权限变化，并返回可诊断状态。
+1. 使用 Carbon/CGEvent 处理全局快捷键和鼠标事件；
+2. 坐标转换、来源身份和 `ISelectionRuntime` 接入 Desktop；
+3. 使用 NSStatusItem 提供菜单栏入口；
+4. 检查 Accessibility 与 Input Monitoring 权限变化，并返回可诊断状态。
+
+Cmd+C 回退代码已实现，默认读取仍只使用 AX，调用方必须显式启用复制。helper 协议 2 区分事件投递权限，保存多项/多格式已物化字节，校验前台/焦点和剪贴板变化，清理原序列时恢复内容。取消先收尾，EOF/父进程退出同样标记取消。新 helper 不与尚在清理的旧 helper 并发。系统 pasteboard 不能原子比较并写入，也不能验证实际复制所有者；真实权限、复制格式和应用兼容性仍需验收。详见 [Mac Cmd+C 回退](../../docs/MAC_CLIPBOARD_FALLBACK.md)。
 
 helper 必须签名并设置 watchdog；AX provider 异常、超时或权限拒绝只能返回失败结果，不能关闭 Yita 主进程。

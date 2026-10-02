@@ -38,7 +38,11 @@ public static class Program
                 "Typed selection failures distinguish unsupported readers from denied permissions");
             var action = await client.SendAsync("requestAccessibility");
             Check(action.DiagnosticCode == "mac-helper-self-test-action-disabled", "Self-test never requests Accessibility authorization");
-            if (args.Length != 0) await VerifySwiftSelectionFixtureAsync(args[1]);
+            if (args.Length != 0)
+            {
+                await VerifySwiftSelectionFixtureAsync(args[1]);
+                await VerifySwiftClipboardFixtureAsync(args[1]);
+            }
             Console.WriteLine("Mac helper protocol smoke passed. No desktop selection, GUI authorization, clipboard, Keychain or API access.");
             return 0;
         }
@@ -75,6 +79,49 @@ public static class Program
             && stale.DiagnosticCode == "mac-helper-ax-target-changed", "Changed target identities return typed cancellation without text");
     }
 
+    private static async Task VerifySwiftClipboardFixtureAsync(string path)
+    {
+        var starts = 0;
+        ProcessStartInfo Start()
+        {
+            starts++;
+            var info = new ProcessStartInfo(path);
+            info.ArgumentList.Add("--self-test");
+            info.ArgumentList.Add("--selection-fixture");
+            info.ArgumentList.Add("clipboard-slow");
+            return info;
+        }
+        using var client = new MacHelperClient(Start);
+        using var adapter = new MacSelectionAdapter(client);
+        var request = new SelectionRequest(SelectionTrigger.TranslateShortcut, new ScreenPoint(-700, 150), ForegroundProcessId: 42);
+        Check((await adapter.ReadAsync(request)).Failure == SelectionFailureKind.UnsupportedApplication,
+            "Clipboard simulation is unavailable without explicit fallback opt-in");
+        var selection = await adapter.ReadAsync(request, allowClipboardFallback: true);
+        Check(selection.Succeeded && selection.Source == SelectionSource.ClipboardFallback && selection.Text == "copied selection",
+            "Swift copy fixture restores every format before returning success");
+        Check(selection.Context is null && selection.Bounds is null, "Copied text has no unrelated context or invented AX bounds");
+        using var cancel = new CancellationTokenSource(TimeSpan.FromMilliseconds(150));
+        try
+        {
+            await adapter.ReadAsync(request, allowClipboardFallback: true, cancellationToken: cancel.Token);
+            Check(false, "Clipboard cancellation is propagated");
+        }
+        catch (OperationCanceledException) { Check(true, "Clipboard cancellation finishes Swift cleanup before propagating"); }
+        Check((await adapter.GetStatusAsync()).Service == NativeServiceState.Available && starts == 1,
+            "The helper remains usable after canceled clipboard cleanup");
+        using var closingClient = new MacHelperClient(Start);
+        var permission = await closingClient.SendAsync("permissions");
+        Check(permission.Response?.ProcessId is > 0, "Swift fixture exposes its helper PID for exit verification");
+        using var child = Process.GetProcessById(permission.Response!.ProcessId!.Value);
+        var pending = closingClient.SendAsync("readSelection", request, allowClipboardFallback: true);
+        await Task.Delay(150);
+        closingClient.Dispose();
+        Check((await pending.WaitAsync(TimeSpan.FromSeconds(3))).State == NativeServiceState.Unavailable,
+            "Disposal cancels pending clipboard work through stdin EOF");
+        await child.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(3));
+        Check(child.ExitCode == 0, "Swift finishes fixture restoration and exits cleanly after EOF");
+    }
+
     public static ProcessStartInfo CreatePeerStartInfo(string mode, string? runtimeConfig = null)
     {
         var host = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH");
@@ -106,7 +153,7 @@ public static class Program
         }
         await EmitAsync(new
         {
-            version = mode == "wrong-version" ? 2 : MacHelperProtocol.Version,
+            version = mode == "wrong-version" ? MacHelperProtocol.Version - 1 : MacHelperProtocol.Version,
             id = "ready", status = "ready",
             bundleIdentifier = mode == "wrong-bundle" ? "unrelated.helper" : MacHelperProtocol.BundleIdentifier,
             processId = mode == "wrong-pid" ? Environment.ProcessId + 1 : Environment.ProcessId,
@@ -116,6 +163,26 @@ public static class Program
             using var document = JsonDocument.Parse(line);
             var id = document.RootElement.GetProperty("id").GetString();
             var command = document.RootElement.GetProperty("command").GetString();
+            if (command == "cancelSelection") continue;
+            if (command == "readSelection" && (mode is "copy-pending" or "copy-partial")
+                && document.RootElement.GetProperty("allowClipboardFallback").GetBoolean())
+            {
+                var cancelled = JsonSerializer.Serialize(new MacHelperResponse
+                {
+                    Version = MacHelperProtocol.Version, Id = id!, Status = "ok",
+                    Selection = SelectionResult.Failed(SelectionFailureKind.Cancelled, "selection-cancelled"),
+                }, MacHelperProtocol.JsonOptions);
+                var split = mode == "copy-partial" ? cancelled.Length / 2 : 0;
+                if (split != 0) { await Console.Out.WriteAsync(cancelled[..split]); await Console.Out.FlushAsync(); }
+                if (await Console.In.ReadLineAsync() is not { } controlLine) return 0;
+                using var control = JsonDocument.Parse(controlLine);
+                if (control.RootElement.GetProperty("command").GetString() != "cancelSelection"
+                    || control.RootElement.GetProperty("id").GetString() != id) return 8;
+                await Task.Delay(50);
+                await Console.Out.WriteLineAsync(cancelled[split..]);
+                await Console.Out.FlushAsync();
+                continue;
+            }
             if (mode == "hang") { await Task.Delay(Timeout.Infinite); return 0; }
             if (mode == "crash") return 7;
             if (mode == "oversize")
@@ -127,14 +194,14 @@ public static class Program
             }
             if (mode == "invalid-json") { await Console.Out.WriteLineAsync("{invalid"); await Console.Out.FlushAsync(); continue; }
             if (mode == "missing-permissions")
-            { await EmitAsync(new { version = 1, id, status = "ok" }); continue; }
+            { await EmitAsync(new { version = MacHelperProtocol.Version, id, status = "ok" }); continue; }
             if (mode == "private-error")
-            { await EmitAsync(new { version = 1, id, status = "error", diagnosticCode = "private selected text" }); continue; }
+            { await EmitAsync(new { version = MacHelperProtocol.Version, id, status = "error", diagnosticCode = "private selected text" }); continue; }
             var response = new MacHelperResponse
             {
-                Version = 1, Id = mode == "wrong-id" ? "old-response" : id!,
+                Version = MacHelperProtocol.Version, Id = mode == "wrong-id" ? "old-response" : id!,
                 Status = mode == "wrong-status" ? "unexpected" : "ok", ProcessId = Environment.ProcessId,
-                Permissions = new MacHelperPermissions { Accessibility = mode == "selection", InputMonitoring = false },
+                Permissions = new MacHelperPermissions { Accessibility = mode == "selection", InputMonitoring = false, EventPosting = false },
                 Capabilities = new MacHelperCapabilities { Selection = mode == "selection", ClipboardFallback = false, GlobalInput = false },
             };
             if (command == "readSelection") response = mode == "selection"

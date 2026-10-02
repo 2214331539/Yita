@@ -1,6 +1,6 @@
 # Yita 跨平台产品开发路线图
 
-更新日期：2026-10-02。状态：`codex/platform-host-services` 已完成阶段 B 的宿主接口、单实例、设置迁移与 Mac 安全存储实现，以及阶段 C1 的 helper 协议、权限入口和 C2 AX 读取代码准备，尚未合入 `main`；Mac Keychain/AX 真机验证、复制回退和全局输入仍待完成。维护者确认朋友已验收旧 WPF 安装版的安装与取词，并要求暂缓新版打包、优先继续平台开发。该反馈不作为 Avalonia Setup 的验收证据。当前代码事实见 [技术架构](ARCHITECTURE.md)，已完成的 Windows 验收见 [验收记录](WINDOWS_AVALONIA_ACCEPTANCE.md)。
+更新日期：2026-10-02。状态：`codex/platform-host-services` 已完成阶段 B 的宿主接口、单实例、设置迁移与 Mac 安全存储实现，以及阶段 C1 的 helper 协议、权限入口和 C2 AX/复制回退代码准备，尚未合入 `main`；Mac Keychain/取词真机验证、全局输入与 Desktop 自动触发仍待完成。维护者确认朋友已验收旧 WPF 安装版的安装与取词，并要求暂缓新版打包、优先继续平台开发。该反馈不作为 Avalonia Setup 的验收证据。当前代码事实见 [技术架构](ARCHITECTURE.md)，已完成的 Windows 验收见 [验收记录](WINDOWS_AVALONIA_ACCEPTANCE.md)。
 
 ## 产品目标与边界
 
@@ -23,7 +23,7 @@
 | 共享翻译与功能 | Core 复用原版提供器、SSE、取消、缓存、解释/问答和记录；Avalonia UI 已还原 | 保持回归，补齐跨平台宿主和存储依赖 |
 | Windows 分发 | 当前只能使用源码构建入口；旧 Release 是 WPF | Avalonia 自包含发布、helper 配套、新版 Setup、安装升级 |
 | macOS UI 与存储 | 解决方案在 macOS CI 编译与自动化测试通过；原生 Keychain 与 AES-GCM 修正记录已有实现和可控存储测试 | Keychain 真机授权/锁定/签名验证、真实桌面生命周期、原生取词、权限、菜单栏 |
-| macOS 划词 | `MacSelectionAdapter` 已接入隔离 helper 协议与权限状态；`readSelection` 已实现 AX 读取与范围边界代码 | 真实 AX 验收、Cmd+C、全局输入、坐标转换与 Desktop 接入 |
+| macOS 划词 | `MacSelectionAdapter` 已接入隔离 helper、权限、AX/边界与显式 Cmd+C 回退代码 | 真实 AX/复制验收、全局输入、坐标转换与 Desktop 接入 |
 | 更新 | GitHub 已有旧版 Release | 新版发布流水线、版本检查、双端升级与回退 |
 | 许可分发 | 仓库保留 MIT、上游与字体声明；旧 Setup 有许可检查 | 新 Desktop 输出尚未复制声明；新增依赖也需随包附许可 |
 
@@ -139,6 +139,16 @@ helper 协议与权限状态已进入下面的 C1 准备工作。Mac 真机验�
 
 本批提供 AX 读取代码，尚未接入 Mac 输入事件或 Desktop 自动触发；真实应用授权、选区及坐标验收仍暂缓。下一批继续安全 Cmd+C 回退，随后接入全局鼠标/快捷键和宿主坐标转换。
 
+### C2 准备：Cmd+C 剪贴板事务与取消
+
+- helper 协议升级到 2，区分事件投递权限，根请求显式启用复制，默认 AX 读取不会自动发送 Cmd+C。只有 AX 空选区/不支持才进入安全回退。
+- 复制前保存有界的多项/多格式字节，检查前台、焦点、安全祖先、文本角色、修饰键和终端；无法可靠保存时停止复制，保留手动入口。
+- private CGEventSource 向原 PID 投递标记的复制事件。使用 changeCount 单次变化、HID 输入计数、文本/格式稳定和来源检查，在仍为原序列时恢复备份；不携带旧内容或推测的上下文。
+- 取消控制帧可在等待复制时到达。客户端保留原有界读取任务，等待收尾后丢弃旧结果；EOF/父进程退出也先取消收尾，新 helper 等待旧 helper 清理结束。卡死进程仍有有界的结束策略。
+- 本机 Release 构建 0 警告/0 错误、418 项测试通过：Core 47、原版业务 258、Windows 适配 22、Mac 存储/协议 54、Desktop 37。Swift 剪贴板 fixtures 与真实进程取消/退出检查由 macOS CI 验证，结果随后记录。
+
+NSPasteboard 不能原子比较序列并写入，也没有可验证的复制所有者；这套策略不能保证消除所有竞态。它保存已物化数据，不能重建任意 provider；强制终止或时限后才发生的复制也可能无法恢复。真实权限、输入计数、changeCount 与格式行为必须经 Mac 验收后才能标记可用。详见 [Mac Cmd+C 回退](MAC_CLIPBOARD_FALLBACK.md)。下一批接入全局拖选/快捷键与 Desktop，随后验证坐标和菜单栏。
+
 ### C1. helper、权限与输入
 
 - 使用 Swift/Cocoa helper 承载 AX、全局输入和菜单栏；C# 保持业务和 Avalonia UI。helper 在自己的 Cocoa 主循环运行，不把跨进程阻塞放在 UI 回调内。
@@ -226,6 +236,7 @@ helper 协议与权限状态已进入下面的 C1 准备工作。Mac 真机验�
 - [ ] B2 验收：真实 Mac Keychain、重启解密及签名身份检查；整个阶段 B 尚未完成。
 - [x] C1 准备：版本化 helper 协议、子进程隔离与重启限制、权限状态及显式授权入口；本机协议和 Desktop 回归通过。
 - [x] C2 AX 代码：前台来源校验、直接/范围取词、安全控件过滤、结构化失败与边界查询；真实 Mac 验收待恢复。
+- [x] C2 复制代码：显式 Cmd+C、多格式备份、序列/来源检查、取消和 EOF 收尾；真实 Mac 复制验收待恢复。
 - [ ] C：具备 Mac 条件后实现原生链路并完成真实桌面验收。
 - [ ] D：双端兼容性矩阵、性能与阅读体验。
 - [ ] E：双端签名安装包、版本检查、升级与公开 Release。

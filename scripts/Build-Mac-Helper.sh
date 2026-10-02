@@ -14,6 +14,9 @@ xcrun swiftc -swift-version 5 -O -warnings-as-errors -sdk "$sdk_path" \
   -target "$architecture-apple-macos12.0" \
   "$repo_root/src/Yita.Native.Mac.Helper/SelectionReader.swift" \
   "$repo_root/src/Yita.Native.Mac.Helper/SelectionSelfTests.swift" \
+  "$repo_root/src/Yita.Native.Mac.Helper/ClipboardSelectionReader.swift" \
+  "$repo_root/src/Yita.Native.Mac.Helper/ClipboardSelfTests.swift" \
+  "$repo_root/src/Yita.Native.Mac.Helper/HelperRequestControl.swift" \
   "$repo_root/src/Yita.Native.Mac.Helper/main.swift" -o "$helper_binary" \
   -framework AppKit -framework ApplicationServices
 plutil -lint "$helper_app/Contents/Info.plist"

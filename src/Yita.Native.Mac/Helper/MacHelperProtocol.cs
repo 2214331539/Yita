@@ -6,7 +6,7 @@ namespace Yita.Native.Mac;
 
 internal static class MacHelperProtocol
 {
-    internal const int Version = 1;
+    internal const int Version = 2;
     internal const string BundleIdentifier = "com.yita.desktop.native-helper";
     internal const int MaximumRequestBytes = 64_000;
     internal const int MaximumResponseBytes = 256_000;
@@ -40,7 +40,7 @@ internal static class MacHelperProtocol
             throw new MacHelperProtocolException(NativeServiceState.Unavailable);
     }
 
-    internal static void ValidateResponse(MacHelperResponse response, string id, string command)
+    internal static void ValidateResponse(MacHelperResponse response, string id, string command, bool allowClipboardFallback = false)
     {
         if (response.Version != Version) throw new MacHelperProtocolException(NativeServiceState.ProtocolMismatch);
         if (response.Id != id || response.Status is not ("ok" or "error"))
@@ -55,6 +55,7 @@ internal static class MacHelperProtocol
                 || selection.Bounds is { IsValid: false }
                 || (selection.Failure != SelectionFailureKind.None
                     && (selection.Text is not null || selection.Context is not null || selection.Bounds is not null))
+                || (selection.Source == SelectionSource.ClipboardFallback && (!allowClipboardFallback || selection.Context is not null || selection.Bounds is not null))
                 || selection.Source == SelectionSource.ManualClipboard))
             throw new MacHelperProtocolException(NativeServiceState.Unavailable);
     }
@@ -65,16 +66,21 @@ internal static class MacHelperProtocol
             or "ax-permission-denied" or "ax-target-unavailable" or "ax-target-changed"
             or "ax-protected-content" or "ax-timeout" or "ax-unsupported" or "ax-text-limit"
             or "ax-unavailable" or "ax-empty" or "invalid-selection-request"
+            or "selection-cancelled" or "clipboard-permission-denied" or "clipboard-unsafe-target"
+            or "clipboard-snapshot-unavailable" or "clipboard-superseded" or "clipboard-user-input"
+            or "clipboard-copy-timeout" or "clipboard-no-text" or "clipboard-text-limit" or "clipboard-restore-failed"
             or "unsupported-command" or "self-test-action-disabled" => "mac-helper-" + code,
         _ => "mac-helper-operation-failed",
     };
 }
 
-internal sealed record MacHelperRequest(int Version, string Id, string Command, SelectionRequest? Selection = null);
+internal sealed record MacHelperRequest(int Version, string Id, string Command, SelectionRequest? Selection = null,
+    bool AllowClipboardFallback = false);
 internal sealed record MacHelperPermissions
 {
     public required bool Accessibility { get; init; }
     public required bool InputMonitoring { get; init; }
+    public required bool EventPosting { get; init; }
 }
 internal sealed record MacHelperCapabilities
 {
@@ -101,5 +107,6 @@ internal sealed class MacHelperProtocolException(NativeServiceState state) : IOE
 }
 internal interface IMacHelperClient : IDisposable
 {
-    Task<MacHelperExchange> SendAsync(string command, SelectionRequest? selection = null, CancellationToken cancellationToken = default);
+    Task<MacHelperExchange> SendAsync(string command, SelectionRequest? selection = null, CancellationToken cancellationToken = default,
+        bool allowClipboardFallback = false);
 }

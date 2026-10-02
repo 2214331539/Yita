@@ -17,6 +17,7 @@ internal sealed class MacHelperClient : IMacHelperClient
     private readonly object _processGate = new();
     private readonly Queue<long> _starts = new();
     private Worker? _worker;
+    private Task? _clipboardCleanup;
     private volatile bool _disposed;
 
     internal MacHelperClient() : this(FindStartInfo) { }
@@ -29,34 +30,61 @@ internal sealed class MacHelperClient : IMacHelperClient
     }
 
     public async Task<MacHelperExchange> SendAsync(string command, SelectionRequest? selection = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, bool allowClipboardFallback = false)
     {
         if (command is not ("permissions" or "requestAccessibility" or "openAccessibilitySettings" or "readSelection"))
             throw new ArgumentException("Unsupported helper command.", nameof(command));
+        if (allowClipboardFallback && command != "readSelection") throw new ArgumentException("Clipboard fallback requires a selection request.");
         ObjectDisposedException.ThrowIf(_disposed, this);
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _stop);
         deadline.CancelAfter(_requestTimeout);
         var acquired = false;
+        Worker? worker = null;
+        string? id = null;
+        Task<byte[]>? responseRead = null;
+        using var responseStop = new CancellationTokenSource();
+        var completed = false;
         try
         {
             await _requests.WaitAsync(deadline.Token).ConfigureAwait(false);
             acquired = true;
-            var worker = await EnsureWorkerAsync(deadline.Token).ConfigureAwait(false);
-            var id = Guid.NewGuid().ToString("N");
-            var request = JsonSerializer.SerializeToUtf8Bytes(new MacHelperRequest(MacHelperProtocol.Version, id, command, selection),
+            worker = await EnsureWorkerAsync(deadline.Token).ConfigureAwait(false);
+            id = Guid.NewGuid().ToString("N");
+            var request = JsonSerializer.SerializeToUtf8Bytes(new MacHelperRequest(MacHelperProtocol.Version, id, command, selection, allowClipboardFallback),
                 MacHelperProtocol.JsonOptions);
             if (request.Length > MacHelperProtocol.MaximumRequestBytes) throw new ArgumentException("Helper request exceeded the limit.");
-            await worker.Process.StandardInput.BaseStream.WriteAsync(request, deadline.Token).ConfigureAwait(false);
-            await worker.Process.StandardInput.BaseStream.WriteAsync(new byte[] { (byte)'\n' }, deadline.Token).ConfigureAwait(false);
-            await worker.Process.StandardInput.BaseStream.FlushAsync(deadline.Token).ConfigureAwait(false);
-            var response = MacHelperProtocol.Parse(await worker.Reader.ReadAsync(deadline.Token).ConfigureAwait(false));
-            MacHelperProtocol.ValidateResponse(response, id, command);
+            deadline.Token.ThrowIfCancellationRequested();
+            if (allowClipboardFallback)
+            {
+                lock (_processGate)
+                {
+                    ObjectDisposedException.ThrowIf(_disposed, this);
+                    worker.ActiveClipboardRequestId = id;
+                }
+            }
+            // Once a clipboard request starts, send a whole frame before notifying cancellation.
+            using var writeDeadline = CancellationTokenSource.CreateLinkedTokenSource(_stop);
+            writeDeadline.CancelAfter(TimeSpan.FromSeconds(2));
+            var writeToken = allowClipboardFallback ? writeDeadline.Token : deadline.Token;
+            await worker.Process.StandardInput.BaseStream.WriteAsync(request, writeToken).ConfigureAwait(false);
+            await worker.Process.StandardInput.BaseStream.WriteAsync(new byte[] { (byte)'\n' }, writeToken).ConfigureAwait(false);
+            await worker.Process.StandardInput.BaseStream.FlushAsync(writeToken).ConfigureAwait(false);
+            // Wait cancellation leaves the same bounded frame read alive for cleanup.
+            responseRead = worker.Reader.ReadAsync(responseStop.Token);
+            var response = MacHelperProtocol.Parse(await responseRead.WaitAsync(deadline.Token).ConfigureAwait(false));
+            MacHelperProtocol.ValidateResponse(response, id, command, allowClipboardFallback);
+            completed = true;
             return new MacHelperExchange(NativeServiceState.Available, response,
                 response.Status == "error" ? MacHelperProtocol.SafeDiagnostic(response.DiagnosticCode) : null);
         }
         catch (OperationCanceledException)
         {
-            if (acquired) StopWorker();
+            if (acquired)
+            {
+                if (!_disposed && allowClipboardFallback && worker is not null && id is not null && responseRead is not null)
+                    completed = await CancelClipboardRequestAsync(worker, id, responseRead).ConfigureAwait(false);
+                if (!completed) StopWorker();
+            }
             cancellationToken.ThrowIfCancellationRequested();
             return new MacHelperExchange(_disposed ? NativeServiceState.Unavailable : NativeServiceState.Timeout,
                 DiagnosticCode: _disposed ? "mac-helper-stopped" : "mac-helper-timeout");
@@ -79,11 +107,46 @@ internal sealed class MacHelperClient : IMacHelperClient
             cancellationToken.ThrowIfCancellationRequested();
             return new MacHelperExchange(NativeServiceState.Unavailable, DiagnosticCode: "mac-helper-unavailable");
         }
-        finally { if (acquired) _requests.Release(); }
+        finally
+        {
+            if (completed && worker is not null)
+            {
+                lock (_processGate) { worker.ActiveClipboardRequestId = null; }
+            }
+            responseStop.Cancel();
+            if (responseRead is not null) _ = ObserveReadAsync(responseRead);
+            if (acquired) _requests.Release();
+        }
+    }
+
+    private static async Task<bool> CancelClipboardRequestAsync(Worker worker, string id, Task<byte[]> responseRead)
+    {
+        using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        try
+        {
+            var request = JsonSerializer.SerializeToUtf8Bytes(new MacHelperRequest(MacHelperProtocol.Version, id, "cancelSelection"), MacHelperProtocol.JsonOptions);
+            await worker.Process.StandardInput.BaseStream.WriteAsync(request, cleanup.Token).ConfigureAwait(false);
+            await worker.Process.StandardInput.BaseStream.WriteAsync(new byte[] { (byte)'\n' }, cleanup.Token).ConfigureAwait(false);
+            await worker.Process.StandardInput.BaseStream.FlushAsync(cleanup.Token).ConfigureAwait(false);
+            var response = MacHelperProtocol.Parse(await responseRead.WaitAsync(cleanup.Token).ConfigureAwait(false));
+            MacHelperProtocol.ValidateResponse(response, id, "readSelection", allowClipboardFallback: true);
+            return true;
+        }
+        catch (Exception exception) when (exception is IOException or OperationCanceledException or InvalidOperationException or Win32Exception)
+        { return false; }
+    }
+
+    private static async Task ObserveReadAsync(Task<byte[]> task)
+    {
+        try { await task.ConfigureAwait(false); }
+        catch (Exception exception) when (exception is IOException or OperationCanceledException or ObjectDisposedException) { }
     }
 
     private async Task<Worker> EnsureWorkerAsync(CancellationToken cancellationToken)
     {
+        Task? cleanup;
+        lock (_processGate) { cleanup = _clipboardCleanup; }
+        if (cleanup is not null) await cleanup.WaitAsync(cancellationToken).ConfigureAwait(false);
         Worker worker;
         lock (_processGate)
         {
@@ -124,8 +187,34 @@ internal sealed class MacHelperClient : IMacHelperClient
     private void StopWorker()
     {
         Worker? worker;
-        lock (_processGate) { worker = _worker; _worker = null; }
-        if (worker is null) return;
+        lock (_processGate)
+        {
+            worker = _worker;
+            _worker = null;
+            if (worker is null) return;
+            if (worker.ActiveClipboardRequestId is not null)
+            {
+                _clipboardCleanup = FinishClipboardWorkerAsync(worker);
+                return;
+            }
+        }
+        KillWorker(worker);
+    }
+
+    private static async Task FinishClipboardWorkerAsync(Worker worker)
+    {
+        try
+        {
+            worker.Process.StandardInput.Close();
+            using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+            await worker.Process.WaitForExitAsync(cleanup.Token).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is IOException or OperationCanceledException or InvalidOperationException or Win32Exception) { }
+        finally { KillWorker(worker); }
+    }
+
+    private static void KillWorker(Worker worker)
+    {
         try { if (!worker.Process.HasExited) worker.Process.Kill(entireProcessTree: true); }
         catch (Exception exception) when (exception is InvalidOperationException or Win32Exception) { }
         finally { worker.Process.Dispose(); }
@@ -153,5 +242,8 @@ internal sealed class MacHelperClient : IMacHelperClient
         // Pending exchanges may still hold the managed semaphore.
     }
 
-    private sealed record Worker(Process Process, BoundedJsonLineReader Reader);
+    private sealed record Worker(Process Process, BoundedJsonLineReader Reader)
+    {
+        internal string? ActiveClipboardRequestId { get; set; }
+    }
 }

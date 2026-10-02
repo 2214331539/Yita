@@ -1,13 +1,14 @@
 import Foundation
 
-private struct FixtureElement {
+struct FixtureElement {
     var text: String? = "hello"
     var range: CFRange? = CFRange(location: 0, length: 5)
     var parent: Int?
     var protected = false
+    var copyEligible = true
 }
 
-private final class FixtureAXAccess: AXSelectionAccess {
+final class FixtureAXAccess: AXSelectionAccess {
     typealias Element = Int
     var trusted = true
     var ownTarget = false
@@ -48,6 +49,7 @@ private final class FixtureAXAccess: AXSelectionAccess {
     }
     func bounds(_ element: Int, range: CFRange) throws -> SelectionRectangle? { rectangle }
     func characterCount(_ element: Int) throws -> Int? { (document as NSString).length }
+    func allowsCopy(_ element: Int) throws -> Bool { elements[element]?.copyEligible == true }
 }
 
 private struct SelectionAssertion: Error { let message: String }

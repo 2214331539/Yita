@@ -41,7 +41,7 @@ struct NativeSelectionRequest: Decodable {
 
 struct NativeSelection: Encodable {
     var text: String?
-    let source = "accessibility"
+    var source = "accessibility"
     var bounds: SelectionRectangle?
     var failure = "none"
     var diagnosticCode: String?
@@ -53,13 +53,13 @@ struct NativeSelection: Encodable {
 }
 
 enum SelectionReadError: Error {
-    case permissionDenied, noTarget, targetChanged, protectedContent, timeout, unsupported, textLimit, invalidRequest, unavailable, empty
+    case permissionDenied, noTarget, targetChanged, protectedContent, timeout, unsupported, textLimit, invalidRequest, unavailable, empty, cancelled
 
     var failure: String {
         switch self {
         case .permissionDenied: return "permissionDenied"
         case .noTarget, .unsupported: return "unsupportedApplication"
-        case .targetChanged, .textLimit: return "cancelled"
+        case .targetChanged, .textLimit, .cancelled: return "cancelled"
         case .protectedContent: return "protectedContent"
         case .timeout: return "timeout"
         case .invalidRequest, .unavailable: return "unknown"
@@ -79,6 +79,7 @@ enum SelectionReadError: Error {
         case .invalidRequest: return "invalid-selection-request"
         case .unavailable: return "ax-unavailable"
         case .empty: return "ax-empty"
+        case .cancelled: return "selection-cancelled"
         }
     }
 }
@@ -104,6 +105,27 @@ protocol AXSelectionAccess {
     func text(_ element: Element, range: CFRange) throws -> String?
     func bounds(_ element: Element, range: CFRange) throws -> SelectionRectangle?
     func characterCount(_ element: Element) throws -> Int?
+    func allowsCopy(_ element: Element) throws -> Bool
+}
+
+func inspectSelectionPaths<Access: AXSelectionAccess>(_ access: Access, origins: [Access.Element],
+    check: () throws -> Void) throws -> [Access.Element] {
+    var candidates: [Access.Element] = []
+    for origin in origins {
+        var current: Access.Element? = origin
+        var path: [Access.Element] = []
+        for _ in 0..<16 {
+            guard let element = current else { break }
+            guard !path.contains(where: { access.sameElement($0, element) }) else { throw SelectionReadError.unsupported }
+            try check()
+            path.append(element)
+            if try access.isProtected(element) { throw SelectionReadError.protectedContent }
+            if !candidates.contains(where: { access.sameElement($0, element) }) { candidates.append(element) }
+            current = try access.parent(of: element)
+        }
+        if current != nil { throw SelectionReadError.unsupported }
+    }
+    return candidates
 }
 
 // The same selection policy runs against AX and deterministic CI fixtures.
@@ -111,13 +133,16 @@ final class AXSelectionReader<Access: AXSelectionAccess> {
     private let access: Access
     private let now: () -> TimeInterval
     private let budget: TimeInterval
+    private let isCancelled: () -> Bool
     private let maximumTextLength = 20_000
 
     init(access: Access, budget: TimeInterval = 1.2,
-         now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }) {
+         now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
+         isCancelled: @escaping () -> Bool = { false }) {
         self.access = access
         self.budget = budget
         self.now = now
+        self.isCancelled = isCancelled
     }
 
     func read(_ request: NativeSelectionRequest) -> NativeSelection {
@@ -136,6 +161,7 @@ final class AXSelectionReader<Access: AXSelectionAccess> {
         }
         let deadline = now() + budget
         func checkTarget() throws {
+            guard !isCancelled() else { throw SelectionReadError.cancelled }
             guard now() < deadline else { throw SelectionReadError.timeout }
             guard access.isTrusted() else { throw SelectionReadError.permissionDenied }
             guard access.frontmostTarget() == target else { throw SelectionReadError.targetChanged }
@@ -144,23 +170,8 @@ final class AXSelectionReader<Access: AXSelectionAccess> {
         try checkTarget()
         let focused = try access.focusedElement()
         let hit = request.trigger == .mouseGesture ? try access.element(at: request.pointer) : nil
-        var candidates: [Access.Element] = []
         // Inspect both paths for protected ancestors before reading any text.
-        for origin in [focused, hit].compactMap({ $0 }) {
-            var current: Access.Element? = origin
-            var path: [Access.Element] = []
-            for _ in 0..<16 {
-                guard let element = current else { break }
-                guard !path.contains(where: { access.sameElement($0, element) }) else { throw SelectionReadError.unsupported }
-                try checkTarget()
-                path.append(element)
-                if try access.isProtected(element) { throw SelectionReadError.protectedContent }
-                if !candidates.contains(where: { access.sameElement($0, element) }) { candidates.append(element) }
-                current = try access.parent(of: element)
-            }
-            // If the bounded ancestor walk cannot establish a safe root, stop.
-            if current != nil { throw SelectionReadError.unsupported }
-        }
+        let candidates = try inspectSelectionPaths(access, origins: [focused, hit].compactMap({ $0 }), check: checkTarget)
         guard !candidates.isEmpty else { throw SelectionReadError.unsupported }
         var foundSelectionAttribute = false
         for element in candidates {
@@ -279,6 +290,13 @@ final class SystemAXSelectionAccess: AXSelectionAccess {
         let value = try attribute(element, kAXNumberOfCharactersAttribute as CFString) as? NSNumber
         guard let count = value?.intValue, count >= 0 else { return nil }
         return count
+    }
+    func allowsCopy(_ element: AXUIElement) throws -> Bool {
+        let role = try attribute(element, kAXRoleAttribute as CFString) as? String
+        if ["AXTextField", "AXTextArea", "AXStaticText", "AXWebArea", "AXDocument", "AXPDFView"].contains(role ?? "") { return true }
+        let bundle = frontmostTarget()?.bundleIdentifier ?? ""
+        return ["com.apple.Preview", "com.adobe.Reader", "com.adobe.Acrobat.Pro", "net.sourceforge.skim-app.skim"].contains(bundle)
+            && ["AXScrollArea", "AXGroup", "AXUnknown", "AXWindow"].contains(role ?? "")
     }
 
     private func asElement(_ value: CFTypeRef?) -> AXUIElement? {

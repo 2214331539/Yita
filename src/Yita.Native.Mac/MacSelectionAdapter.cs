@@ -14,8 +14,11 @@ public sealed class MacSelectionAdapter : ISelectionReader, IPlatformPermissionS
     internal MacSelectionAdapter(IMacHelperClient helper, Func<bool>? isMac = null)
     { _helper = helper; _isMac = isMac ?? (() => true); }
 
-    public async Task<SelectionResult> ReadAsync(
+    public Task<SelectionResult> ReadAsync(
         SelectionRequest request,
+        CancellationToken cancellationToken = default) => ReadAsync(request, false, cancellationToken);
+
+    public async Task<SelectionResult> ReadAsync(SelectionRequest request, bool allowClipboardFallback,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -23,11 +26,14 @@ public sealed class MacSelectionAdapter : ISelectionReader, IPlatformPermissionS
         if (!request.Pointer.IsFinite || request.GestureBounds is { IsValid: false }
             || request.ForegroundProcessId is <= 1)
             return SelectionResult.Failed(SelectionFailureKind.Unknown, "mac-invalid-selection-coordinates");
-        var result = await _helper.SendAsync("readSelection", request, cancellationToken).ConfigureAwait(false);
+        var result = await _helper.SendAsync("readSelection", request, cancellationToken, allowClipboardFallback).ConfigureAwait(false);
         if (result.State != NativeServiceState.Available)
             return SelectionResult.Failed(result.State == NativeServiceState.Timeout ? SelectionFailureKind.Timeout
                 : SelectionFailureKind.Unknown, result.DiagnosticCode);
         if (result.Response?.Status == "ok" && result.Response.Selection is { } selection)
+        {
+            if (!allowClipboardFallback && selection.Source == SelectionSource.ClipboardFallback)
+                return SelectionResult.Failed(SelectionFailureKind.Unknown, "mac-helper-unrequested-clipboard-copy");
             return selection with
             {
                 Context = request.IncludeContext ? selection.Context : null,
@@ -35,6 +41,7 @@ public sealed class MacSelectionAdapter : ISelectionReader, IPlatformPermissionS
                     ? SelectionFailureKind.Empty : selection.Failure,
                 DiagnosticCode = selection.DiagnosticCode is null ? null : MacHelperProtocol.SafeDiagnostic(selection.DiagnosticCode),
             };
+        }
         return SelectionResult.Failed(result.DiagnosticCode == "mac-helper-permission-denied"
             ? SelectionFailureKind.PermissionDenied : SelectionFailureKind.UnsupportedApplication, result.DiagnosticCode);
     }
@@ -50,7 +57,7 @@ public sealed class MacSelectionAdapter : ISelectionReader, IPlatformPermissionS
         if (result is { State: NativeServiceState.Available, Response.Status: "ok", Response.Permissions: { } permissions,
             Response.Capabilities: { } capabilities })
             return new(result.State, new PermissionState(permissions.Accessibility, permissions.InputMonitoring,
-                capabilities.ClipboardFallback && permissions.Accessibility), capabilities.Selection, capabilities.GlobalInput);
+                capabilities.ClipboardFallback && permissions.Accessibility && permissions.EventPosting), capabilities.Selection, capabilities.GlobalInput);
         return new(result.State == NativeServiceState.Available ? NativeServiceState.Unavailable : result.State,
             default, DiagnosticCode: result.DiagnosticCode);
     }

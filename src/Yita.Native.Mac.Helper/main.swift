@@ -3,10 +3,11 @@ import ApplicationServices
 import Darwin
 import Foundation
 
-private let protocolVersion = 1
+private let protocolVersion = 2
 private let bundleIdentifier = "com.yita.desktop.native-helper"
 private let maximumRequestBytes = 64_000
 private let arguments = CommandLine.arguments
+private let requests = HelperRequestRegistry()
 private let selfTest = arguments.contains("--self-test")
 private let selectionFixture: String? = {
     guard selfTest, let index = arguments.firstIndex(of: "--selection-fixture"), index + 1 < arguments.count else { return nil }
@@ -22,16 +23,18 @@ private struct Request: Decodable {
     let id: String
     let command: String
     let selection: NativeSelectionRequest?
+    let allowClipboardFallback: Bool?
 }
 
 private struct Permissions: Encodable {
     let accessibility: Bool
     let inputMonitoring: Bool
+    let eventPosting: Bool
 }
 
 private struct Capabilities: Encodable {
     let selection = true
-    let clipboardFallback = false
+    let clipboardFallback = true
     let globalInput = false
 }
 
@@ -55,17 +58,15 @@ private func emit(_ response: Response) {
 }
 
 private func permissions() -> Permissions {
-    if selfTest { return Permissions(accessibility: false, inputMonitoring: false) }
-    return Permissions(accessibility: AXIsProcessTrusted(), inputMonitoring: CGPreflightListenEventAccess())
+    if selfTest { return Permissions(accessibility: false, inputMonitoring: false, eventPosting: false) }
+    return Permissions(accessibility: AXIsProcessTrusted(), inputMonitoring: CGPreflightListenEventAccess(), eventPosting: CGPreflightPostEventAccess())
 }
 
-private func handle(_ data: Data) {
-    guard let request = try? JSONDecoder().decode(Request.self, from: data),
-          request.version == protocolVersion, request.id.count == 32,
-          request.id.allSatisfy({ $0.isHexDigit }) else { exit(2) }
+@MainActor private func handle(_ request: Request, control: HelperRequestControl) async {
     var response = Response(id: request.id, status: "ok")
     switch request.command {
     case "permissions":
+        response.processId = getpid()
         response.permissions = permissions()
         response.capabilities = Capabilities()
     case "requestAccessibility":
@@ -85,13 +86,35 @@ private func handle(_ data: Data) {
             response.selection = .failed(.invalidRequest)
             emit(response); return
         }
-        if selfTest, let fixture = selectionFixture { response.selection = readSelectionFixture(fixture, request: selection) }
+        if selfTest, let fixture = selectionFixture, fixture.hasPrefix("clipboard") {
+            response.selection = await readClipboardFixture(fixture, request: selection,
+                allowClipboardFallback: request.allowClipboardFallback == true, control: control)
+        }
+        else if selfTest, let fixture = selectionFixture { response.selection = readSelectionFixture(fixture, request: selection) }
         else if selfTest { response.selection = .failed(.permissionDenied) }
-        else { response.selection = AXSelectionReader(access: SystemAXSelectionAccess(ownerPID: parentPID)).read(selection) }
+        else { response.selection = await readNativeSelection(selection, allowClipboardFallback: request.allowClipboardFallback == true,
+            ownerPID: parentPID, control: control) }
     default:
         emit(Response(id: request.id, status: "error", diagnosticCode: "unsupported-command")); return
     }
     emit(response)
+}
+
+private func enqueue(_ data: Data) -> Bool {
+    guard let request = try? JSONDecoder().decode(Request.self, from: data),
+          request.version == protocolVersion, request.id.count == 32,
+          request.id.utf8.allSatisfy({ (48...57).contains($0) || (97...102).contains($0) }) else {
+        requests.shutdown(2); return false
+    }
+    if request.command == "cancelSelection" { requests.cancel(request.id); return true }
+    guard let control = requests.register(request.id) else { requests.shutdown(2); return false }
+    DispatchQueue.main.async {
+        Task { @MainActor in
+            await handle(request, control: control)
+            if let code = requests.finish(request.id) { exit(code) }
+        }
+    }
+    return true
 }
 
 // Only the pipe reader runs off the Cocoa loop; permission APIs and actions run on the main thread.
@@ -103,18 +126,18 @@ private func readRequests() {
         let count = buffer.withUnsafeMutableBytes { bytes in
             Darwin.read(STDIN_FILENO, bytes.baseAddress, bytes.count)
         }
-        if count == 0 { exit(pending.isEmpty ? 0 : 2) }
+        if count == 0 { requests.shutdown(pending.isEmpty ? 0 : 2); return }
         if count < 0 {
             if errno == EINTR { continue }
-            exit(0)
+            requests.shutdown(0); return
         }
         for byte in buffer.prefix(count) {
             if byte == 0x0A {
                 let request = pending
                 pending.removeAll(keepingCapacity: true)
-                DispatchQueue.main.sync { handle(request) }
+                if !enqueue(request) { return }
             } else {
-                guard pending.count < maximumRequestBytes else { exit(2) }
+                guard pending.count < maximumRequestBytes else { requests.shutdown(2); return }
                 pending.append(byte)
             }
         }
@@ -123,6 +146,10 @@ private func readRequests() {
 
 if arguments.contains("--selection-self-test") {
     exit(runSelectionSelfTests())
+}
+if arguments.contains("--clipboard-self-test") {
+    Task { @MainActor in exit(await runClipboardSelfTests()) }
+    dispatchMain()
 }
 if !selfTest {
     _ = NSApplication.shared
@@ -133,7 +160,7 @@ let watchdog = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .
 if let parent = parentPID {
     guard parent > 1, parent == getppid() else { exit(2) }
     watchdog.schedule(deadline: .now() + 1, repeating: 1)
-    watchdog.setEventHandler { if getppid() != parent { exit(0) } }
+    watchdog.setEventHandler { if getppid() != parent { requests.shutdown(0) } }
     watchdog.resume()
 }
 DispatchQueue.global(qos: .utility).async { readRequests() }
