@@ -37,7 +37,7 @@
             <Button x:Name="SendButton" Grid.Column="1" MinWidth="50" Margin="8,0,0,0" Classes="reading-action qa-action" Background="{DynamicResource AccentBrush}" Foreground="White" Content="Ask" Click="SendClick" />
           </Grid>
         </Border>
-        <Border Width="18" Height="18" Grid.RowSpan="3" HorizontalAlignment="Right" VerticalAlignment="Bottom" Background="Transparent" Cursor="SizeAll" PointerPressed="ResizePointerPressed" />
+        <Border Width="18" Height="18" Grid.RowSpan="3" HorizontalAlignment="Right" VerticalAlignment="Bottom" Background="Transparent" Cursor="BottomRightCorner" PointerPressed="ResizePointerPressed" />
       </Grid>
     </Border>
     <local:LiquidGlassRim Grid.Row="1" CornerRadius="{DynamicResource PopupSurfaceCornerRadius}" IsGlassEnabled="{DynamicResource PopupGlassEnabled}" />

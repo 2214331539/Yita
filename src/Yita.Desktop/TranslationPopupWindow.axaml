@@ -96,7 +96,7 @@
       </Border>
       <local:LiquidGlassRim x:Name="GlassSurfaceRim" Margin="{Binding Margin, ElementName=PopupSurface}"
                            CornerRadius="{DynamicResource PopupSurfaceCornerRadius}" IsGlassEnabled="{DynamicResource PopupGlassEnabled}" />
-      <Border Width="18" Height="18" Background="Transparent" HorizontalAlignment="Right" VerticalAlignment="Bottom" Cursor="SizeAll" PointerPressed="ResizePointerPressed" />
+      <Border Width="18" Height="18" Background="Transparent" HorizontalAlignment="Right" VerticalAlignment="Bottom" Cursor="BottomRightCorner" PointerPressed="ResizePointerPressed" />
     </Grid>
   </Grid>
 </Window>
