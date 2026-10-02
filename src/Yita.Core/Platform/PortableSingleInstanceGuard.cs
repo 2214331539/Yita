@@ -28,7 +28,7 @@ public sealed class PortableSingleInstanceGuard : ISingleInstanceGuard
         {
             _lockFile = new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
         }
-        catch (IOException exception) when ((exception.HResult & 0xffff) is 32 or 33)
+        catch (IOException exception) when (IsLockContention(exception))
         {
             if (requestActivation) RequestActivation(pipeName);
             return;
@@ -50,6 +50,14 @@ public sealed class PortableSingleInstanceGuard : ISingleInstanceGuard
     }
 
     public bool IsOwner { get; }
+
+    private static bool IsLockContention(IOException exception)
+    {
+        if (OperatingSystem.IsWindows()) return (exception.HResult & 0xffff) is 32 or 33;
+        // Unix FileShare.None reports flock's EWOULDBLOCK as a raw errno in HResult.
+        if (OperatingSystem.IsMacOS()) return exception.HResult == 35;
+        return OperatingSystem.IsLinux() && exception.HResult == 11;
+    }
 
     private static void RequestActivation(string pipeName)
     {
