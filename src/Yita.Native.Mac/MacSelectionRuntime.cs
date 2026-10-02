@@ -85,6 +85,14 @@ public sealed class MacSelectionRuntime : ISelectionRuntime, IPlatformPermission
                     continue;
                 }
                 SetStatus(exchange.State, input.MouseRunning, input.HotkeyRunning);
+                if (exchange.Response.DiagnosticCode == "input-not-configured" || input.Sequence < _sequence)
+                {
+                    CancelSelection();
+                    _sequence = 0;
+                    RepairInputCapture();
+                    await Task.Delay(_pollInterval, _stop).ConfigureAwait(false);
+                    continue;
+                }
                 await HandleInputAsync(input, _stop).ConfigureAwait(false);
                 await Task.Delay(_pollInterval, _stop).ConfigureAwait(false);
             }
@@ -115,7 +123,8 @@ public sealed class MacSelectionRuntime : ISelectionRuntime, IPlatformPermission
             { CancelSelection(); continue; }
             if (item.Kind == MacInputKind.Cancel) { CancelSelection(); continue; }
             if (item.Kind == MacInputKind.TranslateClipboard) { TranslateClipboard(); continue; }
-            if (await _isOwnWindow(item.Pointer, cancellationToken).ConfigureAwait(false))
+            if (await _isOwnWindow(item.Pointer, cancellationToken).ConfigureAwait(false)
+                || item.AgeMilliseconds + System.Diagnostics.Stopwatch.GetElapsedTime(received).TotalMilliseconds > 500)
             { CancelSelection(); continue; }
             if (item.Kind == MacInputKind.PointerDown)
             {

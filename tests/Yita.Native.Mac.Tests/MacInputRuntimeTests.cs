@@ -81,6 +81,36 @@ public sealed class MacInputRuntimeTests
     }
 
     [Fact]
+    public async Task InputThatExpiresDuringWindowFilteringCannotStartAGesture()
+    {
+        using var helper = new TestHelper();
+        using var runtime = new MacSelectionRuntime(helper, async (_, _) => { await Task.Delay(30); return false; });
+        runtime.Configure(true, true, 0);
+        var clicks = 0;
+        runtime.ExternalPointerPressed += (_, _) => clicks++;
+        await runtime.HandleInputAsync(Batch(Input(MacInputKind.PointerDown, 1, -800, age: 490), Input(MacInputKind.PointerUp, 2, -700)));
+        Assert.Equal(0, clicks);
+        Assert.Equal(0, helper.SelectionReads);
+    }
+
+    [Fact]
+    public async Task AHelperRestartDuringPermissionWorkReconfiguresInputInsteadOfLeavingItStopped()
+    {
+        using var helper = new TestHelper { LoseConfigurationOnFirstPoll = true };
+        using var runtime = new MacSelectionRuntime(helper, pollInterval: TimeSpan.FromMilliseconds(5));
+        var running = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        runtime.StatusChanged += (_, _) =>
+        {
+            if (runtime.IsRunning && helper.Commands.Count(command => command == "configureInput") >= 2) running.TrySetResult();
+        };
+        runtime.Start();
+        await helper.Reconfigured.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        await running.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.True(helper.Commands.Count(command => command == "configureInput") >= 2);
+        Assert.True(runtime.IsRunning);
+    }
+
+    [Fact]
     public async Task LaterInputAndPauseDiscardReaderResultsEvenWhenCancellationIsIgnored()
     {
         foreach (var pause in new[] { false, true })
@@ -172,11 +202,22 @@ public sealed class MacInputRuntimeTests
         public bool Disposed { get; private set; }
         public CancellationToken SelectionToken { get; private set; }
         public TaskCompletionSource<MacHelperExchange>? DelayedSelection { get; init; }
+        public bool LoseConfigurationOnFirstPoll { get; init; }
+        private bool _lost;
+        private int _configurations;
+        public TaskCompletionSource Reconfigured { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public System.Collections.Concurrent.ConcurrentBag<string> Commands { get; } = new();
         public Task<MacHelperExchange> SendAsync(string command, SelectionRequest? selection = null,
             CancellationToken cancellationToken = default, bool allowClipboardFallback = false, MacInputOptions? input = null)
         {
             Commands.Add(command);
+            if (command == "configureInput" && ++_configurations == 2) Reconfigured.TrySetResult();
+            if (command == "pollInput" && LoseConfigurationOnFirstPoll && !_lost)
+            {
+                _lost = true;
+                return Task.FromResult(Success(command) with { Response = Success(command).Response! with
+                    { DiagnosticCode = "input-not-configured", Input = Batch() with { MouseRunning = false, HotkeyRunning = false } } });
+            }
             if (command == "readSelection")
             {
                 SelectionReads++; CopyAllowed = allowClipboardFallback; Sequence = input?.Sequence; SelectionToken = cancellationToken;

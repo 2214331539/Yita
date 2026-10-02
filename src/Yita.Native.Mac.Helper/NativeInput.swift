@@ -270,6 +270,8 @@ final class NativeInputManager {
     }
 
     func poll() -> NativeInputSnapshot {
+        if !configured { diagnostic = "input-not-configured" }
+        else if diagnostic == "input-not-configured" { diagnostic = nil }
         refresh()
         if selfTest, fixture == "drag", configured, !fixtureEmitted {
             fixtureEmitted = true
