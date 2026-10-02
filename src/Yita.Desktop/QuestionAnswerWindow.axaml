@@ -1,0 +1,45 @@
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="using:Yita.Desktop" x:Class="Yita.Desktop.QuestionAnswerWindow" x:ClassModifier="internal" Width="520" Height="360" MinWidth="360" MinHeight="240" MaxWidth="860" MaxHeight="720"
+        SystemDecorations="None" TransparencyLevelHint="Transparent" Background="Transparent" ShowActivated="False"
+        ShowInTaskbar="False" Topmost="True" CanResize="True" FontFamily="{DynamicResource InterfaceFont}" KeyDown="WindowKeyDown" PointerWheelChanged="WindowPointerWheelChanged">
+  <Grid Margin="9" RowDefinitions="Auto,*">
+    <local:WindowSizePresetBar x:Name="SizePresetBar" Margin="0,0,0,6" HorizontalAlignment="Left" />
+    <Border x:Name="Surface" Grid.Row="1" Background="{DynamicResource QuestionAnswerSurfaceBrush}" CornerRadius="{DynamicResource PopupSurfaceCornerRadius}" ClipToBounds="True">
+      <Grid RowDefinitions="Auto,*,Auto">
+        <Border Padding="14,10" Background="{DynamicResource QuestionAnswerHeaderBrush}" PointerPressed="HeaderPointerPressed">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock x:Name="TitleText" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource PopupTextBrush}" VerticalAlignment="Center" Text="Ask AI" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+              <Button x:Name="CopyButton" Classes="reading-action qa-action" Content="Copy" Click="CopyClick" />
+              <Button x:Name="RecordButton" Classes="reading-action qa-action" Content="Record" IsEnabled="False" Click="RecordClick" />
+              <Button x:Name="StopButton" Classes="reading-action qa-action" Content="Stop" IsVisible="False" Click="StopClick" />
+              <Button x:Name="RetryButton" Classes="reading-action qa-action" Content="Retry" IsVisible="False" Click="RetryClick" />
+              <ToggleButton x:Name="PinButton" Classes="reading-action" Width="34" Height="28" Margin="4,0,0,0" ToolTip.Tip="Keep this answer">
+                <TextBlock FontFamily="Segoe Fluent Icons" FontSize="11.5" FontWeight="SemiBold" Text="&#xE718;" />
+              </ToggleButton>
+              <Button Classes="reading-action" Width="34" Height="28" Margin="4,0,0,0" ToolTip.Tip="Close" Click="CloseClick">
+                <TextBlock FontFamily="Segoe Fluent Icons" FontSize="11.5" FontWeight="SemiBold" Text="&#xE711;" />
+              </Button>
+            </StackPanel>
+          </Grid>
+        </Border>
+        <Border Grid.Row="1" Margin="16,12" Background="{DynamicResource PopupTextSurfaceBrush}" CornerRadius="{DynamicResource PopupTextSurfaceCornerRadius}" Padding="{DynamicResource PopupTextSurfacePadding}">
+          <Grid>
+            <TextBlock x:Name="EmptyStateText" Text="Ask a quick question." HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="13" Foreground="{DynamicResource PopupMutedBrush}" />
+            <ScrollViewer x:Name="TranscriptScroll" VerticalScrollBarVisibility="Auto">
+              <local:TranscriptTextBlock x:Name="TranscriptText" Margin="4,0,4,12" FontSize="15.5" TextWrapping="Wrap" RenderOptions.TextRenderingMode="Antialias" Foreground="{DynamicResource PopupTextBrush}" SelectionBrush="{DynamicResource AccentBrush}" SelectionForegroundBrush="{DynamicResource AccentTextBrush}" />
+            </ScrollViewer>
+          </Grid>
+        </Border>
+        <Border Grid.Row="2" Margin="12,0,12,12" Padding="10,7" Background="{DynamicResource QuestionInputBrush}" CornerRadius="14">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBox x:Name="QuestionInputTextBox" Classes="qa-input" FontSize="12" MinHeight="24" MaxHeight="86" Padding="6,2" Background="Transparent" BorderThickness="0" AcceptsReturn="True" TextWrapping="Wrap" Watermark="Ask a follow-up…" KeyDown="InputKeyDown" />
+            <Button x:Name="SendButton" Grid.Column="1" MinWidth="50" Margin="8,0,0,0" Classes="reading-action qa-action" Background="{DynamicResource AccentBrush}" Foreground="White" Content="Ask" Click="SendClick" />
+          </Grid>
+        </Border>
+        <Border Width="18" Height="18" Grid.RowSpan="3" HorizontalAlignment="Right" VerticalAlignment="Bottom" Background="Transparent" Cursor="SizeAll" PointerPressed="ResizePointerPressed" />
+      </Grid>
+    </Border>
+    <local:LiquidGlassRim Grid.Row="1" CornerRadius="{DynamicResource PopupSurfaceCornerRadius}" IsGlassEnabled="{DynamicResource PopupGlassEnabled}" />
+  </Grid>
+</Window>

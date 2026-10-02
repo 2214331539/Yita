@@ -107,7 +107,7 @@ public sealed class WindowsUiAutomationWorkerClient : IWindowsUiAutomationWorker
             var line = JsonSerializer.Serialize(new WorkerRequest(
                 request.Pointer.X,
                 request.Pointer.Y,
-                request.Trigger.ToString()));
+                request.Trigger.ToString(), request.IncludeContext));
             await _worker!.StandardInput.WriteLineAsync(line.AsMemory(), deadline.Token).ConfigureAwait(false);
             await _worker.StandardInput.FlushAsync(deadline.Token).ConfigureAwait(false);
 
@@ -167,6 +167,10 @@ public sealed class WindowsUiAutomationWorkerClient : IWindowsUiAutomationWorker
                 StandardInputEncoding = new UTF8Encoding(false),
                 StandardOutputEncoding = new UTF8Encoding(false),
             };
+            if (!info.Environment.ContainsKey("DOTNET_ROOT")
+                && Environment.ProcessPath is { } processPath
+                && Path.GetFileNameWithoutExtension(processPath).Equals("dotnet", StringComparison.OrdinalIgnoreCase))
+                info.Environment["DOTNET_ROOT"] = Path.GetDirectoryName(processPath);
             info.ArgumentList.Add("--parent-pid");
             info.ArgumentList.Add(Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture));
             _worker = Process.Start(info) ?? throw new IOException("Cannot start UI Automation worker.");
@@ -230,7 +234,7 @@ public sealed class WindowsUiAutomationWorkerClient : IWindowsUiAutomationWorker
         _gate.Dispose();
     }
 
-    private sealed record WorkerRequest(double X, double Y, string Trigger);
+    private sealed record WorkerRequest(double X, double Y, string Trigger, bool IncludeContext);
 
     private sealed record WorkerResponse(
         string? Text,
@@ -239,7 +243,8 @@ public sealed class WindowsUiAutomationWorkerClient : IWindowsUiAutomationWorker
         double? BoundsX,
         double? BoundsY,
         double? BoundsWidth,
-        double? BoundsHeight)
+        double? BoundsHeight,
+        string? Context = null)
     {
         internal SelectionResult ToSelectionResult(SelectionRequest request)
         {
@@ -255,7 +260,8 @@ public sealed class WindowsUiAutomationWorkerClient : IWindowsUiAutomationWorker
                 SelectionSource.Accessibility,
                 bounds,
                 Failure,
-                DiagnosticCode);
+                DiagnosticCode,
+                request.IncludeContext ? Context : null);
         }
     }
 }

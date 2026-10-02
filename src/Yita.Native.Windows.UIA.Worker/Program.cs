@@ -89,7 +89,7 @@ internal static class Program
             var point = new Point(request.X, request.Y);
             ActivateEdgeAccessibility(point, refresh: false);
 
-            var response = ReadCurrentSelection(point);
+            var response = ReadCurrentSelection(point, request.IncludeContext);
             if (response is not null) return response;
 
             // Edge may rebuild its renderer tree after scrolling or zooming.
@@ -97,7 +97,7 @@ internal static class Program
             // recovery attempt without enabling screen-reader mode permanently.
             if (ActivateEdgeAccessibility(point, refresh: true))
             {
-                response = ReadCurrentSelection(point);
+                response = ReadCurrentSelection(point, request.IncludeContext);
                 if (response is not null) return response;
             }
 
@@ -109,7 +109,7 @@ internal static class Program
         }
     }
 
-    private static WorkerResponse? ReadCurrentSelection(Point point)
+    private static WorkerResponse? ReadCurrentSelection(Point point, bool includeContext)
     {
         var expectedRootOwner = GetRootOwnerAt(point);
         if (expectedRootOwner == IntPtr.Zero) return null;
@@ -137,7 +137,7 @@ internal static class Program
 
         foreach (var candidate in candidates)
         {
-            var result = ReadCandidatePath(candidate);
+            var result = ReadCandidatePath(candidate, includeContext);
             if (result is not null) return result;
         }
 
@@ -145,20 +145,20 @@ internal static class Program
 
         foreach (var document in FindVisibleDocumentCandidates(expectedRootOwner, point))
         {
-            var result = ReadCandidatePath(document);
+            var result = ReadCandidatePath(document, includeContext);
             if (result is not null) return result;
         }
 
         return null;
     }
 
-    private static WorkerResponse? ReadCandidatePath(AutomationElement candidate)
+    private static WorkerResponse? ReadCandidatePath(AutomationElement candidate, bool includeContext)
     {
         var current = candidate;
         for (var depth = 0; current is not null && depth < MaximumAncestorDepth; depth++)
         {
             if (IsPassword(current)) return Empty("password-control", SelectionFailureKind.ProtectedContent);
-            if (TryReadText(current, out var text, out var bounds))
+            if (TryReadText(current, includeContext, out var text, out var bounds, out var context))
             {
                 return new WorkerResponse(
                     text,
@@ -167,7 +167,8 @@ internal static class Program
                     bounds.X,
                     bounds.Y,
                     bounds.Width,
-                    bounds.Height);
+                    bounds.Height,
+                    context);
             }
 
             try { current = TreeWalker.RawViewWalker.GetParent(current); }
@@ -179,11 +180,14 @@ internal static class Program
 
     private static bool TryReadText(
         AutomationElement element,
+        bool includeContext,
         out string text,
-        out Rect bounds)
+        out Rect bounds,
+        out string? context)
     {
         text = string.Empty;
         bounds = default;
+        context = null;
         try
         {
             if (!element.TryGetCurrentPattern(TextPattern.Pattern, out var patternObject)
@@ -194,6 +198,7 @@ internal static class Program
             if (ranges is null || ranges.Length == 0) return false;
 
             var parts = new List<string>(ranges.Length);
+            var selectionBounds = Rect.Empty;
             var remaining = MaximumTextLength;
             foreach (var range in ranges)
             {
@@ -202,11 +207,25 @@ internal static class Program
                 if (value.Length == 0) continue;
                 parts.Add(value);
                 remaining -= value.Length;
+                var rectangles = range.GetBoundingRectangles();
+                foreach (var rectangle in rectangles)
+                {
+                    if (rectangle.IsEmpty || !double.IsFinite(rectangle.X) || !double.IsFinite(rectangle.Y)
+                        || !double.IsFinite(rectangle.Width) || !double.IsFinite(rectangle.Height)
+                        || rectangle.Width <= 0 || rectangle.Height <= 0) continue;
+                    selectionBounds.Union(rectangle);
+                }
+                if (includeContext && context is null)
+                {
+                    var paragraph = range.Clone();
+                    paragraph.ExpandToEnclosingUnit(TextUnit.Paragraph);
+                    context = Normalize(paragraph.GetText(4000));
+                }
             }
 
             if (parts.Count == 0) return false;
             text = string.Join(Environment.NewLine, parts);
-            bounds = element.Current.BoundingRectangle;
+            bounds = selectionBounds.IsEmpty ? default : selectionBounds;
             if (double.IsNaN(bounds.X) || double.IsNaN(bounds.Y)
                 || double.IsNaN(bounds.Width) || double.IsNaN(bounds.Height))
             {
@@ -531,7 +550,7 @@ internal static class Program
         int Depth,
         DocumentNodeInfo Info);
 
-    private sealed record WorkerRequest(double X, double Y, string? Trigger);
+    private sealed record WorkerRequest(double X, double Y, string? Trigger, bool IncludeContext = false);
 
     private sealed record WorkerResponse(
         string? Text,
@@ -540,7 +559,8 @@ internal static class Program
         double? BoundsX,
         double? BoundsY,
         double? BoundsWidth,
-        double? BoundsHeight);
+        double? BoundsHeight,
+        string? Context = null);
 
     private static class NativeMethods
     {

@@ -27,7 +27,15 @@ public static class WindowsStartupRegistration
         if (string.IsNullOrWhiteSpace(executable))
             throw new InvalidOperationException("无法确定 Yita 可执行文件路径。");
 
-        key.SetValue(ValueName, Quote(executable), RegistryValueKind.String);
+        var assemblyPath = System.Reflection.Assembly.GetEntryAssembly()?.Location;
+        var runtimeRoot = Environment.GetEnvironmentVariable("DOTNET_ROOT");
+        var portableHost = string.IsNullOrEmpty(runtimeRoot) ? null : Path.Combine(runtimeRoot, "dotnet.exe");
+        var command = portableHost is not null && File.Exists(portableHost) && !string.IsNullOrEmpty(assemblyPath)
+            ? Quote(portableHost) + " " + Quote(assemblyPath) + " --background"
+            : Path.GetFileNameWithoutExtension(executable).Equals("dotnet", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(assemblyPath)
+                ? Quote(executable) + " " + Quote(assemblyPath) + " --background"
+                : Quote(executable) + " --background";
+        key.SetValue(ValueName, command, RegistryValueKind.String);
     }
 
     private static string Quote(string path) =>

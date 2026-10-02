@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - codex/cross-platform-migration
+      - codex/windows-avalonia-parity
   pull_request:
     paths:
       - 'Yita.CrossPlatform.sln'
@@ -13,6 +14,7 @@ on:
       - 'src/Yita.Native.Windows.UIA.Worker/**'
       - 'src/Yita.Native.Mac/**'
       - 'tests/Yita.Core.Tests/**'
+      - 'tests/Yita.Core.Parity.Tests/**'
       - 'tests/Yita.Native.Windows.Tests/**'
       - 'tests/Yita.Desktop.Tests/**'
       - '.github/workflows/cross-platform.yml'

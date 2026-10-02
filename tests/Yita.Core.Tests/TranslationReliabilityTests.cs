@@ -96,12 +96,14 @@ public sealed class TranslationReliabilityTests
         {
             var original = Path.Combine(directory, "original.json");
             var preview = Path.Combine(directory, "preview.json");
-            await new JsonSettingsStore(original).SaveAsync(YitaSettings.Default with { TargetLanguage = "English" });
+            await new JsonSettingsStore(original).SaveAsync(YitaSettings.Default with { TargetLanguage = "English", TargetLanguageMode = "fixed" });
+            var originalBytes = await File.ReadAllBytesAsync(original);
             var store = new JsonSettingsStore(preview, original);
-            Assert.Equal("English", (await store.LoadAsync()).TargetLanguage);
-            await store.SaveAsync(YitaSettings.Default with { TargetLanguage = "日本語" });
-            Assert.Equal("日本語", (await store.LoadAsync()).TargetLanguage);
-            Assert.Equal("English", (await new JsonSettingsStore(original).LoadAsync()).TargetLanguage);
+            Assert.Equal("英语", (await store.LoadAsync()).TargetLanguage);
+            await store.SaveAsync(YitaSettings.Default with { TargetLanguage = "日本語", TargetLanguageMode = "fixed" });
+            Assert.Equal("日语", (await store.LoadAsync()).TargetLanguage);
+            Assert.Equal("英语", (await new JsonSettingsStore(original).LoadAsync()).TargetLanguage);
+            Assert.Equal(originalBytes, await File.ReadAllBytesAsync(original));
         }
         finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
     }

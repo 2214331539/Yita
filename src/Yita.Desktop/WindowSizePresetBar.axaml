@@ -1,0 +1,19 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Yita.Desktop.WindowSizePresetBar" Focusable="False">
+  <Border Padding="4,3" Background="{DynamicResource PopupButtonBrush}" CornerRadius="{DynamicResource PopupActionBarCornerRadius}">
+    <StackPanel Orientation="Horizontal">
+      <Button x:Name="SmallButton" Classes="reading-action size-preset" Tag="Small" Click="PresetClick"><Border Width="9" Height="7" BorderBrush="{DynamicResource PopupTextBrush}" BorderThickness="1.4" CornerRadius="1" /></Button>
+      <Button x:Name="MediumButton" Classes="reading-action size-preset" Tag="Medium" Click="PresetClick"><Border Width="13" Height="10" BorderBrush="{DynamicResource PopupTextBrush}" BorderThickness="1.4" CornerRadius="1.2" /></Button>
+      <Button x:Name="LargeButton" Classes="reading-action size-preset" Tag="Large" Click="PresetClick"><Border Width="17" Height="13" BorderBrush="{DynamicResource PopupTextBrush}" BorderThickness="1.4" CornerRadius="1.5" /></Button>
+      <Button x:Name="WideButton" Classes="reading-action size-preset" Tag="Wide" Click="PresetClick"><Border Width="17" Height="9" BorderBrush="{DynamicResource PopupTextBrush}" BorderThickness="1.4" CornerRadius="1.5" /></Button>
+      <Button x:Name="TallButton" Classes="reading-action size-preset" Tag="Tall" Click="PresetClick"><Border Width="9" Height="17" BorderBrush="{DynamicResource PopupTextBrush}" BorderThickness="1.4" CornerRadius="1.5" /></Button>
+      <Button x:Name="SquareButton" Classes="reading-action size-preset" Tag="Square" Click="PresetClick"><Border Width="13" Height="13" BorderBrush="{DynamicResource PopupTextBrush}" BorderThickness="1.4" CornerRadius="1.5" /></Button>
+      <Border Width="1" Height="17" Margin="4,0,3,0" VerticalAlignment="Center" Background="{DynamicResource PopupButtonBorderBrush}" />
+      <Grid Margin="1,0" VerticalAlignment="Center" ColumnDefinitions="Auto,*,Auto">
+        <TextBlock Text="A" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PopupMutedBrush}" Margin="0,0,3,0" VerticalAlignment="Center" />
+        <Slider x:Name="FontSizeSlider" Classes="direct-font-size" Grid.Column="1" Width="54" Height="22" Minimum="12" Maximum="34" Value="16.5" SmallChange="0.5" LargeChange="2" ValueChanged="FontSizeChanged" />
+        <TextBlock x:Name="FontSizeValueText" Grid.Column="2" Width="24" FontSize="9.5" Foreground="{DynamicResource PopupMutedBrush}" Text="16.5" TextAlignment="Right" Margin="4,0,0,0" VerticalAlignment="Center" />
+      </Grid>
+    </StackPanel>
+  </Border>
+</UserControl>

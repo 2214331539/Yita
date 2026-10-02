@@ -63,6 +63,16 @@ internal static class WindowsNativeMethods
     internal struct InputData
     {
         [FieldOffset(0)] internal KeyboardInput Keyboard;
+        // INPUT's native union is sized by MOUSEINPUT, even when sending keys.
+        [FieldOffset(0)] internal MouseInput Mouse;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct MouseInput
+    {
+        internal int X, Y;
+        internal uint MouseData, Flags, Time;
+        internal UIntPtr Extra;
     }
 
     [StructLayout(LayoutKind.Sequential)]

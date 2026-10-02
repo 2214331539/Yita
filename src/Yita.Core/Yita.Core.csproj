@@ -7,4 +7,5 @@
     <RootNamespace>Yita.Core</RootNamespace>
     <Version>0.9.0</Version>
   </PropertyGroup>
+  <Import Project="Parity/OriginalBehavior.props" />
 </Project>

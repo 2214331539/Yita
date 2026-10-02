@@ -6,6 +6,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Interactivity;
+using Avalonia.LogicalTree;
 using Avalonia.Media;
 using Avalonia.Themes.Fluent;
 using Avalonia.Threading;
@@ -21,17 +22,41 @@ namespace Yita.Desktop.Tests;
 
 public static class TestAppBuilder
 {
-    public static AppBuilder BuildAvaloniaApp() => AppBuilder.Configure<TestApplication>()
+    public static AppBuilder BuildAvaloniaApp() => AppBuilder.Configure<App>()
         .UseSkia().UseHeadless(new AvaloniaHeadlessPlatformOptions { UseHeadlessDrawing = false });
-}
-
-public sealed class TestApplication : Application
-{
-    public override void Initialize() => Styles.Add(new FluentTheme());
 }
 
 public sealed class DesktopInteractionTests
 {
+    [AvaloniaFact]
+    public async Task ConnectionTestAlwaysReachesTheProviderAndUsesTheCurrentUnsavedKey()
+    {
+        var handler = new DelayedHandler(delayFirst: false);
+        using var fixture = await Fixture.CreateAsync(handler);
+        await fixture.Window.ShowSelectionTranslationAsync(Request(100), Result("hello"));
+        var test = fixture.Window.FindControl<Button>("TestConnectionButton")!;
+        Click(test);
+        for (var attempt = 0; attempt < 100 && !test.IsEnabled; attempt++) await Task.Delay(10);
+        fixture.Window.FindControl<TextBox>("ApiKeyPasswordBox")!.Text = "new-key";
+        Click(test);
+        for (var attempt = 0; attempt < 100 && !test.IsEnabled; attempt++) await Task.Delay(10);
+        Assert.Equal(3, handler.AuthorizationValues.Count);
+        Assert.Equal("new-key", handler.AuthorizationValues[^1]);
+    }
+
+    [AvaloniaFact]
+    public async Task ExternalClicksDismissOnlyUnpinnedWindows()
+    {
+        using var fixture = await Fixture.CreateAsync(new DelayedHandler(delayFirst: false));
+        await fixture.Window.ShowSelectionTranslationAsync(Request(100), Result("first"));
+        var pinned = Assert.Single(fixture.Window.TranslationPopups);
+        pinned.FindControl<ToggleButton>("PinButton")!.IsChecked = true;
+        await fixture.Window.ShowSelectionTranslationAsync(Request(500), Result("second"));
+        fixture.Window.DismissUnpinnedWindows();
+        Assert.True(pinned.IsVisible);
+        Assert.Single(fixture.Window.TranslationPopups, window => window.IsVisible);
+    }
+
     [AvaloniaFact]
     public void OriginalAndTranslationRemainSelectableAndErrorColorIsReset()
     {
@@ -42,14 +67,14 @@ public sealed class DesktopInteractionTests
             popup.SetError("Connection failed");
             popup.SetText("正常译文");
             var text = popup.FindControl<SelectableTextBlock>("TranslationText")!;
-            Assert.Equal("正常译文", text.Text);
-            Assert.Equal(Color.Parse("#173F43"), ((SolidColorBrush)text.Foreground!).Color);
+            Assert.Equal("正常译文", ReferenceTypography.GetText(text));
+            Assert.Equal(Color.Parse("#302D29"), ((SolidColorBrush)text.Foreground!).Color);
             Click(popup.FindControl<Button>("OriginalButton")!);
-            Assert.Equal("The original sentence.", text.Text);
+            Assert.Equal("The original sentence.", ReferenceTypography.GetText(text));
             popup.SetText("流式译文仍在更新");
-            Assert.Equal("The original sentence.", text.Text);
+            Assert.Equal("The original sentence.", ReferenceTypography.GetText(text));
             Click(popup.FindControl<Button>("TranslatedButton")!);
-            Assert.Equal("流式译文仍在更新", text.Text);
+            Assert.Equal("流式译文仍在更新", ReferenceTypography.GetText(text));
         }
         finally { popup.Close(); }
     }
@@ -68,7 +93,7 @@ public sealed class DesktopInteractionTests
             Assert.InRange(popup.Height, popup.MinHeight, popup.MaxHeight);
             var scroll = popup.FindControl<ScrollViewer>("ReadingScroll")!;
             Assert.True(scroll.Extent.Height > scroll.Viewport.Height);
-            var close = popup.GetVisualDescendants().OfType<Button>().Single(button => ToolTip.GetTip(button)?.ToString() == "关闭翻译");
+            var close = popup.FindControl<Button>("CloseButton")!;
             Click(close);
             Assert.False(popup.IsVisible);
             popup.Show();
@@ -89,10 +114,10 @@ public sealed class DesktopInteractionTests
         await handler.FirstStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
         await fixture.Window.ShowSelectionTranslationAsync(Request(500), Result("second"));
         var popup = Assert.Single(fixture.Window.TranslationPopups);
-        Assert.Equal("new translation", popup.FindControl<SelectableTextBlock>("TranslationText")!.Text);
+        Assert.Equal("new translation", ReferenceTypography.GetText(popup.FindControl<SelectableTextBlock>("TranslationText")!));
         handler.ReleaseFirst.TrySetResult();
         await oldRequest;
-        Assert.Equal("new translation", popup.FindControl<SelectableTextBlock>("TranslationText")!.Text);
+        Assert.Equal("new translation", ReferenceTypography.GetText(popup.FindControl<SelectableTextBlock>("TranslationText")!));
     }
 
     [AvaloniaFact]
@@ -104,7 +129,7 @@ public sealed class DesktopInteractionTests
         first.FindControl<ToggleButton>("PinButton")!.IsChecked = true;
         await fixture.Window.ShowSelectionTranslationAsync(Request(500), Result("second"));
         Assert.Equal(2, fixture.Window.TranslationPopups.Count);
-        Assert.Equal("old translation", first.FindControl<SelectableTextBlock>("TranslationText")!.Text);
+        Assert.Equal("old translation", ReferenceTypography.GetText(first.FindControl<SelectableTextBlock>("TranslationText")!));
     }
 
     [AvaloniaFact]
@@ -115,15 +140,14 @@ public sealed class DesktopInteractionTests
         var oldRequest = fixture.Window.ShowSelectionTranslationAsync(Request(100), Result("first"));
         await handler.FirstStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
         var popup = Assert.Single(fixture.Window.TranslationPopups);
-        Click(popup.GetVisualDescendants().OfType<Button>()
-            .Single(button => ToolTip.GetTip(button)?.ToString() == "关闭翻译"));
+        Click(popup.FindControl<Button>("CloseButton")!);
         Assert.False(popup.IsVisible);
         await fixture.Window.ShowSelectionTranslationAsync(Request(500), Result("second"));
         Assert.Same(popup, Assert.Single(fixture.Window.TranslationPopups));
         Assert.True(popup.IsVisible);
         handler.ReleaseFirst.TrySetResult();
         await oldRequest;
-        Assert.Equal("new translation", popup.FindControl<SelectableTextBlock>("TranslationText")!.Text);
+        Assert.Equal("new translation", ReferenceTypography.GetText(popup.FindControl<SelectableTextBlock>("TranslationText")!));
     }
 
     [AvaloniaFact]
@@ -137,7 +161,7 @@ public sealed class DesktopInteractionTests
         await fixture.Window.ShowSelectionTranslationAsync(Request(500), Result("second"));
         var nextPopup = Assert.Single(fixture.Window.TranslationPopups);
         Assert.NotSame(closedPopup, nextPopup);
-        Assert.Equal("new translation", nextPopup.FindControl<SelectableTextBlock>("TranslationText")!.Text);
+        Assert.Equal("new translation", ReferenceTypography.GetText(nextPopup.FindControl<SelectableTextBlock>("TranslationText")!));
     }
 
     [AvaloniaFact]
@@ -160,36 +184,30 @@ public sealed class DesktopInteractionTests
     {
         var handler = new DelayedHandler(delayFirst: false);
         using var fixture = await Fixture.CreateAsync(handler);
-        fixture.Window.FindControl<TextBox>("ApiKeyField")!.Text = "unsaved-test-key";
-        fixture.Window.FindControl<TextBox>("EndpointBox")!.Text = "not-a-url";
+        fixture.Window.FindControl<TextBox>("ApiKeyPasswordBox")!.Text = "unsaved-test-key";
+        fixture.Window.FindControl<TextBox>("EndpointTextBox")!.Text = "not-a-url";
         await fixture.Window.ShowSelectionTranslationAsync(Request(100), Result("first"));
         Assert.Equal("test-key", Assert.Single(handler.AuthorizationValues));
         var popup = Assert.Single(fixture.Window.TranslationPopups);
-        Assert.Equal("old translation", popup.FindControl<SelectableTextBlock>("TranslationText")!.Text);
+        Assert.Equal("old translation", ReferenceTypography.GetText(popup.FindControl<SelectableTextBlock>("TranslationText")!));
     }
 
     [AvaloniaFact]
-    public async Task HistoryShowsNewestRecordAndFiltersSourceOrTranslation()
+    public async Task SettingsNavigationAndCancelPreserveSavedPreferences()
     {
         using var fixture = await Fixture.CreateAsync(new DelayedHandler(delayFirst: false));
-        await fixture.History.AppendAsync(new TranslationHistoryEntry(DateTimeOffset.UtcNow.AddMinutes(-1),
-            "apple", "苹果", "en", "zh"));
-        await fixture.History.AppendAsync(new TranslationHistoryEntry(DateTimeOffset.UtcNow,
-            "pear", "梨", "en", "zh"));
-        // Use the real refresh event, awaiting its observable result.
-        var refresh = fixture.Window.GetVisualDescendants().OfType<Button>().Single(button => button.Content?.ToString() == "刷新");
-        Click(refresh);
-        for (var index = 0; index < 100 && fixture.Window.FindControl<ListBox>("HistoryList")!.ItemCount == 0; index++)
-            await Task.Delay(10);
-        var list = fixture.Window.FindControl<ListBox>("HistoryList")!;
-        Assert.Equal(2, list.ItemCount);
-        Assert.Equal("pear", ((HistoryListItem)list.Items[0]!).Entry.SourceText);
-        fixture.Window.FindControl<TextBox>("HistorySearchBox")!.Text = "苹果";
-        Dispatcher.UIThread.RunJobs();
-        Assert.Equal(1, list.ItemCount);
-        list.SelectedIndex = 0;
-        Assert.Equal("apple", fixture.Window.FindControl<TextBox>("HistorySourceText")!.Text);
-        Assert.Equal("苹果", fixture.Window.FindControl<TextBox>("HistoryTranslatedText")!.Text);
+        var navigation = fixture.Window.FindControl<ListBox>("SettingsNavigation")!;
+        var pages = new[] { "GeneralPage", "HistoryPage", "AppearancePage", "ModelPage" };
+        for (var index = 0; index < pages.Length; index++)
+        {
+            navigation.SelectedIndex = index;
+            for (var page = 0; page < pages.Length; page++)
+                Assert.Equal(page == index, fixture.Window.FindControl<StackPanel>(pages[page])!.IsVisible);
+        }
+        fixture.Window.FindControl<TextBox>("EndpointTextBox")!.Text = "unsaved";
+        Click(fixture.Window.GetLogicalDescendants().OfType<Button>().Single(button => button.Tag?.ToString() == "loc:Cancel"));
+        Assert.Equal("https://api.deepseek.com", fixture.Window.FindControl<TextBox>("EndpointTextBox")!.Text);
+        Assert.False(fixture.Window.IsVisible);
     }
 
     private static void Click(Button button) => button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
@@ -212,6 +230,7 @@ public sealed class DesktopInteractionTests
             var history = new JsonlTranslationHistoryStore(Path.Combine(directory, "history.jsonl"));
             var window = new MainWindow(null, store, secrets, history, new HttpClient(handler));
             window.Show();
+            await window.Initialization;
             return new Fixture(window, history, directory);
         }
 
@@ -236,7 +255,8 @@ public sealed class DesktopInteractionTests
             var text = first ? "old translation" : "new translation";
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = new StringContent("data: {\"choices\":[{\"delta\":{\"content\":\"" + text + "\"}}]}\n\ndata: [DONE]\n\n"),
+                Content = new StringContent("data: {\"choices\":[{\"delta\":{\"content\":\"" + text + "\"}}]}\n\ndata: [DONE]\n\n",
+                    System.Text.Encoding.UTF8, "text/event-stream"),
             };
         }
     }

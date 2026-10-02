@@ -12,6 +12,7 @@ public sealed class App : Application
     private WindowsSingleInstanceGuard? _singleInstance;
     private YitaTrayController? _tray;
     private bool _allowWindowClose;
+    private MainWindow? _settingsWindow;
 
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
 
@@ -21,7 +22,8 @@ public sealed class App : Application
         {
             if (OperatingSystem.IsWindows())
             {
-                _singleInstance = new WindowsSingleInstanceGuard();
+                _singleInstance = new WindowsSingleInstanceGuard(requestActivation:
+                    desktop.Args?.Contains("--background", StringComparer.OrdinalIgnoreCase) != true);
                 if (!_singleInstance.IsOwner)
                 {
                     desktop.Shutdown(0);
@@ -43,8 +45,13 @@ public sealed class App : Application
             }
 
             var mainWindow = new MainWindow(_windowsRuntime);
+            _settingsWindow = mainWindow;
             desktop.MainWindow = mainWindow;
-            mainWindow.SettingsChanged += (_, _) => _tray?.SetEnabled(mainWindow.IsSelectionTranslationEnabled);
+            mainWindow.SettingsChanged += (_, _) =>
+            {
+                _tray?.SetEnabled(mainWindow.IsSelectionTranslationEnabled);
+                _tray?.ApplyUiLanguage(mainWindow.SavedSettings.UiLanguage);
+            };
             desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
             desktop.ShutdownRequested += (_, _) => _allowWindowClose = true;
             mainWindow.Closing += (_, args) =>
@@ -55,6 +62,8 @@ public sealed class App : Application
             };
             if (_windowsRuntime is not null)
             {
+                _windowsRuntime.ExternalPointerPressed += (_, _) =>
+                    Avalonia.Threading.Dispatcher.UIThread.Post(mainWindow.DismissUnpinnedWindows);
                 _windowsRuntime.SelectionCaptured += (_, args) =>
                     Avalonia.Threading.Dispatcher.UIThread.Post(
                         async () =>
@@ -82,7 +91,8 @@ public sealed class App : Application
                         _allowWindowClose = true;
                         desktop.Shutdown(0);
                     },
-                    mainWindow.IsSelectionTranslationEnabled);
+                    mainWindow.IsSelectionTranslationEnabled, _windowsRuntime,
+                    mainWindow.CopyDiagnostics, mainWindow.ShowAbout);
             }
             catch
             {
@@ -90,6 +100,13 @@ public sealed class App : Application
                 // main window and native selection layer remain usable.
                 desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
             }
+            _tray?.ApplyUiLanguage(mainWindow.SavedSettings.UiLanguage);
+            if (_tray is not null && desktop.Args?.Contains("--background", StringComparer.OrdinalIgnoreCase) == true)
+            {
+                desktop.MainWindow = null;
+                _ = mainWindow.Initialization;
+            }
+            _singleInstance?.StartActivationListener(() => Avalonia.Threading.Dispatcher.UIThread.Post(ShowMainWindow));
             desktop.Exit += (_, _) =>
             {
                 mainWindow.ShutdownServices();
@@ -104,8 +121,7 @@ public sealed class App : Application
 
     private void ShowMainWindow()
     {
-        if (ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop
-            || desktop.MainWindow is not { } window) return;
+        if (_allowWindowClose || _settingsWindow is not { } window) return;
         if (!window.IsVisible) window.Show();
         window.Activate();
     }

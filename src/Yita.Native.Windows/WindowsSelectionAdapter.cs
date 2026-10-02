@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using Yita.Core;
 using Yita.Core.Selection;
+using Yita.Services;
 
 namespace Yita.Native.Windows;
 
@@ -10,9 +11,12 @@ public sealed class WindowsSelectionAdapter : ISelectionReader
     private readonly ISelectionReader _fullReader;
     private readonly ISelectionReader _accessibleReader;
     private readonly WindowsUiAutomationSelectionReader? _uiaReader = null;
+    private readonly WindowsClipboardSelectionReader _clipboardReader = new();
     private readonly Func<SelectionRequest, CancellationToken, Task<SelectionResult>>? _override = null;
 
-    public bool UseClipboardFallback { get; set; } = true;
+    public bool UseClipboardFallback { get; set; }
+    public bool UseWpsPdfCompatibility { get; set; } = true;
+    public bool UseSelectionContext { get; set; }
 
     public WindowsSelectionAdapter()
     {
@@ -36,11 +40,22 @@ public sealed class WindowsSelectionAdapter : ISelectionReader
         (_fullReader, _accessibleReader, _override) =
         (new DelegateSelectionReader(reader), new DelegateSelectionReader(reader), reader);
 
-    public Task<SelectionResult> ReadAsync(
+    public async Task<SelectionResult> ReadAsync(
         SelectionRequest request,
-        CancellationToken cancellationToken = default) =>
-        (_override is not null ? _fullReader : UseClipboardFallback ? _fullReader : _accessibleReader)
-            .ReadAsync(request, cancellationToken);
+        CancellationToken cancellationToken = default)
+    {
+        request = request with { IncludeContext = UseSelectionContext };
+        if (_override is not null) return await _fullReader.ReadAsync(request, cancellationToken).ConfigureAwait(false);
+        if (request.Trigger != SelectionTrigger.MouseGesture)
+            return await WindowsClipboardSelectionReader.ReadExistingAsync(request, cancellationToken).ConfigureAwait(false);
+        if (UseWpsPdfCompatibility && WindowsClipboardSelectionReader.IsWpsPdfRequest(request))
+        {
+            var copied = await _clipboardReader.ReadAsync(request, cancellationToken).ConfigureAwait(false);
+            if (copied.Succeeded || copied.Failure is SelectionFailureKind.ProtectedContent or SelectionFailureKind.Cancelled) return copied;
+            return await _accessibleReader.ReadAsync(request, cancellationToken).ConfigureAwait(false);
+        }
+        return await (UseClipboardFallback ? _fullReader : _accessibleReader).ReadAsync(request, cancellationToken).ConfigureAwait(false);
+    }
 
     public void Dispose()
     {
@@ -69,6 +84,25 @@ public sealed class WindowsClipboardSelectionReader : ISelectionReader
 
     public WindowsClipboardSelectionReader() { }
 
+    internal static bool IsWpsPdfRequest(SelectionRequest request)
+    {
+        if (!OperatingSystem.IsWindows() || request.ForegroundApplication is not ("wpspdf" or "wps")) return false;
+        var target = ResolveTarget(request.Pointer);
+        return target is not null && IsWpsPdfProcess(target.Value.ProcessId, target.Value.RootWindow);
+    }
+
+    internal static async Task<SelectionResult> ReadExistingAsync(SelectionRequest request, CancellationToken token)
+    {
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            token.ThrowIfCancellationRequested();
+            var text = TryReadText();
+            if (!string.IsNullOrWhiteSpace(text)) return new SelectionResult(text, SelectionSource.ManualClipboard);
+            await Task.Delay(20, token).ConfigureAwait(false);
+        }
+        return SelectionResult.Failed(SelectionFailureKind.ClipboardUnavailable, "manual-clipboard-empty");
+    }
+
     internal WindowsClipboardSelectionReader(
         Func<SelectionRequest, CancellationToken, Task<SelectionResult>> overrideReader) =>
         _override = overrideReader;
@@ -95,48 +129,61 @@ public sealed class WindowsClipboardSelectionReader : ISelectionReader
             return SelectionResult.Failed(SelectionFailureKind.UnsupportedApplication, "target-unavailable");
 
         var isWpsPdf = IsWpsPdfProcess(target.Value.ProcessId, target.Value.RootWindow);
-        var originalSequence = WindowsNativeMethods.GetClipboardSequenceNumber();
-        var originalText = TryReadText();
-        if (originalSequence == 0)
-            return SelectionResult.Failed(SelectionFailureKind.ClipboardUnavailable, "sequence-unavailable");
+        using var snapshot = WindowsClipboardSnapshot.TryCapture();
+        if (snapshot is null || snapshot.Sequence == 0)
+            return SelectionResult.Failed(SelectionFailureKind.ClipboardUnavailable, "clipboard-cannot-preserve");
+        var originalSequence = snapshot.Sequence;
 
         string? selectedText = null;
         uint copiedSequence = originalSequence;
         IntPtr copiedOwner = IntPtr.Zero;
         var attempts = isWpsPdf ? 2 : 1;
+        try
+        {
         for (var attempt = 0; attempt < attempts && selectedText is null; attempt++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!TrySendCopy(target.Value))
+            if (WindowsNativeMethods.GetClipboardSequenceNumber() != copiedSequence)
+                return SelectionResult.Failed(SelectionFailureKind.Cancelled, "clipboard-changed-by-user");
+            if (!TrySendCopy(target.Value, out var sendFailure))
             {
                 if (!isWpsPdf || attempt + 1 >= attempts)
-                    return SelectionResult.Failed(SelectionFailureKind.UnsupportedApplication, "copy-not-sent");
+                    return SelectionResult.Failed(SelectionFailureKind.UnsupportedApplication, sendFailure);
             }
             else
             {
+                // Once copy has been delivered, finish observing and restoring the
+                // clipboard before honoring cancellation from a newer selection.
                 var deadline = DateTime.UtcNow + (isWpsPdf ? WpsTimeout : Timeout);
+                var attemptSequence = copiedSequence;
                 while (DateTime.UtcNow < deadline)
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
                     var sequence = WindowsNativeMethods.GetClipboardSequenceNumber();
-                    if (sequence != originalSequence)
+                    if (sequence != attemptSequence)
                     {
                         var owner = WindowsNativeMethods.GetClipboardOwner();
-                        var text = TryReadText();
-                        if (owner != IntPtr.Zero
-                            && IsClipboardOwnerFromTarget(owner, target.Value)
-                            && !string.IsNullOrWhiteSpace(text))
+                        if (owner != IntPtr.Zero && IsClipboardOwnerFromTarget(owner, target.Value))
                         {
-                            selectedText = text.Trim();
-                            copiedSequence = WindowsNativeMethods.GetClipboardSequenceNumber();
+                            copiedSequence = sequence;
                             copiedOwner = owner;
-                            break;
                         }
+                        var text = TryReadText();
+                        if (sequence != WindowsNativeMethods.GetClipboardSequenceNumber())
+                            return SelectionResult.Failed(SelectionFailureKind.Cancelled, "clipboard-changed-during-read");
+                        if (owner != IntPtr.Zero
+                            && IsClipboardOwnerFromTarget(owner, target.Value))
+                        {
+                            copiedSequence = sequence;
+                            copiedOwner = owner;
+                            if (!string.IsNullOrWhiteSpace(text)) { selectedText = text.Trim(); break; }
+                        }
+                        else return SelectionResult.Failed(SelectionFailureKind.Cancelled, "clipboard-owner-changed");
                     }
-                    await Task.Delay(20, cancellationToken).ConfigureAwait(false);
+                    await Task.Delay(20, CancellationToken.None).ConfigureAwait(false);
                 }
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
             if (selectedText is null && attempt + 1 < attempts)
                 await Task.Delay(80, cancellationToken).ConfigureAwait(false);
         }
@@ -144,24 +191,30 @@ public sealed class WindowsClipboardSelectionReader : ISelectionReader
         if (selectedText is null)
             return SelectionResult.Failed(SelectionFailureKind.Empty, "copy-empty");
 
-        // Restore only when the copied application still owns the clipboard.
-        // If the original clipboard did not contain Unicode text, leave richer
-        // formats untouched rather than clearing them blindly.
-        if (WindowsNativeMethods.GetClipboardSequenceNumber() == copiedSequence
-            && WindowsNativeMethods.GetClipboardOwner() == copiedOwner
-            && originalText is not null)
-            TryWriteText(originalText);
-
         return new SelectionResult(
             selectedText,
             SelectionSource.ClipboardFallback,
             new SelectionBounds(request.Pointer.X, request.Pointer.Y, 0, 0),
             SelectionFailureKind.None,
             isWpsPdf ? "wps-ctrl-c" : "ctrl-c");
+        }
+        finally
+        {
+            if (copiedOwner != IntPtr.Zero)
+            {
+                for (var attempt = 0; attempt < 5; attempt++)
+                {
+                    if (WindowsNativeMethods.GetClipboardSequenceNumber() != copiedSequence
+                        || WindowsNativeMethods.GetClipboardOwner() != copiedOwner || snapshot.TryRestore(copiedSequence, copiedOwner)) break;
+                    await Task.Delay(20, CancellationToken.None).ConfigureAwait(false);
+                }
+            }
+        }
     }
 
-    private static bool TrySendCopy(SelectionTarget target)
+    private static bool TrySendCopy(SelectionTarget target, out string failure)
     {
+        failure = "copy-target-not-foreground";
         if (!WindowsNativeMethods.IsForegroundTargetReady()) return false;
         var foreground = WindowsNativeMethods.GetForegroundWindow();
         var foregroundRoot = foreground == IntPtr.Zero
@@ -169,6 +222,17 @@ public sealed class WindowsClipboardSelectionReader : ISelectionReader
             : WindowsNativeMethods.GetAncestor(foreground, WindowsNativeMethods.GaRootOwner);
         if (foregroundRoot == IntPtr.Zero) foregroundRoot = foreground;
         if (foregroundRoot != target.RootWindow) return false;
+        failure = "copy-user-keys-held";
+        foreach (var key in new[] { 0x01, 0x02, 0x10, 0x11, 0x12, 0x5B, 0x5C, 0x43 })
+            if ((GetAsyncKeyState(key) & 0x8000) != 0) return false;
+        failure = "copy-focus-unavailable";
+        var info = new GuiThreadInfo { Size = (uint)Marshal.SizeOf<GuiThreadInfo>() };
+        if (!GetGUIThreadInfo(0, ref info) || info.Focus == IntPtr.Zero) return false;
+        var className = new StringBuilder(256);
+        WindowsNativeMethods.GetClassName(info.Focus, className, className.Capacity);
+        failure = "copy-password-control";
+        if (className.ToString().Contains("edit", StringComparison.OrdinalIgnoreCase)
+            && (WindowsNativeMethods.GetWindowLongPtr(info.Focus, -16).ToInt64() & 0x20) != 0) return false;
 
         var inputs = new[]
         {
@@ -177,9 +241,26 @@ public sealed class WindowsClipboardSelectionReader : ISelectionReader
             WindowsNativeMethods.KeyInput(WindowsNativeMethods.VirtualKeyC, true),
             WindowsNativeMethods.KeyInput(WindowsNativeMethods.VirtualKeyControl, true),
         };
-        return WindowsNativeMethods.SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<WindowsNativeMethods.Input>())
-            == inputs.Length;
+        failure = "copy-input-rejected";
+        var sent = WindowsNativeMethods.SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<WindowsNativeMethods.Input>());
+        if (sent > 0 && sent < inputs.Length)
+        {
+            var releases = sent >= 2 ? new[] { inputs[2], inputs[3] } : new[] { inputs[3] };
+            WindowsNativeMethods.SendInput((uint)releases.Length, releases, Marshal.SizeOf<WindowsNativeMethods.Input>());
+        }
+        // C-down can already initiate copying even if SendInput was partial.
+        return sent >= 2;
     }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct GuiThreadInfo
+    {
+        public uint Size, Flags;
+        public IntPtr Active, Focus, Capture, MenuOwner, MoveSize, Caret;
+        public WindowsNativeMethods.NativeRect CaretRect;
+    }
+    [DllImport("user32.dll")] private static extern short GetAsyncKeyState(int key);
+    [DllImport("user32.dll")] private static extern bool GetGUIThreadInfo(uint thread, ref GuiThreadInfo info);
 
     private static SelectionTarget? ResolveTarget(ScreenPoint point)
     {
@@ -239,39 +320,22 @@ public sealed class WindowsClipboardSelectionReader : ISelectionReader
         {
             var handle = WindowsNativeMethods.GetClipboardData(WindowsNativeMethods.CfUnicodeText);
             if (handle == IntPtr.Zero) return null;
+            var size = GlobalSize(handle).ToUInt64();
+            if (size < 2 || size > 1024 * 1024 || size % 2 != 0) return null;
             var pointer = WindowsNativeMethods.GlobalLock(handle);
             if (pointer == IntPtr.Zero) return null;
-            try { return Marshal.PtrToStringUni(pointer); }
+            try
+            {
+                var value = Marshal.PtrToStringUni(pointer, (int)size / 2);
+                var terminator = value?.IndexOf('\0') ?? -1;
+                return terminator >= 0 ? value![..terminator] : null;
+            }
             finally { WindowsNativeMethods.GlobalUnlock(handle); }
         }
         finally { WindowsNativeMethods.CloseClipboard(); }
     }
 
-    private static bool TryWriteText(string value)
-    {
-        if (!WindowsNativeMethods.OpenClipboard(IntPtr.Zero)) return false;
-        IntPtr memory = IntPtr.Zero;
-        try
-        {
-            var bytes = Encoding.Unicode.GetBytes(value + "\0");
-            memory = WindowsNativeMethods.GlobalAlloc(WindowsNativeMethods.GmemMoveable, (UIntPtr)bytes.Length);
-            if (memory == IntPtr.Zero) return false;
-            var pointer = WindowsNativeMethods.GlobalLock(memory);
-            if (pointer == IntPtr.Zero) return false;
-            try { Marshal.Copy(bytes, 0, pointer, bytes.Length); }
-            finally { WindowsNativeMethods.GlobalUnlock(memory); }
-            if (!WindowsNativeMethods.EmptyClipboard()) return false;
-            if (WindowsNativeMethods.SetClipboardData(WindowsNativeMethods.CfUnicodeText, memory) == IntPtr.Zero)
-                return false;
-            memory = IntPtr.Zero;
-            return true;
-        }
-        finally
-        {
-            if (memory != IntPtr.Zero) WindowsNativeMethods.GlobalFree(memory);
-            WindowsNativeMethods.CloseClipboard();
-        }
-    }
+    [DllImport("kernel32.dll")] private static extern UIntPtr GlobalSize(IntPtr memory);
 }
 
 public interface IWindowsHotkeyService : IDisposable
@@ -303,8 +367,10 @@ public sealed class WindowsGlobalHotkeyService : IWindowsHotkeyService
         lock (_gate)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            if (_thread is not null) return;
+            if (_thread is { IsAlive: true }) return;
             if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("Windows hotkey is unavailable.");
+            _started.Reset();
+            _startupError = null;
             _thread = new Thread(MessageLoop) { IsBackground = true, Name = "Yita.CrossPlatform.Hotkey" };
             _thread.Start();
         }
@@ -370,32 +436,77 @@ public sealed class WindowsGlobalHotkeyService : IWindowsHotkeyService
 
 public sealed class WindowsSelectionRuntime : IDisposable
 {
+    public event EventHandler<ScreenPoint>? ExternalPointerPressed;
     private readonly WindowsGlobalHotkeyService _hotkey = new();
     private readonly WindowsMouseSelectionService _mouse = new();
     private readonly WindowsSelectionAdapter _reader = new();
     private readonly LatestRequestController _requests = new();
     private volatile bool _isEnabled;
     private volatile int _selectionDelayMilliseconds = 80;
+    private readonly RuntimeHealthJournal _health = new(Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Yita", "desktop-runtime-health.log"));
+    private Timer? _recoveryTimer;
+    private int _repairing;
+    private bool _started;
+    private bool _disposed;
 
     public event EventHandler<SelectionCapturedEventArgs>? SelectionCaptured;
 
-    public bool IsRunning => _hotkey.IsRunning;
+    public bool IsRunning => _mouse.IsRunning;
+    public bool IsHotkeyRunning => _hotkey.IsRunning;
 
-    public void Configure(bool isEnabled, bool useClipboardFallback, int selectionDelayMilliseconds)
+    public void Configure(bool isEnabled, bool useClipboardFallback, int selectionDelayMilliseconds,
+        bool useWpsPdfCompatibility = true, bool useSelectionContext = false)
     {
         _isEnabled = isEnabled;
         _selectionDelayMilliseconds = Math.Clamp(selectionDelayMilliseconds, 0, 2_000);
         _reader.UseClipboardFallback = useClipboardFallback;
+        _reader.UseWpsPdfCompatibility = useWpsPdfCompatibility;
+        _reader.UseSelectionContext = useSelectionContext;
         if (!isEnabled) _requests.Cancel();
     }
 
     public void Start()
     {
         if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("Windows selection is unavailable.");
+        if (_started) return;
+        _started = true;
         _hotkey.TranslateRequested += OnTranslateRequested;
         _mouse.SelectionGestureCompleted += OnSelectionGestureCompleted;
-        _hotkey.Start();
-        _mouse.Start();
+        _mouse.ExternalPointerPressed += OnExternalPointerPressed;
+        try { _hotkey.Start(); _health.Record(RuntimeHealthEvent.HotkeyStarted); }
+        catch (Exception exception) { _health.Record(RuntimeHealthEvent.HotkeyRegistrationFailed, exception); }
+        try { _mouse.Start(); _health.Record(RuntimeHealthEvent.MouseHookStarted); }
+        catch (Exception exception) { _health.Record(RuntimeHealthEvent.MouseHookStoppedUnexpectedly, exception); }
+        _recoveryTimer = new Timer(_ => RepairInputCapture(), null, TimeSpan.FromMinutes(15), TimeSpan.FromMinutes(15));
+    }
+
+    public void RepairInputCapture()
+    {
+        if (_disposed || Interlocked.CompareExchange(ref _repairing, 1, 0) != 0) return;
+        try
+        {
+            try { _mouse.Rebind(); _health.Record(RuntimeHealthEvent.MouseHookRecoverySucceeded); }
+            catch (Exception exception) { _health.Record(RuntimeHealthEvent.MouseHookRecoveryFailed, exception); }
+            if (!_hotkey.IsRunning)
+            {
+                try { _hotkey.Start(); _health.Record(RuntimeHealthEvent.HotkeyRecovered); }
+                catch (Exception exception) { _health.Record(RuntimeHealthEvent.HotkeyRegistrationFailed, exception); }
+            }
+        }
+        finally { Volatile.Write(ref _repairing, 0); }
+    }
+
+    public string CreateDiagnostics(bool chinese) => _health.CreateReport(chinese)
+        + Environment.NewLine + $"MouseHook={IsRunning}; Hotkey={IsHotkeyRunning}";
+
+    public void TranslateClipboard() => OnTranslateRequested(this, EventArgs.Empty);
+
+    private void OnExternalPointerPressed(object? sender, ScreenPoint point)
+    {
+        if (_disposed) return;
+        _requests.Cancel();
+        try { ExternalPointerPressed?.Invoke(this, point); } catch { }
     }
 
     private async void OnTranslateRequested(object? sender, EventArgs e)
@@ -403,12 +514,10 @@ public sealed class WindowsSelectionRuntime : IDisposable
         try
         {
             if (!WindowsNativeMethods.GetCursorPos(out var point)) return;
-            if (!_isEnabled) return;
-            if (!IsExternalPoint(new ScreenPoint(point.X, point.Y))) return;
             using var pending = _requests.Begin();
             var request = new SelectionRequest(SelectionTrigger.TranslateShortcut, new ScreenPoint(point.X, point.Y));
             var result = await _reader.ReadAsync(request, pending.Token).ConfigureAwait(false);
-            if (_isEnabled && pending.IsCurrent)
+            if (pending.IsCurrent)
                 SelectionCaptured?.Invoke(this, new SelectionCapturedEventArgs(request, result));
         }
         catch { }
@@ -498,10 +607,14 @@ public sealed class WindowsSelectionRuntime : IDisposable
 
     public void Dispose()
     {
+        if (_disposed) return;
+        _disposed = true;
+        _recoveryTimer?.Dispose();
         _isEnabled = false;
         _requests.Dispose();
         _hotkey.TranslateRequested -= OnTranslateRequested;
         _mouse.SelectionGestureCompleted -= OnSelectionGestureCompleted;
+        _mouse.ExternalPointerPressed -= OnExternalPointerPressed;
         _hotkey.Dispose();
         _mouse.Dispose();
         _reader.Dispose();

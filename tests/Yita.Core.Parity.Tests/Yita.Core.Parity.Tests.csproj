@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" PrivateAssets="all" />
+    <ProjectReference Include="../../src/Yita.Core/Yita.Core.csproj" />
+    <Using Include="Xunit" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="../Yita.Tests/DeepSeekStreamingProviderTests.cs" Link="Original/DeepSeekStreamingProviderTests.cs" />
+    <Compile Include="../Yita.Tests/MockTranslationProviderTests.cs" Link="Original/MockTranslationProviderTests.cs" />
+    <Compile Include="../Yita.Tests/BoundedSseLineReaderTests.cs" Link="Original/BoundedSseLineReaderTests.cs" />
+    <Compile Include="../Yita.Tests/ProviderCircuitBreakerTests.cs" Link="Original/ProviderCircuitBreakerTests.cs" />
+    <Compile Include="../Yita.Tests/TranslationProviderFactoryTests.cs" Link="Original/TranslationProviderFactoryTests.cs" />
+    <Compile Include="../Yita.Tests/TranslationMemoryCacheTests.cs" Link="Original/TranslationMemoryCacheTests.cs" />
+    <Compile Include="../Yita.Tests/TranslationMemoryStoreTests.cs" Link="Original/TranslationMemoryStoreTests.cs" />
+    <Compile Include="../Yita.Tests/TranslationInFlightRegistryTests.cs" Link="Original/TranslationInFlightRegistryTests.cs" />
+    <Compile Include="../Yita.Tests/StreamingUpdateThrottleTests.cs" Link="Original/StreamingUpdateThrottleTests.cs" />
+    <Compile Include="../Yita.Tests/SafeAsyncEnumeratorTests.cs" Link="Original/SafeAsyncEnumeratorTests.cs" />
+    <Compile Include="../Yita.Tests/TranslationOutputGuardTests.cs" Link="Original/TranslationOutputGuardTests.cs" />
+    <Compile Include="../Yita.Tests/LanguageDirectionResolverTests.cs" Link="Original/LanguageDirectionResolverTests.cs" />
+    <Compile Include="../Yita.Tests/PersonalGlossaryTests.cs" Link="Original/PersonalGlossaryTests.cs" />
+    <Compile Include="../Yita.Tests/HighlightMarkupTests.cs" Link="Original/HighlightMarkupTests.cs" />
+    <Compile Include="../Yita.Tests/TextNormalizerTests.cs" Link="Original/TextNormalizerTests.cs" />
+    <Compile Include="../Yita.Tests/AppSettingsTests.cs" Link="Original/AppSettingsTests.cs" />
+    <Compile Include="../Yita.Tests/SettingsStoreMigrationTests.cs" Link="Original/SettingsStoreMigrationTests.cs" />
+    <Compile Include="../Yita.Tests/SettingsStoreCredentialTests.cs" Link="Original/SettingsStoreCredentialTests.cs" />
+    <Compile Include="../Yita.Tests/ThemeCatalogTests.cs" Link="Original/ThemeCatalogTests.cs" />
+    <Compile Include="../Yita.Tests/TranslationFontCatalogTests.cs" Link="Original/TranslationFontCatalogTests.cs" />
+    <Compile Include="../Yita.Tests/TranslationPreferenceCatalogTests.cs" Link="Original/TranslationPreferenceCatalogTests.cs" />
+    <Compile Include="../Yita.Tests/PopupVisualStyleCatalogTests.cs" Link="Original/PopupVisualStyleCatalogTests.cs" />
+    <Compile Include="../Yita.Tests/UiLanguageCatalogTests.cs" Link="Original/UiLanguageCatalogTests.cs" />
+    <Compile Include="../Yita.Tests/AiHistoryStoreTests.cs" Link="Original/AiHistoryStoreTests.cs" />
+    <Compile Include="../Yita.Tests/AiSummaryServiceTests.cs" Link="Original/AiSummaryServiceTests.cs" />
+    <Compile Include="../Yita.Tests/RequestVersionGateTests.cs" Link="Original/RequestVersionGateTests.cs" />
+    <Compile Include="../Yita.Tests/ExplanationRequestGateTests.cs" Link="Original/ExplanationRequestGateTests.cs" />
+    <Compile Include="../Yita.Tests/QuestionAnswerRequestGateTests.cs" Link="Original/QuestionAnswerRequestGateTests.cs" />
+    <Compile Include="../Yita.Tests/TranslationPerformanceMonitorTests.cs" Link="Original/TranslationPerformanceMonitorTests.cs" />
+    <Compile Include="../Yita.Tests/RuntimeHealthJournalTests.cs" Link="Original/RuntimeHealthJournalTests.cs" />
+    <Compile Include="../Yita.Tests/PopupAutoSizeCalculatorTests.cs" Link="Original/PopupAutoSizeCalculatorTests.cs" />
+    <Compile Include="../Yita.Tests/TranslationTypographyTests.cs" Link="Original/TranslationTypographyTests.cs" />
+  </ItemGroup>
+</Project>

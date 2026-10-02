@@ -35,13 +35,14 @@ public sealed class CoreContractTests
             await store.SaveAsync(YitaSettings.Default with
             {
                 TargetLanguage = "English",
+                TargetLanguageMode = "fixed",
                 AiHistoryEnabled = true,
                 PopupOffsetX = -24.5,
                 PopupOffsetY = 36,
             });
             var loaded = await store.LoadAsync();
 
-            Assert.Equal("English", loaded.TargetLanguage);
+            Assert.Equal("英语", loaded.TargetLanguage);
             Assert.True(loaded.AiHistoryEnabled);
             Assert.Equal(-24.5, loaded.PopupOffsetX);
             Assert.Equal(36, loaded.PopupOffsetY);

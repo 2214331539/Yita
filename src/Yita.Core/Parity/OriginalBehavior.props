@@ -1,0 +1,39 @@
+<Project>
+  <!-- Compile the unchanged reference behavior into the portable Core. -->
+  <ItemGroup>
+    <Compile Include="../Yita.App/Translation/*.cs" Exclude="../Yita.App/Translation/TranslationMemoryStore.cs" Link="Original/Translation/%(Filename)%(Extension)" />
+    <Compile Include="../Yita.App/Settings/AppSettings.cs" Link="Original/Settings/AppSettings.cs" />
+    <Compile Include="../Yita.App/Settings/SettingsStore.cs" Link="Original/Settings/SettingsStore.cs" />
+    <Compile Include="../Yita.App/Settings/UiLanguageCatalog.cs" Link="Original/Settings/UiLanguageCatalog.cs" />
+    <Compile Include="../Yita.App/Settings/TranslationPreferenceCatalog.cs" Link="Original/Settings/TranslationPreferenceCatalog.cs" />
+    <Compile Include="../Yita.App/Settings/TranslationFontCatalog.cs" Link="Original/Settings/TranslationFontCatalog.cs" />
+    <Compile Include="../Yita.App/Settings/ThemeCatalog.cs" Link="Original/Settings/ThemeCatalog.cs" />
+    <Compile Include="../Yita.App/Settings/PopupVisualStyleCatalog.cs" Link="Original/Settings/PopupVisualStyleCatalog.cs" />
+    <Compile Include="../Yita.App/Settings/HighlightPaletteCatalog.cs" Link="Original/Settings/HighlightPaletteCatalog.cs" />
+    <Compile Include="../Yita.App/Settings/SummaryRange.cs" Link="Original/Settings/SummaryRange.cs" />
+    <Compile Include="../Yita.App/Selection/TextNormalizer.cs" Link="Original/Selection/TextNormalizer.cs" />
+    <Compile Include="../Yita.App/Services/AiHistoryStore.cs" Link="Original/Services/AiHistoryStore.cs" />
+    <Compile Include="../Yita.App/Services/AiSummaryService.cs" Link="Original/Services/AiSummaryService.cs" />
+    <Compile Include="../Yita.App/Services/RequestVersionGate.cs" Link="Original/Services/RequestVersionGate.cs" />
+    <Compile Include="../Yita.App/Services/ExplanationRequestGate.cs" Link="Original/Services/ExplanationRequestGate.cs" />
+    <Compile Include="../Yita.App/Services/QuestionAnswerRequestGate.cs" Link="Original/Services/QuestionAnswerRequestGate.cs" />
+    <Compile Include="../Yita.App/Services/TranslationPerformanceMonitor.cs" Link="Original/Services/TranslationPerformanceMonitor.cs" />
+    <Compile Include="../Yita.App/Services/RuntimeHealthJournal.cs" Link="Original/Services/RuntimeHealthJournal.cs" />
+    <Compile Include="../Yita.App/Windows/PopupAutoSizeCalculator.cs" Link="Original/Placement/PopupAutoSizeCalculator.cs" />
+    <Compile Include="../Yita.App/Windows/TranslationTypography.cs" Link="Original/Presentation/TranslationTypography.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Yita.Desktop</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Yita.Native.Windows</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Yita.Core.Parity.Tests</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Yita.Desktop.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>

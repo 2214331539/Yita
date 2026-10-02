@@ -45,7 +45,8 @@ public sealed record SelectionRequest(
     SelectionTrigger Trigger,
     ScreenPoint Pointer,
     string? ForegroundApplication = null,
-    SelectionBounds? GestureBounds = null);
+    SelectionBounds? GestureBounds = null,
+    bool IncludeContext = false);
 
 public readonly record struct SelectionGesture(
     ScreenPoint Start,
@@ -118,7 +119,8 @@ public sealed record SelectionResult(
     SelectionSource Source,
     SelectionBounds? Bounds = null,
     SelectionFailureKind Failure = SelectionFailureKind.None,
-    string? DiagnosticCode = null)
+    string? DiagnosticCode = null,
+    string? Context = null)
 {
     public bool Succeeded => !string.IsNullOrWhiteSpace(Text) && Failure == SelectionFailureKind.None;
 

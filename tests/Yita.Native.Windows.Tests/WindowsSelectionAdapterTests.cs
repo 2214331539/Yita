@@ -6,6 +6,25 @@ namespace Yita.Native.Windows.Tests;
 public sealed class WindowsSelectionAdapterTests
 {
     [Fact]
+    public async Task ASecondLaunchActivatesTheExistingOwnerWithoutTakingItsMutex()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        var identity = "Yita.Tests." + Guid.NewGuid().ToString("N");
+        using var owner = new WindowsSingleInstanceGuard(identity);
+        var requested = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        // The activation event can arrive before the UI finishes starting.
+        using var second = new WindowsSingleInstanceGuard(identity);
+        Assert.True(owner.IsOwner);
+        Assert.False(second.IsOwner);
+        owner.StartActivationListener(() => requested.TrySetResult());
+        await requested.Task.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+    [Fact]
+    public void SendInputStructureMatchesTheWin32AbiIncludingTheLargestUnionMember()
+    {
+        Assert.Equal(IntPtr.Size == 8 ? 40 : 28, System.Runtime.InteropServices.Marshal.SizeOf<WindowsNativeMethods.Input>());
+    }
+    [Fact]
     public async Task AdapterPreservesThePlatformNeutralSelectionContract()
     {
         var adapter = new WindowsSelectionAdapter((request, _) => Task.FromResult(

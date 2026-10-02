@@ -12,6 +12,7 @@ namespace Yita.Native.Windows;
 /// </summary>
 public sealed class WindowsMouseSelectionService : IDisposable
 {
+    public event EventHandler<ScreenPoint>? ExternalPointerPressed;
     private readonly object _lifecycleGate = new();
     private readonly WindowsNativeMethods.LowLevelMouseProc _hookCallback;
     private readonly SelectionGestureDetector _gestureDetector;
@@ -84,6 +85,12 @@ public sealed class WindowsMouseSelectionService : IDisposable
             StopCurrentRun();
             throw new InvalidOperationException("无法安装全局鼠标钩子。", startup.Exception);
         }
+    }
+
+    internal void Rebind()
+    {
+        StopCurrentRun();
+        Start();
     }
 
     private void HookThreadMain(HookStartup startup, int generation)
@@ -176,7 +183,7 @@ public sealed class WindowsMouseSelectionService : IDisposable
 
         await foreach (var input in _inputEvents.Reader.ReadAllAsync().ConfigureAwait(false))
         {
-            if (_disposed) continue;
+            if (_disposed || input.Generation != Volatile.Read(ref _generation) || !IsRunning) continue;
             try
             {
                 if (input.Generation != activeGeneration)
@@ -193,6 +200,12 @@ public sealed class WindowsMouseSelectionService : IDisposable
                     activeWindow = RootWindowAt(input.Point);
                     hasInitialBounds = activeWindow != IntPtr.Zero
                         && WindowsNativeMethods.GetWindowRect(activeWindow, out initialBounds);
+                    if (activeWindow != IntPtr.Zero)
+                    {
+                        WindowsNativeMethods.GetWindowThreadProcessId(activeWindow, out var processId);
+                        if (processId != 0 && processId != (uint)Environment.ProcessId)
+                            ExternalPointerPressed?.Invoke(this, input.Point.ToScreenPoint());
+                    }
                     continue;
                 }
 

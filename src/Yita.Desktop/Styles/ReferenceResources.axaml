@@ -1,0 +1,40 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:sys="clr-namespace:System;assembly=System.Runtime" xmlns:transform="clr-namespace:Avalonia.Media.Transformation;assembly=Avalonia.Base">
+  <sys:TimeSpan x:Key="PressMotionDuration">0:0:0.140</sys:TimeSpan>
+  <sys:TimeSpan x:Key="SwitchMotionDuration">0:0:0.200</sys:TimeSpan>
+  <transform:TransformOperations x:Key="PressedScale">scale(0.96)</transform:TransformOperations>
+  <FontFamily x:Key="InterfaceFont">Microsoft YaHei</FontFamily>
+  <SolidColorBrush x:Key="AppWindowBackgroundBrush" Color="#F5F2EC" />
+  <SolidColorBrush x:Key="AppCardBackgroundBrush" Color="#FFFCF7" />
+  <SolidColorBrush x:Key="AppCardBorderBrush" Color="#E3DCD0" />
+  <SolidColorBrush x:Key="AppFieldBackgroundBrush" Color="#F4F0E8" />
+  <SolidColorBrush x:Key="AppFieldBorderBrush" Color="#C7BDAE" />
+  <SolidColorBrush x:Key="AppTextBrush" Color="#302D29" />
+  <SolidColorBrush x:Key="AppMutedTextBrush" Color="#696158" />
+  <SolidColorBrush x:Key="AppHoverBrush" Color="#E8EEE7" />
+  <SolidColorBrush x:Key="AppPressedBrush" Color="#DCE7DE" />
+  <SolidColorBrush x:Key="SuccessBrush" Color="#24756B" />
+  <SolidColorBrush x:Key="DangerBrush" Color="#A43E32" />
+  <SolidColorBrush x:Key="AccentBrush" Color="#24756B" />
+  <SolidColorBrush x:Key="AccentLightBrush" Color="#1C625A" />
+  <SolidColorBrush x:Key="AccentTextBrush" Color="#FFFFFF" />
+  <SolidColorBrush x:Key="SwitchKnobBrush" Color="#FFFFFF" />
+  <SolidColorBrush x:Key="PopupBackgroundBrush" Color="#FFFCF7" />
+  <SolidColorBrush x:Key="PopupBorderBrush" Color="#DDD5C9" />
+  <SolidColorBrush x:Key="PopupButtonBrush" Color="#EFE9DF" />
+  <SolidColorBrush x:Key="PopupButtonHoverBrush" Color="#E3EDE7" />
+  <SolidColorBrush x:Key="PopupButtonBorderBrush" Color="#C7BDAE" />
+  <SolidColorBrush x:Key="PopupTextBrush" Color="#302D29" />
+  <SolidColorBrush x:Key="PopupMutedBrush" Color="#696158" />
+  <SolidColorBrush x:Key="PopupBadgeBrush" Color="#24756B" />
+  <SolidColorBrush x:Key="PopupTailBrush" Color="#FFFCF7" />
+  <SolidColorBrush x:Key="ExplanationSurfaceBrush" Color="#FFFCF7" />
+  <SolidColorBrush x:Key="ExplanationHeaderBrush" Color="#EFE9DF" />
+  <SolidColorBrush x:Key="QuestionAnswerSurfaceBrush" Color="#FFFCF7" />
+  <SolidColorBrush x:Key="QuestionAnswerHeaderBrush" Color="#EFE9DF" />
+  <SolidColorBrush x:Key="QuestionInputBrush" Color="#F4F0E8" />
+  <SolidColorBrush x:Key="PopupTextSurfaceBrush" Color="Transparent" />
+  <CornerRadius x:Key="PopupSurfaceCornerRadius">12</CornerRadius>
+  <CornerRadius x:Key="PopupActionBarCornerRadius">14</CornerRadius>
+  <CornerRadius x:Key="PopupTextSurfaceCornerRadius">0</CornerRadius>
+  <Thickness x:Key="PopupTextSurfacePadding">0</Thickness>
+</ResourceDictionary>

@@ -1,47 +1,102 @@
-<Window xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        x:Class="Yita.Desktop.TranslationPopupWindow"
-        Width="380" Height="220"
-        MinWidth="280" MinHeight="120"
-        MaxWidth="720" MaxHeight="520"
-        SizeToContent="Manual"
-        CanResize="True"
-        Topmost="True"
-        ShowInTaskbar="False"
-        ShowActivated="False"
-        Title="Yita · 翻译"
-        SystemDecorations="None"
-        Background="Transparent">
-  <Border Background="#FFFFFC" BorderBrush="#CFE3DF" BorderThickness="1" CornerRadius="12" Padding="16">
-    <Grid RowDefinitions="Auto,*">
-      <Grid ColumnDefinitions="*,Auto,Auto"
-            Background="Transparent"
-            PointerPressed="HeaderPointerPressed"
-            PointerMoved="HeaderPointerMoved"
-            PointerReleased="HeaderPointerReleased"
-            PointerCaptureLost="HeaderPointerCaptureLost"
-            Cursor="SizeAll">
-        <StackPanel Orientation="Horizontal" Spacing="4" Cursor="Arrow">
-          <Button x:Name="OriginalButton" Content="原文" Click="OriginalClick" FontSize="13" Padding="10,5" />
-          <Button x:Name="TranslatedButton" Content="译文" Click="TranslatedClick" FontSize="13" Padding="10,5" />
-        </StackPanel>
-        <ToggleButton x:Name="PinButton" Grid.Column="1" Width="30" Height="30" Margin="0,0,4,0"
-                      Click="PinClick" ToolTip.Tip="固定窗口" Cursor="Arrow" AutomationProperties.Name="固定窗口">
-          <Path Data="M 6,2 L 14,2 L 12,7 L 16,11 L 4,11 L 8,7 Z M 10,11 L 10,18"
-                Stroke="#155E63" StrokeThickness="1.5" Width="20" Height="20" />
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Yita.Desktop.TranslationPopupWindow" Width="460" Height="240"
+        MinWidth="380" MinHeight="192" MaxWidth="820" MaxHeight="600"
+        SystemDecorations="None" TransparencyLevelHint="Transparent" Background="Transparent"
+        ShowInTaskbar="False" ShowActivated="False" Topmost="True" CanResize="True"
+        xmlns:local="using:Yita.Desktop" FontFamily="{DynamicResource InterfaceFont}" KeyDown="PopupKeyDown">
+  <Grid x:Name="PopupRoot" RowDefinitions="Auto,*">
+    <Border x:Name="ActionBarSurface" Margin="0,0,18,7" Padding="5,4" HorizontalAlignment="Right"
+            Background="{DynamicResource PopupButtonBrush}" CornerRadius="{DynamicResource PopupActionBarCornerRadius}">
+      <StackPanel Orientation="Horizontal">
+        <TextBlock x:Name="NoticeText" IsVisible="False" Margin="7,0,6,0" VerticalAlignment="Center" FontSize="11" Foreground="{DynamicResource AccentBrush}" />
+        <Border Padding="3" Margin="0,0,6,0" CornerRadius="10" Background="{DynamicResource PopupBackgroundBrush}">
+          <StackPanel Orientation="Horizontal">
+            <Button x:Name="OriginalButton" Classes="reading-action text-action" Content="Source" ToolTip.Tip="Show source" Click="OriginalClick" />
+            <Button x:Name="TranslatedButton" Classes="reading-action text-action selected" Content="Translation" ToolTip.Tip="Show translation" Click="TranslatedClick" />
+          </StackPanel>
+        </Border>
+        <ToggleButton x:Name="PinButton" Classes="reading-action" ToolTip.Tip="Keep window" Click="PinClick">
+          <Grid Width="24" Height="24"><Viewbox Width="20" Height="20"><Canvas Width="24" Height="24"><Path Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Data="M16,9V4L17,3V2H7V3L8,4V9C8,10.66 6.66,12 5,12V14H11V21H13V14H19V12C17.34,12 16,10.66 16,9Z" /></Canvas></Viewbox></Grid>
         </ToggleButton>
-        <Button Grid.Column="2" Width="30" Height="30" Click="CloseClick" ToolTip.Tip="关闭翻译"
-                Cursor="Arrow" AutomationProperties.Name="关闭翻译">
-          <Path Data="M 4,4 L 16,16 M 16,4 L 4,16" Stroke="#536C6D" StrokeThickness="1.5" Width="20" Height="20" />
+        <Button x:Name="CloseButton" Classes="reading-action" ToolTip.Tip="Close" Click="CloseClick">
+          <Grid Width="24" Height="24"><Viewbox Width="20" Height="20"><Canvas Width="24" Height="24"><Path Stroke="{DynamicResource PopupTextBrush}" StrokeThickness="2" StrokeLineCap="Round" Data="M6,6 L18,18 M18,6 L6,18" /></Canvas></Viewbox></Grid>
         </Button>
-      </Grid>
-      <ScrollViewer x:Name="ReadingScroll" Grid.Row="1" Margin="0,14,0,4" HorizontalScrollBarVisibility="Disabled">
-        <SelectableTextBlock x:Name="TranslationText" Text="正在读取选区…" TextWrapping="Wrap" FontSize="16" Foreground="#173F43" />
-      </ScrollViewer>
-      <Border Grid.Row="1" Width="14" Height="14" HorizontalAlignment="Right" VerticalAlignment="Bottom"
-              Background="Transparent" Cursor="BottomRightCorner" PointerPressed="ResizePointerPressed">
-        <Path Data="M 5,12 L 12,5 M 9,12 L 12,9" Stroke="#9EB9B6" StrokeThickness="1.5" />
+      </StackPanel>
+    </Border>
+    <Grid Grid.Row="1">
+      <Path x:Name="BubbleTail" Width="18" Height="16" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,31,0,0" IsHitTestVisible="False" Fill="{DynamicResource PopupTailBrush}" Data="M0,0 L18,8 L0,16 Z" IsVisible="False" />
+      <Border x:Name="PopupSurface" Padding="22,6,22,20" CornerRadius="{DynamicResource PopupSurfaceCornerRadius}" Background="{DynamicResource PopupBackgroundBrush}">
+        <Grid RowDefinitions="28,*">
+          <Border x:Name="DragHandle" Height="28" Classes="drag-handle" Background="Transparent" Cursor="SizeAll" CornerRadius="14" ToolTip.Tip="Drag to move"
+                  PointerPressed="HeaderPointerPressed" PointerMoved="HeaderPointerMoved" PointerReleased="HeaderPointerReleased" PointerCaptureLost="HeaderPointerCaptureLost">
+            <Border Width="44" Height="4" HorizontalAlignment="Center" VerticalAlignment="Center" Background="{DynamicResource PopupMutedBrush}" Opacity="0.38" CornerRadius="2.5" />
+          </Border>
+          <Grid Grid.Row="1" RowDefinitions="*,Auto">
+            <Border Background="{DynamicResource PopupTextSurfaceBrush}" CornerRadius="{DynamicResource PopupTextSurfaceCornerRadius}" Padding="{DynamicResource PopupTextSurfacePadding}">
+              <Grid>
+                <StackPanel x:Name="LoadingPanel" VerticalAlignment="Center">
+                  <TextBlock x:Name="LoadingText" Text="Translating…" FontSize="13.5" Foreground="{DynamicResource PopupTextBrush}" TextWrapping="Wrap" />
+                </StackPanel>
+                <ScrollViewer x:Name="ReadingScroll" IsVisible="False" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                  <SelectableTextBlock x:Name="TranslationText" Margin="4,0" FontSize="16.5" LineHeight="25.58" TextWrapping="Wrap" RenderOptions.TextRenderingMode="Antialias" Foreground="{DynamicResource PopupTextBrush}">
+                    <SelectableTextBlock.ContextMenu>
+                      <ContextMenu FontFamily="{DynamicResource InterfaceFont}" FontSize="13">
+                        <MenuItem x:Name="CopyTextMenu" Header="Copy" Click="CopyReadingClick" />
+                        <MenuItem x:Name="SelectAllMenu" Header="Select all" Click="SelectAllClick" />
+                        <Separator />
+                        <MenuItem x:Name="ExplainMenu" Header="Explain" Click="ExplainClick" />
+                        <MenuItem x:Name="CodeMenu" Header="Analyze code" Click="CodeClick" />
+                        <MenuItem x:Name="EditMenu" Header="Edit and save correction" Click="EditClick" />
+                      </ContextMenu>
+                    </SelectableTextBlock.ContextMenu>
+                  </SelectableTextBlock>
+                </ScrollViewer>
+                <Canvas x:Name="SelectionActionLayer" ZIndex="10">
+                  <Button x:Name="SelectionExplainButton" IsVisible="False" Classes="reading-action text-action" Focusable="False"
+                          Padding="9,3" Background="{DynamicResource PopupButtonBrush}" Content="Explain" Click="ExplainClick" />
+                </Canvas>
+                <Grid x:Name="CorrectionPanel" IsVisible="False" RowDefinitions="*,Auto">
+                  <TextBox x:Name="CorrectionText" AcceptsReturn="True" TextWrapping="Wrap" ScrollViewer.VerticalScrollBarVisibility="Auto" />
+                  <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,8,0,0">
+                    <Button x:Name="CancelCorrectionButton" Classes="reading-action text-action" Content="Cancel" Click="CancelCorrectionClick" />
+                    <Button x:Name="SaveCorrectionButton" Classes="reading-action text-action" Content="Save" Click="SaveCorrectionClick" />
+                  </StackPanel>
+                </Grid>
+                <Grid x:Name="ExplanationOverlay" IsVisible="False" RowDefinitions="Auto,*" Background="{DynamicResource ExplanationSurfaceBrush}">
+                  <Border Padding="10,8" Background="{DynamicResource ExplanationHeaderBrush}">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <TextBlock x:Name="ExplanationTitle" FontSize="12.5" FontWeight="SemiBold" VerticalAlignment="Center" Text="AI explanation" />
+                      <StackPanel Grid.Column="1" Orientation="Horizontal">
+                        <Button x:Name="ExplanationCopyButton" Classes="reading-action qa-action" Content="Copy" Click="CopyExplanationClick" />
+                        <Button x:Name="ExplanationRecordButton" Classes="reading-action qa-action" Content="Record" Click="RecordExplanationClick" />
+                        <Button x:Name="ExplanationRetryButton" Classes="reading-action qa-action" Content="Retry" IsVisible="False" Click="RetryExplanationClick" />
+                        <Button x:Name="ExplanationBackButton" Classes="reading-action qa-action" Content="Back" Click="BackExplanationClick" />
+                      </StackPanel>
+                    </Grid>
+                  </Border>
+                  <ScrollViewer Grid.Row="1" Margin="12,10" VerticalScrollBarVisibility="Auto">
+                    <SelectableTextBlock x:Name="ExplanationText" FontSize="16.5" LineHeight="27.72" TextWrapping="Wrap" Foreground="{DynamicResource PopupTextBrush}" />
+                  </ScrollViewer>
+                </Grid>
+              </Grid>
+            </Border>
+            <Grid x:Name="QuestionRow" Grid.Row="1" IsVisible="False" ColumnDefinitions="*,Auto">
+              <Border MaxWidth="520" HorizontalAlignment="Center" Margin="8,10,8,0" Padding="9,6" CornerRadius="14" Background="{DynamicResource QuestionInputBrush}">
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBox x:Name="InlineQuestionTextBox" MinWidth="190" MinHeight="23" MaxHeight="72" Padding="2" FontSize="12" BorderThickness="0" Background="Transparent" Watermark="Ask about this…" AcceptsReturn="True" TextWrapping="Wrap" KeyDown="QuestionKeyDown" />
+                  <Button x:Name="AskButton" Grid.Column="1" MinWidth="48" Margin="8,0,0,0" Classes="reading-action text-action" Background="{DynamicResource AccentBrush}" Foreground="{DynamicResource AccentTextBrush}" Content="Ask" Click="AskClick" />
+                </Grid>
+              </Border>
+              <Button x:Name="DeepSeekChatButton" Grid.Column="1" MinWidth="92" Height="32" Margin="8,10,0,0" Padding="10,4" VerticalAlignment="Bottom" Classes="reading-action text-action" Background="{DynamicResource PopupButtonBrush}" Click="ChatClick">
+                <StackPanel Orientation="Horizontal"><TextBlock Text="&#x2726;" Margin="0,0,6,0" FontSize="13" VerticalAlignment="Center" /><TextBlock Text="DeepSeek" VerticalAlignment="Center" FontWeight="SemiBold" /></StackPanel>
+              </Button>
+            </Grid>
+          </Grid>
+        </Grid>
       </Border>
+      <local:LiquidGlassRim x:Name="GlassSurfaceRim" Margin="{Binding Margin, ElementName=PopupSurface}"
+                           CornerRadius="{DynamicResource PopupSurfaceCornerRadius}" IsGlassEnabled="{DynamicResource PopupGlassEnabled}" />
+      <Border Width="18" Height="18" Background="Transparent" HorizontalAlignment="Right" VerticalAlignment="Bottom" Cursor="SizeAll" PointerPressed="ResizePointerPressed" />
     </Grid>
-  </Border>
+  </Grid>
 </Window>

@@ -1,132 +1,427 @@
-<Window xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:local="clr-namespace:Yita.Desktop"
-        x:Class="Yita.Desktop.MainWindow"
-        Width="960" Height="650"
-        MinWidth="820" MinHeight="540"
-        Title="Yita · 译獭"
-        Background="#F7F9F8">
-  <Grid ColumnDefinitions="210,*">
-    <Border Background="#EBF2EF" Padding="22">
-      <StackPanel Spacing="14">
-        <TextBlock Text="Yita" FontSize="28" FontWeight="SemiBold" Foreground="#155E63" />
-        <TextBlock Text="译獭 · 跨平台预览" FontSize="13" Foreground="#7B5E50" Margin="0,0,0,16" />
-        <Button x:Name="GeneralNav" Tag="General" Content="常规" Click="NavigateClick" HorizontalContentAlignment="Left" />
-        <Button x:Name="HistoryNav" Tag="History" Content="AI 记录" Click="NavigateClick" HorizontalContentAlignment="Left" />
-        <Button x:Name="AppearanceNav" Tag="Appearance" Content="翻译与外观" Click="NavigateClick" HorizontalContentAlignment="Left" />
-        <Button x:Name="ModelNav" Tag="Model" Content="模型配置" Click="NavigateClick" HorizontalContentAlignment="Left" />
-        <Border Height="1" Background="#D5E3DE" Margin="0,12,0,0" />
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Window x:Class="Yita.Desktop.MainWindow" Title="Yita Settings" Icon="avares://Yita.Desktop/Assets/Yita.ico" Width="980" Height="760" MinWidth="760" MinHeight="500" WindowStartupLocation="CenterScreen" ShowInTaskbar="True" UseLayoutRounding="True" FontFamily="Microsoft YaHei" FontSize="14" Background="{DynamicResource AppWindowBackgroundBrush}" Foreground="{DynamicResource AppTextBrush}" xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" CanResize="True" RenderOptions.TextRenderingMode="Antialias" x:CompileBindings="False">
+  <Grid x:Name="SettingsRoot" Background="{DynamicResource AppWindowBackgroundBrush}">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+    <Grid Grid.Row="0" Margin="28,24,28,18">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <Border Width="42" Height="42" Margin="0,0,13,0" VerticalAlignment="Center" Background="Transparent" BorderThickness="0">
+        <Image Width="34" Height="34" Source="avares://Yita.Desktop/Assets/AppLogo.png" />
+      </Border>
+      <StackPanel Grid.Column="1" VerticalAlignment="Center">
+        <TextBlock FontSize="24" FontWeight="SemiBold" Foreground="{DynamicResource AppTextBrush}" Tag="loc:HeaderTitle" Text="Settings" LineHeight="31" />
+        <TextBlock Margin="0,3,0,0" Tag="loc:HeaderSubtitle" Text="Translation behavior, appearance, and connection" Classes="supporting" LineHeight="20" />
       </StackPanel>
-    </Border>
-
-    <Grid Grid.Column="1" Margin="34,28,34,28" RowDefinitions="Auto,*,Auto">
-      <StackPanel Spacing="5">
-        <TextBlock x:Name="PageTitle" Text="常规" FontSize="27" FontWeight="SemiBold" Foreground="#173F43" />
-        <TextBlock x:Name="PageDescription" Text="运行设置" Foreground="#64746F" />
+      <StackPanel Grid.Column="2" VerticalAlignment="Center">
+        <TextBlock Margin="0,0,0,6" HorizontalAlignment="Right" Tag="loc:InterfaceLanguage" Text="Interface language" Classes="label" LineHeight="19" />
+        <Button x:Name="UiLanguageButton" MinWidth="94" Content="中文" Click="UiLanguageButton_Click" Classes="secondary" />
       </StackPanel>
-
-      <ScrollViewer Grid.Row="1" Margin="0,24,0,0" HorizontalScrollBarVisibility="Disabled">
-        <Grid>
-          <Border x:Name="GeneralPage" Padding="0,4">
-            <StackPanel Spacing="18">
-              <TextBlock Text="运行开关" FontSize="18" FontWeight="SemiBold" Foreground="#155E63" />
-              <CheckBox x:Name="EnabledCheckBox" Content="启用划词翻译" />
-              <CheckBox x:Name="StartCheckBox" Content="随系统启动" />
-              <CheckBox x:Name="ClipboardCheckBox" Content="允许剪贴板回退取词" />
-              <Grid ColumnDefinitions="150,*" RowDefinitions="Auto,Auto">
-                <TextBlock Text="划词等待（毫秒）" VerticalAlignment="Center" />
-                <NumericUpDown x:Name="SelectionDelayBox" Grid.Column="1" Minimum="0" Maximum="2000" Increment="20" Value="80" />
-                <TextBlock Grid.Row="1" Text="最大选区字符数" VerticalAlignment="Center" />
-                <NumericUpDown x:Name="MaximumCharactersBox" Grid.Row="1" Grid.Column="1" Minimum="100" Maximum="50000" Increment="100" Value="8000" />
-              </Grid>
-              <TextBlock x:Name="GeneralStatus" Foreground="#155E63" TextWrapping="Wrap" />
-            </StackPanel>
-          </Border>
-
-          <Border x:Name="HistoryPage" Padding="0,4" IsVisible="False">
-            <StackPanel Spacing="14">
-              <TextBlock Text="AI 记录" FontSize="18" FontWeight="SemiBold" Foreground="#155E63" />
-              <CheckBox x:Name="HistoryCheckBox" Content="在本机保存翻译原文与译文" />
-              <Grid ColumnDefinitions="*,Auto,Auto">
-                <TextBox x:Name="HistorySearchBox" Watermark="搜索原文或译文" TextChanged="HistorySearchChanged" />
-                <Button Grid.Column="1" Margin="8,0" Content="刷新" Click="RefreshHistoryClick" />
-                <Button Grid.Column="2" Content="清空记录" Click="RequestClearHistoryClick" />
-              </Grid>
-              <StackPanel x:Name="ClearHistoryConfirmation" IsVisible="False" Spacing="8">
-                <TextBlock Text="清空本机全部翻译记录？此操作无法撤销。" Foreground="#B34335" />
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <Button Content="确认清空" Click="ConfirmClearHistoryClick" />
-                  <Button Content="取消" Click="CancelClearHistoryClick" />
-                </StackPanel>
-              </StackPanel>
-              <TextBlock x:Name="HistoryStatus" TextWrapping="Wrap" Foreground="#155E63" />
-              <ListBox x:Name="HistoryList" Height="160" SelectionChanged="HistorySelectionChanged">
-                <ListBox.ItemTemplate>
-                  <DataTemplate x:DataType="local:HistoryListItem">
-                    <StackPanel Spacing="4" Margin="0,3">
-                      <TextBlock Text="{Binding Summary}" TextTrimming="CharacterEllipsis" MaxWidth="500" />
-                      <TextBlock Text="{Binding Details}" FontSize="12" Foreground="#64746F" />
-                    </StackPanel>
-                  </DataTemplate>
-                </ListBox.ItemTemplate>
-              </ListBox>
-              <TextBlock Text="原文" Foreground="#64746F" />
-              <TextBox x:Name="HistorySourceText" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" Height="90" />
-              <TextBlock Text="译文" Foreground="#64746F" />
-              <TextBox x:Name="HistoryTranslatedText" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" Height="120" />
-            </StackPanel>
-          </Border>
-
-          <Border x:Name="AppearancePage" Padding="0,4" IsVisible="False">
-            <StackPanel Spacing="18">
-              <TextBlock Text="翻译与外观" FontSize="18" FontWeight="SemiBold" Foreground="#155E63" />
-              <Grid ColumnDefinitions="150,*" RowDefinitions="Auto,Auto,Auto">
-                <TextBlock Text="目标语言" VerticalAlignment="Center" />
-                <ComboBox x:Name="TargetLanguageBox" Grid.Column="1" SelectedIndex="0">
-                  <ComboBoxItem Content="简体中文" />
-                  <ComboBoxItem Content="English" />
-                  <ComboBoxItem Content="日本語" />
-                </ComboBox>
-                <TextBlock Text="翻译示例" Grid.Row="1" VerticalAlignment="Top" />
-                <TextBox x:Name="SourceTextBox" Grid.Row="1" Grid.Column="1" Height="100" AcceptsReturn="True" TextWrapping="Wrap" Watermark="待翻译文本" />
-                <TextBlock Text="译文" Grid.Row="2" VerticalAlignment="Top" />
-                <Border Grid.Row="2" Grid.Column="1" Background="#FFFFFF" BorderBrush="#D5E3DE" BorderThickness="1" CornerRadius="6" Padding="12">
-                  <ScrollViewer MaxHeight="180">
-                    <SelectableTextBlock x:Name="TranslationText" Text="尚未翻译" TextWrapping="Wrap" Foreground="#173F43" />
-                  </ScrollViewer>
-                </Border>
-              </Grid>
-              <StackPanel Orientation="Horizontal" Spacing="10">
-                <Button Content="开始翻译" Click="TranslateClick" />
-                <Button Content="取消" Click="CancelClick" />
-              </StackPanel>
-              <TextBlock x:Name="TranslationStatus" Foreground="#155E63" TextWrapping="Wrap" />
-            </StackPanel>
-          </Border>
-
-          <Border x:Name="ModelPage" Padding="0,4" IsVisible="False">
-            <StackPanel Spacing="16">
-              <TextBlock Text="模型配置" FontSize="18" FontWeight="SemiBold" Foreground="#155E63" />
-              <Grid ColumnDefinitions="150,*" RowDefinitions="Auto,Auto,Auto">
-                <TextBlock Text="Endpoint" VerticalAlignment="Center" />
-                <TextBox x:Name="EndpointBox" Grid.Column="1" Watermark="https://api.deepseek.com" />
-                <TextBlock Text="Model" Grid.Row="1" VerticalAlignment="Center" />
-                <TextBox x:Name="ModelBox" Grid.Row="1" Grid.Column="1" Watermark="deepseek-v4-flash" />
-                <TextBlock Text="API Key" Grid.Row="2" VerticalAlignment="Center" />
-                <TextBox x:Name="ApiKeyField" Grid.Row="2" Grid.Column="1" PasswordChar="●" Watermark="API Key" />
-              </Grid>
-              <StackPanel Orientation="Horizontal" Spacing="10">
-                <Button Content="测试连接" Click="TestConnectionClick" />
-              </StackPanel>
-              <TextBlock x:Name="ModelStatus" Foreground="#155E63" TextWrapping="Wrap" />
-            </StackPanel>
-          </Border>
-        </Grid>
-      </ScrollViewer>
-      <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Margin="0,18,0,0">
-        <TextBlock x:Name="SaveStatus" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="#155E63" Margin="0,0,12,0" />
-        <Button Grid.Column="1" Content="保存设置" Click="SaveSettingsClick" />
-      </Grid>
     </Grid>
+    <ScrollViewer x:Name="SettingsScrollViewer" Grid.Row="1" Margin="0,0,7,0" Padding="28,0,21,24" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+      <Grid ColumnDefinitions="178,*" MinWidth="680">
+        <Border Margin="0,0,18,0" Padding="7" Background="{DynamicResource AppCardBackgroundBrush}" CornerRadius="16" VerticalAlignment="Top">
+          <ListBox x:Name="SettingsNavigation" Classes="settings-navigation" SelectionChanged="SettingsNavigationChanged" SelectedIndex="0">
+            <ListBoxItem Tag="general" Content="General" />
+            <ListBoxItem Tag="ai-history" Content="AI history" />
+            <ListBoxItem Tag="translation-appearance" Content="Translation &amp; appearance" />
+            <ListBoxItem Tag="model" Content="Model configuration" />
+          </ListBox>
+        </Border>
+        <Grid Grid.Column="1">
+          <StackPanel x:Name="GeneralPage" Margin="0,0,0,10" IsVisible="True">
+            <Border Classes="card">
+              <StackPanel>
+                <TextBlock Tag="loc:GeneralTitle" Text="General" Classes="section" LineHeight="20" />
+                <TextBlock Margin="0,4,0,17" Tag="loc:GeneralDescription" Text="Control availability and selection behavior." Classes="supporting" LineHeight="20" />
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel>
+                    <TextBlock FontWeight="SemiBold" Tag="loc:SelectionTranslation" Text="Selection translation" LineHeight="20" />
+                    <TextBlock Margin="0,3,18,0" Tag="loc:SelectionTranslationDescription" Text="Translate text automatically after you select it." Classes="supporting" LineHeight="20" />
+                  </StackPanel>
+                  <ToggleSwitch x:Name="EnabledCheckBox" Grid.Column="1" VerticalAlignment="Center" AutomationProperties.Name="Enable selection translation" Classes="switch" />
+                </Grid>
+                <Border Height="1" Margin="0,14" Background="{DynamicResource AppCardBorderBrush}" />
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel>
+                    <TextBlock FontWeight="SemiBold" Tag="loc:StartWithWindows" Text="Start with Windows" LineHeight="20" />
+                    <TextBlock Margin="0,3,18,0" Tag="loc:StartWithWindowsDescription" Text="Stay ready in the background after sign-in." Classes="supporting" LineHeight="20" />
+                  </StackPanel>
+                  <ToggleSwitch x:Name="StartWithWindowsCheckBox" Grid.Column="1" VerticalAlignment="Center" AutomationProperties.Name="Start with Windows" Classes="switch" />
+                </Grid>
+                <Border Height="1" Margin="0,14" Background="{DynamicResource AppCardBorderBrush}" />
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel>
+                    <TextBlock FontWeight="SemiBold" Tag="loc:ClipboardFallback" Text="Compatibility clipboard fallback" LineHeight="20" />
+                    <TextBlock Margin="0,3,18,0" Tag="loc:ClipboardFallbackDescription" Text="Only use this for apps that expose no accessibility text; it temporarily changes the system clipboard." Classes="supporting" LineHeight="20" />
+                  </StackPanel>
+                  <ToggleSwitch x:Name="ClipboardFallbackCheckBox" Grid.Column="1" VerticalAlignment="Center" AutomationProperties.Name="Compatibility clipboard fallback" Classes="switch" />
+                </Grid>
+                <Grid Margin="0,16,0,0">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel>
+                    <TextBlock FontWeight="SemiBold" Tag="loc:WpsPdfCompatibility" Text="WPS PDF compatibility" LineHeight="20" />
+                    <TextBlock Margin="0,3,18,0" Tag="loc:WpsPdfCompatibilityDescription" Text="Use copy when WPS PDF does not expose selected text." Classes="supporting" LineHeight="20" />
+                  </StackPanel>
+                  <ToggleSwitch x:Name="WpsPdfCompatibilityCheckBox" Grid.Column="1" VerticalAlignment="Center" AutomationProperties.Name="WPS PDF compatibility" Classes="switch" />
+                </Grid>
+                <Grid Margin="0,20,0,0">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel>
+                    <TextBlock Tag="loc:SelectionDelay" Text="Trigger delay · ms" Classes="label" LineHeight="19" />
+                    <TextBox x:Name="SelectionDelayTextBox" Text="80" ToolTip.Tip="Prevents accidental triggers from window dragging or brief selections; range 0–1000" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="2">
+                    <TextBlock Tag="loc:MaximumSelection" Text="Selection limit · characters" Classes="label" LineHeight="19" />
+                    <TextBox x:Name="MaximumSelectionTextBox" ToolTip.Tip="Prevents accidental translation of an entire document; range 100–20000" />
+                  </StackPanel>
+                </Grid>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+          <StackPanel x:Name="HistoryPage" Margin="0,0,0,10" IsVisible="False">
+            <Border Margin="0,14,0,0" Classes="card">
+              <StackPanel>
+                <TextBlock Tag="loc:AiHistoryTitle" Text="AI history" Classes="section" LineHeight="20" />
+                <TextBlock Margin="0,4,0,17" TextWrapping="Wrap" Tag="loc:AiHistoryDescription" Text="Choose where manual Record entries are saved. Automatic history for every completed explanation and answer remains optional." Classes="supporting" LineHeight="20" />
+                <CheckBox x:Name="AiHistoryEnabledCheckBox" Content="Save AI explanations and Q&amp;A" Tag="loc:EnableAiHistory" />
+                <TextBlock Margin="28,4,0,0" TextWrapping="Wrap" Tag="loc:AiHistoryPrivacy" Text="Manual Record saves only when clicked. Files are readable Markdown and may contain private selected text." Classes="supporting" LineHeight="20" />
+                <TextBlock Margin="0,17,0,0" Tag="loc:HistoryDirectory" Text="Save folder" Classes="label" LineHeight="19" />
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <TextBox x:Name="AiHistoryDirectoryTextBox" VerticalContentAlignment="Center" TextChanged="AiHistoryDirectoryTextBox_TextChanged" />
+                  <Button Grid.Column="1" Margin="8,0,0,0" Content="Browse" Tag="loc:Browse" Click="BrowseAiHistoryDirectoryButton_Click" Classes="secondary" />
+                  <Button x:Name="OpenAiHistoryDirectoryButton" Grid.Column="2" Margin="8,0,0,0" Content="Open" Tag="loc:OpenFolder" Click="OpenAiHistoryDirectoryButton_Click" Classes="secondary" />
+                </Grid>
+                <TextBlock Margin="0,7,0,0" TextWrapping="Wrap" Tag="loc:ManualRecordDirectoryDescription" Text="Manual Record works even when automatic history is off and appends to one Markdown file per day." Classes="supporting" LineHeight="20" />
+                <Grid Margin="0,17,0,0">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel>
+                    <TextBlock Tag="loc:SummaryRange" Text="Summary range" Classes="label" LineHeight="19" />
+                    <ComboBox x:Name="AiSummaryRangeComboBox">
+                      <ComboBoxItem Content="Today" Tag="today" />
+                      <ComboBoxItem Content="Last 7 days" Tag="last-7-days" />
+                      <ComboBoxItem Content="All records" Tag="all" />
+                    </ComboBox>
+                  </StackPanel>
+                  <Button x:Name="GenerateAiSummaryButton" Grid.Column="2" MinWidth="126" Margin="0,22,0,0" Content="AI summary" Tag="loc:GenerateSummary" Click="GenerateAiSummaryButton_Click" Classes="primary" />
+                </Grid>
+                <TextBlock x:Name="AiHistoryStatusText" Margin="0,12,0,0" Foreground="{DynamicResource AppMutedTextBrush}" TextWrapping="Wrap" LineHeight="20" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+          <StackPanel x:Name="AppearancePage" Margin="0,0,0,10" IsVisible="False">
+            <Border Margin="0,14,0,0" Classes="card">
+              <StackPanel>
+                <TextBlock Tag="loc:TranslationAppearanceTitle" Text="Translation &amp; appearance" Classes="section" LineHeight="20" />
+                <TextBlock Margin="0,4,0,17" Tag="loc:TranslationAppearanceDescription" Text="Choose the default language direction and reading experience." Classes="supporting" LineHeight="20" />
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel>
+                    <TextBlock Tag="loc:SourceLanguage" Text="Source language" Classes="label" LineHeight="19" />
+                    <ComboBox x:Name="SourceLanguageComboBox">
+                      <ComboBoxItem Content="Auto detect" Tag="自动检测" />
+                      <ComboBoxItem Content="English" Tag="英语" />
+                      <ComboBoxItem Content="Simplified Chinese" Tag="简体中文" />
+                    </ComboBox>
+                  </StackPanel>
+                  <StackPanel Grid.Column="2">
+                    <TextBlock Tag="loc:TargetLanguage" Text="Target language" Classes="label" LineHeight="19" />
+                    <ComboBox x:Name="TargetLanguageComboBox">
+                      <ComboBoxItem Content="Choose automatically" Tag="自动判断" />
+                      <ComboBoxItem Content="Simplified Chinese" Tag="简体中文" />
+                      <ComboBoxItem Content="English" Tag="英语" />
+                      <ComboBoxItem Content="Japanese" Tag="日语" />
+                    </ComboBox>
+                  </StackPanel>
+                </Grid>
+                <Border Height="1" Margin="0,17" Background="{DynamicResource AppCardBorderBrush}" />
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel>
+                    <TextBlock FontWeight="SemiBold" Tag="loc:UseSelectionContext" Text="Use surrounding context" LineHeight="20" />
+                    <TextBlock Margin="0,3,18,0" Tag="loc:UseSelectionContextDescription" Text="Use the surrounding paragraph to resolve ambiguity. Extra text is sent only when this is enabled." Classes="supporting" LineHeight="20" />
+                  </StackPanel>
+                  <ToggleSwitch x:Name="UseSelectionContextCheckBox" Grid.Column="1" VerticalAlignment="Center" AutomationProperties.Name="Use surrounding context" Classes="switch" />
+                </Grid>
+                <Grid Margin="0,18,0,0">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel>
+                    <TextBlock Tag="loc:TranslationMode" Text="Translation mode" Classes="label" LineHeight="19" />
+                    <ComboBox x:Name="TranslationModeComboBox">
+                      <ComboBoxItem Content="Fast" Tag="fast" />
+                      <ComboBoxItem Content="Balanced" Tag="balanced" />
+                      <ComboBoxItem Content="Precise" Tag="precise" />
+                    </ComboBox>
+                  </StackPanel>
+                  <StackPanel Grid.Column="2">
+                    <TextBlock Tag="loc:TranslationTone" Text="Writing style" Classes="label" LineHeight="19" />
+                    <ComboBox x:Name="TranslationToneComboBox">
+                      <ComboBoxItem Content="Natural" Tag="natural" />
+                      <ComboBoxItem Content="Formal" Tag="formal" />
+                      <ComboBoxItem Content="Concise" Tag="concise" />
+                      <ComboBoxItem Content="Academic" Tag="academic" />
+                      <ComboBoxItem Content="Technical" Tag="technical" />
+                    </ComboBox>
+                  </StackPanel>
+                </Grid>
+                <StackPanel Margin="0,18,0,0">
+                  <TextBlock Tag="loc:PersonalGlossary" Text="Personal glossary" Classes="label" LineHeight="19" />
+                  <TextBox x:Name="PersonalGlossaryTextBox" MinHeight="94" MaxLength="20000" Padding="11,9" AcceptsReturn="True" TextWrapping="Wrap" VerticalContentAlignment="Top" ScrollViewer.VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Personal glossary" />
+                  <TextBlock Margin="0,7,0,0" Tag="loc:PersonalGlossaryDescription" Text="One term per line: source =&gt; preferred translation. Stored only on this device." Classes="supporting" LineHeight="20" />
+                  <Grid Margin="0,14,0,0">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                      <TextBlock Tag="loc:TranslationMemory" Text="Saved translation memory" Classes="label" LineHeight="19" />
+                      <TextBlock x:Name="TranslationMemoryStatusText" Margin="0,3,16,0" Text="No saved corrections" Classes="supporting" LineHeight="20" />
+                    </StackPanel>
+                    <Button x:Name="ClearTranslationMemoryButton" Grid.Column="1" VerticalAlignment="Center" Content="Clear" Tag="loc:ClearTranslationMemory" Click="ClearTranslationMemoryButton_Click" Classes="secondary" />
+                  </Grid>
+                  <TextBlock Margin="0,7,0,0" Tag="loc:TranslationMemoryDescription" Text="Only corrections you save from the popup are encrypted for this Windows account. Up to 3 relevant pairs may guide future requests." TextWrapping="Wrap" Classes="supporting" LineHeight="20" />
+                </StackPanel>
+                <Grid Margin="0,17,0,0">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel>
+                    <TextBlock Tag="loc:EnglishTranslationFont" Text="English translation font" Classes="label" LineHeight="19" />
+                    <ComboBox x:Name="EnglishTranslationFontComboBox">
+                      <ComboBoxItem Content="Segoe UI" Tag="Segoe UI" />
+                      <ComboBoxItem Content="Times New Roman" Tag="Times New Roman" />
+                      <ComboBoxItem Content="Arial" Tag="Arial" />
+                      <ComboBoxItem Content="Source Sans Pro" Tag="Source Sans Pro" />
+                      <ComboBoxItem Content="Georgia" Tag="Georgia" />
+                      <ComboBoxItem Content="Calibri" Tag="Calibri" />
+                      <ComboBoxItem Content="Cambria" Tag="Cambria" />
+                    </ComboBox>
+                  </StackPanel>
+                  <StackPanel Grid.Column="2">
+                    <TextBlock Tag="loc:ChineseTranslationFont" Text="Chinese translation font" Classes="label" LineHeight="19" />
+                    <ComboBox x:Name="ChineseTranslationFontComboBox">
+                      <ComboBoxItem Content="SimHei (Heiti)" Tag="SimHei" />
+                      <ComboBoxItem Content="Microsoft YaHei UI" Tag="Microsoft YaHei UI" />
+                      <ComboBoxItem Content="SimSun (Songti)" Tag="SimSun" />
+                      <ComboBoxItem Content="KaiTi" Tag="KaiTi" />
+                    </ComboBox>
+                  </StackPanel>
+                </Grid>
+                <Grid Margin="0,17,0,0">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel>
+                    <TextBlock Tag="loc:AccentColor" Text="Accent color" Classes="label" LineHeight="19" />
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                      </Grid.ColumnDefinitions>
+                      <ComboBox x:Name="ColorThemeComboBox" SelectionChanged="ColorThemeComboBox_SelectionChanged">
+                        <ComboBoxItem Content="Yita · Lakeside" Tag="yita" />
+                        <ComboBoxItem Content="Ocean blue" Tag="ocean" />
+                        <ComboBoxItem Content="Violet" Tag="violet" />
+                        <ComboBoxItem Content="Emerald" Tag="emerald" />
+                        <ComboBoxItem Content="Warm orange" Tag="sunset" />
+                        <ComboBoxItem Content="Rose" Tag="rose" />
+                        <ComboBoxItem Content="Custom" Tag="custom" />
+                      </ComboBox>
+                      <Border x:Name="ThemePreviewBorder" Grid.Column="1" Width="28" Height="28" Margin="9,0,0,0" VerticalAlignment="Center" BorderBrush="{DynamicResource AppFieldBorderBrush}" BorderThickness="1" CornerRadius="10" />
+                    </Grid>
+                  </StackPanel>
+                  <StackPanel Grid.Column="2">
+                    <TextBlock Tag="loc:CustomColor" Text="Custom color" Classes="label" LineHeight="19" />
+                    <TextBox x:Name="CustomAccentColorTextBox" TextChanged="CustomAccentColorTextBox_TextChanged" ToolTip.Tip="Enter #RRGGBB, for example #24756B" />
+                  </StackPanel>
+                </Grid>
+                <Grid Margin="0,17,0,0">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel>
+                    <TextBlock Tag="loc:PopupVisualStyle" Text="Popup style" Classes="label" LineHeight="19" />
+                    <ComboBox x:Name="PopupVisualStyleComboBox" SelectionChanged="PopupVisualStyleComboBox_SelectionChanged">
+                      <ComboBoxItem Content="Minimal" Tag="minimal" />
+                      <ComboBoxItem Content="Bubble" Tag="bubble" />
+                      <ComboBoxItem Content="Bubble 2.0" Tag="bubble-v2" />
+                      <ComboBoxItem Content="Bubble 3.0 · Glass" Tag="bubble-v3" />
+                      <ComboBoxItem Content="Bubble 3.0 · Color Glass" Tag="bubble-v3-color" />
+                    </ComboBox>
+                    <TextBlock x:Name="PopupStyleGlassHint" Margin="0,6,0,0" FontSize="12" Foreground="{DynamicResource AppMutedTextBrush}" TextWrapping="Wrap" Tag="loc:PopupStyleGlassHint" Text="Liquid-glass edges with clear, readable text." IsVisible="False" LineHeight="20" />
+                  </StackPanel>
+                  <Grid Grid.Column="2" Width="112" Height="38" Margin="0,20,0,0" HorizontalAlignment="Right" VerticalAlignment="Top">
+                    <Path x:Name="PopupStylePreviewTail" Margin="0,13,0,0" HorizontalAlignment="Left" VerticalAlignment="Top" Data="M0,0 L12,6 L0,12 Z" Fill="{DynamicResource AppFieldBackgroundBrush}" IsVisible="False" />
+                    <Border x:Name="PopupStylePreviewSurface" Margin="0,4,0,4" Background="{DynamicResource AppFieldBackgroundBrush}" BorderBrush="{DynamicResource AppFieldBorderBrush}" BorderThickness="1" CornerRadius="10">
+                      <Grid>
+                        <Border x:Name="PopupStylePreviewTextSurface" Margin="8,5" Background="Transparent" CornerRadius="9" IsHitTestVisible="False" />
+                        <StackPanel Margin="12,0" VerticalAlignment="Center" Orientation="Horizontal">
+                          <Ellipse Width="5" Height="5" Margin="0,0,5,0" Fill="{DynamicResource AccentBrush}" />
+                          <Border Width="38" Height="4" VerticalAlignment="Center" Background="{DynamicResource AppCardBorderBrush}" CornerRadius="2" />
+                        </StackPanel>
+                      </Grid>
+                    </Border>
+                  </Grid>
+                </Grid>
+                <Grid Margin="0,17,0,0" IsVisible="False">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel>
+                    <TextBlock Tag="loc:HighlightPalette" Text="Highlight palette" Classes="label" LineHeight="19" />
+                    <ComboBox x:Name="HighlightPaletteComboBox" SelectionChanged="HighlightPaletteComboBox_SelectionChanged">
+                      <ComboBoxItem Content="Yita · Soft emphasis" Tag="yita" />
+                      <ComboBoxItem Content="Clarity" Tag="clarity" />
+                      <ComboBoxItem Content="Morandi" Tag="morandi" />
+                      <ComboBoxItem Content="Ocean" Tag="ocean" />
+                      <ComboBoxItem Content="Warm" Tag="warm" />
+                      <ComboBoxItem Content="High contrast" Tag="contrast" />
+                    </ComboBox>
+                  </StackPanel>
+                  <StackPanel Grid.Column="2">
+                    <TextBlock Tag="loc:HighlightPalettePreview" Text="AI emphasis preview" Classes="label" LineHeight="19" />
+                    <StackPanel Orientation="Horizontal" Height="32" VerticalAlignment="Center">
+                      <Border x:Name="HighlightPrimaryPreviewBorder" Width="58" Height="25" Margin="0,0,7,0" CornerRadius="6">
+                        <TextBlock x:Name="HighlightPrimaryPreviewText" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Text="Key" LineHeight="20" />
+                      </Border>
+                      <Border x:Name="HighlightSecondaryPreviewBorder" Width="46" Height="25" Margin="0,0,7,0" CornerRadius="6">
+                        <TextBlock x:Name="HighlightSecondaryPreviewText" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Text="AI" LineHeight="20" />
+                      </Border>
+                      <Border x:Name="HighlightTertiaryPreviewBorder" Width="46" Height="25" CornerRadius="6">
+                        <TextBlock x:Name="HighlightTertiaryPreviewText" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Text="Note" LineHeight="20" />
+                      </Border>
+                    </StackPanel>
+                  </StackPanel>
+                </Grid>
+                <TextBlock Margin="0,7,0,0" Tag="loc:HighlightPaletteDescription" Text="DeepSeek marks only the most useful generated phrases. Copy, history, and saved records keep normal text." Classes="supporting" IsVisible="False" LineHeight="20" />
+                <Grid Margin="0,18,0,0">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <TextBlock Margin="0,0,18,0" VerticalAlignment="Center" Tag="loc:DefaultTranslationFontSize" Text="Default translation size" Classes="label" LineHeight="19" />
+                  <Slider x:Name="DefaultFontSizeSlider" Grid.Column="1" Minimum="12" Maximum="34" Value="16.5" SmallChange="0.5" LargeChange="2" IsSnapToTickEnabled="False" ValueChanged="DefaultFontSizeSlider_ValueChanged" Classes="font-size" />
+                  <Border Grid.Column="2" MinWidth="46" Height="28" Margin="13,0,0,0" Background="{DynamicResource AppFieldBackgroundBrush}" CornerRadius="6">
+                    <TextBlock x:Name="DefaultFontSizeValueText" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold" Text="16.5" LineHeight="20" />
+                  </Border>
+                </Grid>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+          <StackPanel x:Name="ModelPage" Margin="0,0,0,10" IsVisible="False">
+            <Border Margin="0,14,0,0" Classes="card">
+              <StackPanel>
+                <TextBlock Tag="loc:TranslationServiceTitle" Text="Translation service" Classes="section" LineHeight="20" />
+                <TextBlock Margin="0,4,0,17" Tag="loc:TranslationServiceDescription" Text="Your API key is stored only in Windows Credential Manager on this device." Classes="supporting" LineHeight="20" />
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel>
+                    <TextBlock Tag="loc:Provider" Text="Provider" Classes="label" LineHeight="19" />
+                    <ComboBox x:Name="ProviderComboBox" SelectionChanged="ProviderComboBox_SelectionChanged">
+                      <ComboBoxItem Content="DeepSeek API" Tag="deepseek" />
+                      <ComboBoxItem Content="Mock · offline test" Tag="mock" />
+                    </ComboBox>
+                  </StackPanel>
+                  <StackPanel Grid.Column="2">
+                    <TextBlock Tag="loc:Model" Text="Model" Classes="label" LineHeight="19" />
+                    <Grid>
+                      <AutoCompleteBox x:Name="ModelComboBox" />
+                      <Button Width="32" Height="38" HorizontalAlignment="Right" Classes="model-arrow" Click="ModelPickerArrowClick">
+                        <Path Width="8" Height="4" Stroke="{DynamicResource AppMutedTextBrush}" StrokeThickness="1.2" Data="M0,0 L4,4 L8,0" />
+                      </Button>
+                    </Grid>
+                  </StackPanel>
+                </Grid>
+                <StackPanel Margin="0,17,0,0">
+                  <TextBlock Tag="loc:ApiEndpoint" Text="API endpoint" Classes="label" LineHeight="19" />
+                  <TextBox x:Name="EndpointTextBox" />
+                </StackPanel>
+                <StackPanel Margin="0,17,0,0">
+                  <TextBlock Tag="loc:ApiKey" Text="API key" Classes="label" LineHeight="19" />
+                  <TextBox x:Name="ApiKeyPasswordBox" PasswordChar="●" />
+                </StackPanel>
+                <Grid Margin="0,13,0,0">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+                  <Button x:Name="TestConnectionButton" Content="Test connection" Tag="loc:TestConnection" Click="TestConnectionButton_Click" Classes="secondary" />
+                  <Button Grid.Column="1" Margin="8,0,0,0" Content="Clear key" Tag="loc:ClearKey" Click="ClearApiKeyButton_Click" Classes="secondary" />
+                  <TextBlock x:Name="ConnectionStatusText" Grid.Column="2" Margin="12,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource AppMutedTextBrush}" Text="" TextAlignment="Right" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Text, RelativeSource={RelativeSource Self}}" LineHeight="20" />
+                </Grid>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </Grid>
+      </Grid>
+    </ScrollViewer>
+    <Border Grid.Row="2" Padding="28,15" Background="{DynamicResource AppCardBackgroundBrush}" BorderBrush="{DynamicResource AppCardBorderBrush}" BorderThickness="0,1,0,0">
+      <Grid>
+        <TextBlock VerticalAlignment="Center" Tag="loc:FooterHint" Text="Changes take effect immediately after saving" Classes="supporting" LineHeight="20" />
+        <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+          <Button Margin="0,0,8,0" Content="Cancel" Tag="loc:Cancel" IsCancel="True" Classes="secondary" Click="CancelButton_Click" />
+          <Button Content="Save settings" Tag="loc:SaveSettings" IsDefault="True" Click="SaveButton_Click" Classes="primary" />
+        </StackPanel>
+      </Grid>
+    </Border>
   </Grid>
 </Window>

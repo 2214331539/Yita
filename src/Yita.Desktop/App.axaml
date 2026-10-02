@@ -2,8 +2,16 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:fluent="clr-namespace:Avalonia.Themes.Fluent;assembly=Avalonia.Themes.Fluent"
              x:Class="Yita.Desktop.App">
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceInclude Source="avares://Yita.Desktop/Styles/ReferenceResources.axaml" />
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
   <Application.Styles>
     <fluent:FluentTheme />
+    <StyleInclude Source="avares://Yita.Desktop/Styles/ReferenceControls.axaml" />
     <Style Selector="Window">
       <Setter Property="FontFamily" Value="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, sans-serif" />
       <Setter Property="FontSize" Value="14" />
