@@ -122,7 +122,47 @@ public static class Program
         Check((await pending.WaitAsync(TimeSpan.FromSeconds(3))).State == NativeServiceState.Unavailable,
             "Disposal cancels pending clipboard work through stdin EOF");
         await child.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(3));
-        Check(child.ExitCode == 0, "Swift finishes fixture restoration and exits cleanly after EOF");
+        Check(child.HasExited, "Client disposal stops the Swift helper");
+        await VerifySwiftClipboardEOFAsync(path, request);
+    }
+
+    private static async Task VerifySwiftClipboardEOFAsync(string path, SelectionRequest request)
+    {
+        var info = new ProcessStartInfo(path)
+        {
+            UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden,
+            RedirectStandardInput = true, RedirectStandardOutput = true,
+        };
+        info.ArgumentList.Add("--self-test");
+        info.ArgumentList.Add("--selection-fixture");
+        info.ArgumentList.Add("clipboard-slow");
+        info.ArgumentList.Add("--parent-pid");
+        info.ArgumentList.Add(Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        // Unix exposes exit codes only through the Process that started the child.
+        using var child = Process.Start(info) ?? throw new InvalidOperationException("Could not start Swift EOF fixture.");
+        try
+        {
+            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            var reader = new BoundedJsonLineReader(child.StandardOutput.BaseStream, MacHelperProtocol.MaximumResponseBytes);
+            MacHelperProtocol.ValidateReady(MacHelperProtocol.Parse(await reader.ReadAsync(deadline.Token)), child.Id);
+            var id = Guid.NewGuid().ToString("N");
+            var frame = JsonSerializer.Serialize(new MacHelperRequest(MacHelperProtocol.Version, id, "readSelection", request,
+                AllowClipboardFallback: true), MacHelperProtocol.JsonOptions);
+            await child.StandardInput.WriteLineAsync(frame.AsMemory(), deadline.Token);
+            await child.StandardInput.FlushAsync(deadline.Token);
+            await Task.Delay(150, deadline.Token);
+            child.StandardInput.Close();
+            var response = MacHelperProtocol.Parse(await reader.ReadAsync(deadline.Token));
+            MacHelperProtocol.ValidateResponse(response, id, "readSelection", allowClipboardFallback: true);
+            Check(response.Selection?.Failure == SelectionFailureKind.Cancelled,
+                "Swift EOF cancels the in-flight copy before returning any selected text");
+            await child.WaitForExitAsync(deadline.Token);
+            Check(child.ExitCode == 0, "Swift finishes fixture restoration and exits cleanly after EOF");
+        }
+        finally
+        {
+            if (!child.HasExited) child.Kill(entireProcessTree: true);
+        }
     }
 
     public static ProcessStartInfo CreatePeerStartInfo(string mode, string? runtimeConfig = null)
