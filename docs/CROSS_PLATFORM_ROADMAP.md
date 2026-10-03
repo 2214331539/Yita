@@ -1,6 +1,6 @@
 # Yita 跨平台产品开发路线图
 
-更新日期：2026-10-03。状态：`codex/platform-host-services` 已完成阶段 B 宿主/存储与阶段 C 的 helper、权限、AX/Cmd+C、全局输入、Desktop 触发、菜单栏、登录项和睡眠恢复代码，尚未合入 `main`。Mac Keychain、外部取词、真实登录和窗口行为仍待真机验证。维护者最新授权将同一最新版的 Windows Avalonia Setup 与 Apple Silicon Mac 包共同发布到 GitHub Release，使用公开预览标记，不混入旧 WPF 包。朋友此前验收的是旧 WPF 安装版，不作为 Avalonia Setup 的验收证据。当前代码事实见 [技术架构](ARCHITECTURE.md)，已完成的 Windows 验收见 [验收记录](WINDOWS_AVALONIA_ACCEPTANCE.md)。
+更新日期：2026-10-04。状态：`codex/platform-host-services` 已完成阶段 B 宿主/存储与阶段 C 的 helper、权限、AX/Cmd+C、全局输入、Desktop 触发、菜单栏、登录项和睡眠恢复代码，尚未合入 `main`。Mac Keychain、外部取词、真实登录和窗口行为仍待真机验证。维护者最新授权将同一最新版的 Windows Avalonia Setup 与 Apple Silicon Mac 包共同发布到 GitHub Release，使用公开预览标记，不混入旧 WPF 包。朋友此前验收的是旧 WPF 安装版，不作为 Avalonia Setup 的验收证据。当前代码事实见 [技术架构](ARCHITECTURE.md)，已完成的 Windows 验收见 [验收记录](WINDOWS_AVALONIA_ACCEPTANCE.md)。
 
 ## 产品目标与边界
 
@@ -35,7 +35,7 @@
 - `codex/csharp-wpf-legacy` 和 `codex/csharp-wpf-upstream-baseline` 保留为历史基准，不用于新产品日常开发。
 - 已按维护者要求删除远程 `codex/cross-platform-migration`，以及本地 `codex/windows-avalonia-parity`、`codex/yita-branding`；删除前已确认三者提交均包含在 `main` 中。
 - 本地 `codex/cross-platform-migration` 按本次仅删除其远程分支的范围保留，不作为下一阶段开发入口。
-- 不重写既有提交、标签或 Release。新架构使用新版本；试用版先标记 Pre-release，完成安装验收后再升级发布状态。
+- 不重写既有提交、标签或已发布安装包；经维护者授权可整理 Release 说明和附件。新架构使用新版本；试用版先标记 Pre-release，完成安装验收后再升级发布状态。
 - 不再以分支名区分是否运行 CI。后续 CI 支持 `main`、新功能分支与 PR，并移除已删除分支的触发配置。
 
 ## 交付顺序
@@ -233,7 +233,7 @@ NSPasteboard 不能原子比较序列并写入，也没有可验证的复制所�
 
 ## 阶段 E：双端分发与更新
 
-- Windows 输出自包含 Setup；Mac 仅输出 `osx-arm64` 的 `.app`、DMG 与备用 ZIP，不提供 Intel 或 Universal 下载。
+- Windows 输出自包含 Setup；Mac 仅构建 `osx-arm64` 的 `.app`、DMG 与备用 ZIP，不提供 Intel 或 Universal 下载。公开 Release 只附 Setup、DMG 与一份安装包校验文件；备用 ZIP、测试说明和构建清单保留在 Actions artifacts。
 - 最低 macOS 版本按所用 .NET、Avalonia、原生 API 及实际验收环境的交集确定，并写入 Release 和包元数据。
 - Mac 正式公开包使用 Developer ID、Hardened Runtime、notarization 与 stapling，按正确次序签名嵌套 helper、原生库和主应用；窗口权限不依赖随意启用的 entitlement。
 - 签名、公证需要维护者的 Apple 开发者账号与证书条件；Windows 公共分发的代码签名同样需要对应证书。尚未具备时只能准确标注内部试用状态。
@@ -275,7 +275,7 @@ NSPasteboard 不能原子比较序列并写入，也没有可验证的复制所�
 - [ ] D：双端兼容性矩阵、性能与阅读体验。
 - [ ] E：双端签名安装包、版本检查、升级与公开 Release。
 - [x] E 试用包：Apple Silicon 自包含 `.app`、DMG/ZIP、完整许可、包内 helper 启动与封装校验；`4004efd` 的 [Actions #36998582502](https://github.com/2214331539/Yita/actions/runs/36998582502) 已通过。真机验收见 [同学测试清单](MAC_PREVIEW_TESTING.md)。
-- [x] E 公开预览：`v0.9.0-preview.1` 同时提供当前 Avalonia Windows Setup 和 Apple Silicon DMG/ZIP；正式签名、LTS、升级及真机验收继续保留。
+- [x] E 公开预览：`v0.9.0-preview.1` 同时提供当前 Avalonia Windows Setup 和 Apple Silicon DMG，备用 ZIP 保留在 Actions artifacts；正式签名、LTS、升级及真机验收继续保留。
 
 ### Apple Silicon 内部试用包检查点
 
@@ -293,7 +293,14 @@ NSPasteboard 不能原子比较序列并写入，也没有可验证的复制所�
 - 两端预览未做商业签名，Mac 仅 ad-hoc 签名；真机授权/外部取词、升级与长期使用仍按验收清单记录。正式 LTS、签名和更新任务继续保留。
 - 公开 [Release v0.9.0-preview.1](https://github.com/2214331539/Yita/releases/tag/v0.9.0-preview.1) 已于 2026-10-03 发布，标记为 Pre-release。源码固定为 `fe73ef7c8c8c59d6bc091c2843d628c15ace330a`；后续记录提交仅更新文档，不重写此标签或产物。
 - 分支预验证 [Actions #37132713409](https://github.com/2214331539/Yita/actions/runs/37132713409) 与标签发布 [Actions #37132927733](https://github.com/2214331539/Yita/actions/runs/37132927733) 均成功，两端各通过 489 项自动化。Windows runner 通过安装、payload、封装启动、重装和卸载；Mac 原始应用、挂载 DMG 与解压 ZIP 均通过 19 个 ARM64 原生文件的签名、运行时及 helper 检查。
-- Release 共 12 项资产：两个平台的安装包、备用 ZIP、测试说明、构建 JSON、Windows payload 清单及三份 SHA256 文件。发布任务核验两端版本、RID、干净工作区、同一标签提交与全部平台文件哈希后共同上传；旧 `v0.8.4` 及 `main` 保持不变。
+- 初次发布时 Release 共上传 12 项资产：两个平台的安装包、备用 ZIP、测试说明、构建 JSON、Windows payload 清单及三份 SHA256 文件。发布任务核验两端版本、RID、干净工作区、同一标签提交与全部平台文件哈希后共同上传；随后按下述记录精简公开附件。
+
+### Release 附件精简检查点
+
+- 2026-10-04，按维护者要求清理当前及上一版 Release。`v0.9.0-preview.1` 仅保留 Windows Setup、Apple Silicon DMG 与只覆盖两份安装包的 `SHA256SUMS.txt`；`v0.8.4` 仅保留原 Windows Setup 与其 SHA256 文件。GitHub 自动生成的两项源码下载仍显示，页面分别为 5 项与 4 项。
+- 已核对安装包的资产 ID、SHA256 与下载地址均未变化，两个 Release 的稳定/预览状态及源码标签未变化；发布说明中的未完成文字已删除。此次没有修改应用代码、已安装程序或 `main`。
+- 一次性清理 [Actions #37137163311](https://github.com/2214331539/Yita/actions/runs/37137163311) 成功，清理前后元数据保存在 `release-cleanup-record` artifact（30 天）。完成后移除该临时工作流，保留执行记录。
+- 后续发布继续核验两端全部内部产物的元数据和 SHA256，再只公开 Setup、DMG 与一份校验文件；ZIP、测试说明和构建清单仅留在 Actions。已验证实际发布暂存脚本只输出这三份文件，并拒绝遭修改的内部 payload。
 
 ## 跨平台产品完成定义
 
