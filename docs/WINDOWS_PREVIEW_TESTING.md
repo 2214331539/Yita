@@ -2,7 +2,7 @@
 
 此版本与同一 Release 中的 M 系列 Mac 包使用相同最新源码、Core 与 Avalonia 界面。Windows 主界面是 Avalonia，不是旧 WPF 产品；独立 UI Automation helper 因 Windows 系统接口需要仍携带 Windows Desktop Runtime。
 
-支持 Windows 10 1809 及以上 / Windows 11 x64。Setup 和备用 ZIP 均为自包含包，无需安装 .NET、SDK 或开发工具。需要联网及自己的 DeepSeek API Key。
+支持 Windows 10 1809 及以上 / Windows 11 x64。公开 Release 提供自包含 Setup，无需安装 .NET、SDK 或开发工具。备用 ZIP 仅保留在 Actions 构建产物中。需要联网及自己的 DeepSeek API Key。
 
 ## 安装
 

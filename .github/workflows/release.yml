@@ -104,14 +104,10 @@ jobs:
             }
           }
           $null = New-Item artifacts/release -ItemType Directory
-          foreach ($file in (Get-ChildItem $win, $mac -File)) {
-            $name = if ($file.Name -eq 'SHA256SUMS.txt') { 'SHA256SUMS-osx-arm64.txt' } else { $file.Name }
-            $target = Join-Path artifacts/release $name
-            if (Test-Path $target) { throw "Duplicate release asset: $name" }
-            Copy-Item $file.FullName $target
-          }
-          foreach ($required in @("Yita-Setup-$version-win-x64.exe", "Yita-$version-osx-arm64.dmg")) {
-            if (!(Test-Path (Join-Path artifacts/release $required))) { throw "Missing installer: $required" }
+          foreach ($item in @(@($win, "Yita-Setup-$version-win-x64.exe"), @($mac, "Yita-$version-osx-arm64.dmg"))) {
+            $source = Join-Path $item[0] $item[1]
+            if (!(Test-Path $source -PathType Leaf)) { throw "Missing installer: $($item[1])" }
+            Copy-Item $source (Join-Path artifacts/release $item[1])
           }
           Get-ChildItem artifacts/release -File | Sort-Object Name | ForEach-Object {
             (Get-FileHash $_.FullName).Hash.ToLowerInvariant() + '  ' + $_.Name

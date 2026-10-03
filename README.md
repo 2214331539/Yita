@@ -28,7 +28,7 @@ Yita 是一个开源桌面划词翻译工具。在外部应用中用鼠标拖选
 | Windows | [Avalonia Setup](https://github.com/2214331539/Yita/releases/download/v0.9.0-preview.1/Yita-Setup-0.9.0-preview.1-win-x64.exe) | Windows 10 1809+ / Windows 11 x64 |
 | macOS | [Apple Silicon DMG](https://github.com/2214331539/Yita/releases/download/v0.9.0-preview.1/Yita-0.9.0-preview.1-osx-arm64.dmg) | M 系列芯片，包元数据最低 macOS 12.0 |
 
-[完整 Release、备用 ZIP 与 SHA256](https://github.com/2214331539/Yita/releases/tag/v0.9.0-preview.1)。两端都自带运行时，无需预装 .NET。Windows 安装包尚无商业代码签名，Mac 使用 ad-hoc 签名且未公证；首次运行、权限和试用清单见 [Windows 说明](docs/WINDOWS_PREVIEW_TESTING.md) / [Mac 说明](docs/MAC_PREVIEW_TESTING.md)。本版标记为 Pre-release，构建检查不替代真机兼容性验收。
+[完整 Release 与 SHA256](https://github.com/2214331539/Yita/releases/tag/v0.9.0-preview.1)。只需下载对应系统的安装包，两端都自带运行时，无需预装 .NET。ZIP、构建 JSON 和测试文件保留在 Actions 产物中。Windows 安装包尚无商业代码签名，Mac 使用 ad-hoc 签名且未公证；首次运行、权限和试用清单见 [Windows 说明](docs/WINDOWS_PREVIEW_TESTING.md) / [Mac 说明](docs/MAC_PREVIEW_TESTING.md)。本版标记为 Pre-release，构建检查不替代真机兼容性验收。
 
 ## 界面预览
 
@@ -188,7 +188,7 @@ scripts/ · packaging/               Avalonia 双端及保留的 WPF 打包流�
 | `codex/csharp-wpf-upstream-baseline` | 切换前本地 main 的上游 WPF 基线，单独保留其历史 |
 | `codex/platform-host-services` | 共享宿主、单实例、设置版本迁移和 Mac 安全存储开发，尚未合入 main |
 
-旧 WPF 与新 Avalonia 都使用 C#，旧分支名中的 `csharp-wpf` 用来区分界面与原生组织方式。已有版本标签与 Release 资产保留，不重写历史。
+旧 WPF 与新 Avalonia 都使用 C#，旧分支名中的 `csharp-wpf` 用来区分界面与原生组织方式。已有版本标签与安装包保留；下载附件仅保留安装包和校验文件。
 
 早期迁移和 Windows 还原的提交均已包含在 `main` 中。历史分支保持参考用途；后续功能从最新 `main` 创建独立分支，验收后通过 Pull Request 合入。
 
@@ -224,7 +224,7 @@ GitHub Actions 的 `Cross-platform architecture` 工作流在 Windows/macOS runn
 
 ### 安装包与更新
 
-当前预览使用 `Build-DesktopSetup.ps1` 生成 Avalonia Windows Setup，使用 `Build-Mac-Preview.sh` 生成 Apple Silicon DMG/ZIP。`release.yml` 在两个平台构建同一个标签，验证版本、源码提交、SHA256 和封装后启动，全部通过后共同发布预览 Release。`packaging/release-version.json` 是发布版本入口，标签必须与它一致。
+当前预览使用 `Build-DesktopSetup.ps1` 生成 Avalonia Windows Setup，使用 `Build-Mac-Preview.sh` 生成 Apple Silicon DMG/ZIP。`release.yml` 在两个平台构建同一个标签，验证版本、源码提交、SHA256 和封装后启动，全部通过后共同发布预览 Release。公开附件仅有 Setup、DMG 和一份安装包校验文件；ZIP、构建信息和完整测试产物保留在 Actions 中。`packaging/release-version.json` 是发布版本入口，标签必须与它一致。
 
 旧 `Build-Setup.ps1` / `Publish.ps1` 仍面向 WPF，需要生成旧包时检出 `codex/csharp-wpf-legacy`。新 Windows 包的 helper 在 `Native/WindowsUIA`，拥有独立运行时；Mac 采用标准 `.app` 目录和随包运行时。当前没有应用内自动更新器，更新需退出后运行新版 Setup 或替换完整 Mac 应用/ZIP；正式签名、公证、升级验收及 LTS 更新仍需继续完成。
 
