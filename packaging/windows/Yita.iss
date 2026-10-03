@@ -10,19 +10,37 @@
 #ifndef OutputDir
   #define OutputDir "..\..\artifacts\release"
 #endif
+#ifndef AppExecutable
+  #define AppExecutable "Yita.exe"
+#endif
+#ifndef AppProductId
+  #define AppProductId "{{2F7C12F3-CF37-4B0B-B76C-73B7443709EE}"
+#endif
+#ifndef ProductName
+  #define ProductName "Yita"
+#endif
+#ifndef InstallFolder
+  #define InstallFolder "Yita"
+#endif
+#ifndef AppNumericVersion
+  #define AppNumericVersion AppVersion + ".0"
+#endif
+#ifndef StartupValueName
+  #define StartupValueName "Yita"
+#endif
 #define ProjectRoot "..\.."
 
 [Setup]
-AppId={{2F7C12F3-CF37-4B0B-B76C-73B7443709EE}
-AppName=Yita
+AppId={#AppProductId}
+AppName={#ProductName}
 AppVersion={#AppVersion}
 AppVerName=Yita {#AppVersion}
 AppPublisher=Yita
 AppPublisherURL=https://github.com/2214331539/Yita
 AppSupportURL=https://github.com/2214331539/Yita/issues
 AppUpdatesURL=https://github.com/2214331539/Yita/releases
-DefaultDirName={localappdata}\Programs\Yita
-DefaultGroupName=Yita
+DefaultDirName={localappdata}\Programs\{#InstallFolder}
+DefaultGroupName={#ProductName}
 DisableProgramGroupPage=yes
 DisableWelcomePage=no
 DisableDirPage=no
@@ -31,8 +49,8 @@ PrivilegesRequired=lowest
 ArchitecturesAllowed=x64os
 ArchitecturesInstallIn64BitMode=x64os
 MinVersion=10.0.17763
-UninstallDisplayName=Yita
-UninstallDisplayIcon={app}\Yita.exe
+UninstallDisplayName={#ProductName}
+UninstallDisplayIcon={app}\{#AppExecutable}
 SetupIconFile={#ProjectRoot}\src\Yita.App\Assets\AppLogo.ico
 WizardStyle=modern light zircon hidebevels
 WizardSizePercent=115,115
@@ -48,11 +66,11 @@ Compression=lzma2/normal
 SolidCompression=yes
 LZMAUseSeparateProcess=yes
 CloseApplications=yes
-CloseApplicationsFilter=Yita.exe,*.dll
+CloseApplicationsFilter={#AppExecutable},Yita.UIA.Worker.exe,*.dll
 RestartApplications=no
 AllowCancelDuringInstall=yes
 SetupLogging=yes
-VersionInfoVersion={#AppVersion}.0
+VersionInfoVersion={#AppNumericVersion}
 VersionInfoProductName=Yita
 VersionInfoDescription=Yita Windows Setup
 VersionInfoCompany=Yita
@@ -88,11 +106,11 @@ Name: "desktopicon"; Description: "{cm:DesktopShortcut}"; Flags: checkedonce
 Source: "{#PayloadDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\Yita"; Filename: "{app}\Yita.exe"; WorkingDir: "{app}"
-Name: "{autodesktop}\Yita"; Filename: "{app}\Yita.exe"; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{group}\{#ProductName}"; Filename: "{app}\{#AppExecutable}"; WorkingDir: "{app}"
+Name: "{autodesktop}\{#ProductName}"; Filename: "{app}\{#AppExecutable}"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\Yita.exe"; Description: "{cm:LaunchYita}"; Flags: nowait postinstall skipifsilent unchecked
+Filename: "{app}\{#AppExecutable}"; Description: "{cm:LaunchYita}"; Flags: nowait postinstall skipifsilent unchecked
 
 [Code]
 const
@@ -140,8 +158,8 @@ var
 begin
   Result := True;
   if CurPageID = wpReady then begin
-    if GetVersionNumbersString(ExpandConstant('{app}\Yita.exe'), ExistingVersion) then begin
-      if StrToVersion(ExistingVersion, InstalledVersion) and StrToVersion('{#AppVersion}.0', SetupVersion) then begin
+    if GetVersionNumbersString(ExpandConstant('{app}\{#AppExecutable}'), ExistingVersion) then begin
+      if StrToVersion(ExistingVersion, InstalledVersion) and StrToVersion('{#AppNumericVersion}', SetupVersion) then begin
         if ComparePackedVersion(InstalledVersion, SetupVersion) > 0 then begin
           SuppressibleMsgBox(CustomMessage('OlderVersion'), mbError, MB_OK, IDOK);
           Result := False;
@@ -156,9 +174,11 @@ var
   StartupCommand: String;
 begin
   if CurUninstallStep = usUninstall then begin
-    if RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run', 'Yita', StartupCommand) then begin
-      if CompareText(StartupCommand, '"' + ExpandConstant('{app}\Yita.exe') + '"') = 0 then
-        RegDeleteValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run', 'Yita');
+    if RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run', '{#StartupValueName}', StartupCommand) then begin
+      if (CompareText(StartupCommand, '"' + ExpandConstant('{app}\{#AppExecutable}') + '"') = 0)
+        or (CompareText(StartupCommand, '"' + ExpandConstant('{app}\{#AppExecutable}') + '" --background') = 0)
+        or (CompareText(StartupCommand, ExpandConstant('{app}\{#AppExecutable}') + ' --background') = 0) then
+        RegDeleteValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run', '{#StartupValueName}');
     end;
   end;
 end;

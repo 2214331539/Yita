@@ -1,12 +1,16 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][string]$PublishDirectory,
-    [Parameter(Mandatory)][string]$OutputDirectory
+    [Parameter(Mandatory)][string]$OutputDirectory,
+    [ValidateSet('osx-arm64', 'win-x64')][string]$RuntimeIdentifier = 'osx-arm64',
+    [string]$AssetsFile = '',
+    [string]$DependencyFileName = 'Yita.Desktop.deps.json'
 )
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path $PSScriptRoot -Parent
-$assets = Get-Content (Join-Path $repoRoot 'src/Yita.Desktop/obj/project.assets.json') -Raw | ConvertFrom-Json -AsHashtable
-$deps = Get-Content (Join-Path $PublishDirectory 'Yita.Desktop.deps.json') -Raw | ConvertFrom-Json -AsHashtable
+if (!$AssetsFile) { $AssetsFile = Join-Path $repoRoot 'src/Yita.Desktop/obj/project.assets.json' }
+$assets = Get-Content $AssetsFile -Raw | ConvertFrom-Json -AsHashtable
+$deps = Get-Content (Join-Path $PublishDirectory $DependencyFileName) -Raw | ConvertFrom-Json -AsHashtable
 $null = New-Item $OutputDirectory -ItemType Directory -Force
 Copy-Item (Join-Path $repoRoot 'LICENSE') $OutputDirectory
 Copy-Item (Join-Path $repoRoot 'NOTICE.md') $OutputDirectory
@@ -18,8 +22,10 @@ $packages = @{}
 foreach ($entry in $assets.libraries.GetEnumerator()) {
     if ($entry.Value.type -eq 'package') { $packages[$entry.Key] = $entry.Value.path }
 }
-$runtimeEntries = @($deps.libraries.Keys | Where-Object { $_ -match '^(runtimepack\.)?Microsoft\.NETCore\.App\.Runtime\.osx-arm64/' })
-if ($runtimeEntries.Count -ne 1) { throw 'Expected exactly one Apple Silicon runtime pack in the published dependency manifest.' }
+$runtimeEntries = @($deps.libraries.Keys | Where-Object {
+    $_ -match ('^(runtimepack\.)?Microsoft\.(NETCore|WindowsDesktop)\.App\.Runtime\.' + [regex]::Escape($RuntimeIdentifier) + '/')
+})
+if ($runtimeEntries.Count -lt 1) { throw 'No matching self-contained runtime pack in the published dependency manifest.' }
 foreach ($key in $runtimeEntries) { $packages[$key] = ($key -replace '^runtimepack\.', '').ToLowerInvariant() }
 $inventory = @()
 foreach ($key in ($packages.Keys | Sort-Object)) {
@@ -65,4 +71,4 @@ foreach ($key in ($packages.Keys | Sort-Object)) {
     }
 }
 $inventory | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $OutputDirectory 'dependency-inventory.json') -Encoding utf8NoBOM
-Write-Output "Collected complete notices for $($inventory.Count) restored packages, including $($runtimeEntries[0])."
+Write-Output "Collected complete notices for $($inventory.Count) restored packages, including $($runtimeEntries -join ', ')."

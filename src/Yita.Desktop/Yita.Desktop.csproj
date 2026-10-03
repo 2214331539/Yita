@@ -34,7 +34,7 @@
   -->
   <Target Name="BuildAndCopyWindowsUiAutomationWorker"
           BeforeTargets="Build"
-          Condition="'$(OS)' == 'Windows_NT'">
+          Condition="'$(OS)' == 'Windows_NT' and '$(RuntimeIdentifier)' == ''">
     <MSBuild Projects="..\Yita.Native.Windows.UIA.Worker\Yita.Native.Windows.UIA.Worker.csproj"
              Targets="Restore;Build"
              Properties="Configuration=$(Configuration)" />

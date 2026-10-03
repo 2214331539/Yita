@@ -213,10 +213,14 @@ public sealed class WindowsUiAutomationWorkerClient : IWindowsUiAutomationWorker
     {
         if (!OperatingSystem.IsWindows()) return null;
 
-        var configured = Environment.GetEnvironmentVariable("YITA_UIA_WORKER_PATH");
-        if (!string.IsNullOrWhiteSpace(configured) && File.Exists(configured)) return configured;
+        return ResolveWorkerPath(AppContext.BaseDirectory, Environment.GetEnvironmentVariable("YITA_UIA_WORKER_PATH"));
+    }
 
-        var baseDirectory = AppContext.BaseDirectory;
+    internal static string? ResolveWorkerPath(string baseDirectory, string? configured = null)
+    {
+        if (!string.IsNullOrWhiteSpace(configured) && File.Exists(configured)) return configured;
+        var packaged = Path.Combine(baseDirectory, "Native", "WindowsUIA", "Yita.UIA.Worker.exe");
+        if (File.Exists(packaged)) return packaged;
         foreach (var name in new[] { "Yita.UIA.Worker.exe", "Yita.Native.Windows.UIA.Worker.exe" })
         {
             var candidate = Path.Combine(baseDirectory, name);

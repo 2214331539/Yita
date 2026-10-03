@@ -2,11 +2,11 @@
 
 此包用于同学协助测试，不是已完成真机验收的正式版本。仅面向 Apple Silicon（M1/M2/M3/M4 等 M 系列芯片），不支持 Intel Mac。包元数据最低 macOS 12.0；实际兼容性以测试记录为准。
 
-应用自带 .NET 运行时，无需安装 .NET、SDK、Xcode 或 Rosetta。需要联网和自己的 DeepSeek API Key。本轮没有发布公共 GitHub Release，也没有配置自动更新。
+应用自带 .NET 运行时，无需安装 .NET、SDK、Xcode 或 Rosetta。需要联网和自己的 DeepSeek API Key。公开预览版通过 GitHub Release 下载，内部构建通过 Actions artifact 分发；尚未配置自动更新。
 
 ## 安装与首次启动
 
-1. 打开 `Yita-0.9.0-macos-preview.*-osx-arm64.dmg`，将 `Yita.app` 拖到 `Applications`。不要直接在 DMG 中长期运行，开机启动应指向已安装应用。
+1. 打开 Release 中的 `Yita-*-osx-arm64.dmg`，将 `Yita.app` 拖到 `Applications`。不要直接在 DMG 中长期运行，开机启动应指向已安装应用。
 2. 弹出 DMG，再从“应用程序”打开 Yita。ZIP 是备用格式：在 Mac 上解压，将其中的 `Yita.app` 移到“应用程序”。两种包内容相同，不要同时运行多份。
 3. 本试用包仅使用 ad-hoc 签名，没有 Apple Developer ID 签名和公证。首次启动如被系统阻止，在确认文件来自维护者后，打开“系统设置 → 隐私与安全性”，使用对应的“仍要打开”并完成系统确认。较旧系统也可能提供右键“打开”。不需要关闭系统安全功能或执行清除 quarantine 的命令。
 4. 设置页配置 DeepSeek 模型及 API Key，测试连接，再保存设置。Key 保存在当前用户的 macOS Keychain；若系统请求钥匙串访问，请按照实际提示处理。

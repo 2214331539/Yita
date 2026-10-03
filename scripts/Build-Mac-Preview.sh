@@ -4,12 +4,13 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 output_root="${1:-$repo_root/artifacts/macos-preview}"
 build_number="${2:-1}"
+version="${3:-0.9.0-macos-preview.$build_number}"
 [[ "$(uname -s)" == Darwin && "$(uname -m)" == arm64 ]] || { printf 'Apple Silicon macOS is required to build this preview.\n' >&2; exit 1; }
 [[ "$build_number" =~ ^[1-9][0-9]*$ ]] || { printf 'A positive numeric build number is required.\n' >&2; exit 1; }
+[[ "$version" =~ ^0\.9\.0-(macos-preview|preview)\.[1-9][0-9]*$ ]] || { printf 'An explicit 0.9.0 preview version is required.\n' >&2; exit 1; }
 for tool in dotnet pwsh xcrun codesign hdiutil iconutil sips plutil ditto; do command -v "$tool" >/dev/null; done
 mkdir -p "$output_root"
 output_root="$(cd "$output_root" && pwd -P)"
-version="0.9.0-macos-preview.$build_number"
 name="Yita-$version-osx-arm64"
 for extension in dmg zip; do
   [[ ! -e "$output_root/$name.$extension" ]] || { printf 'Refusing to overwrite an existing preview package.\n' >&2; exit 1; }
@@ -56,6 +57,9 @@ runtime="$(plutil -extract runtimeOptions.includedFrameworks.0.version raw -o - 
 plutil -create xml1 "$manifest"
 plutil -insert version -string "$version" "$manifest"
 plutil -insert commit -string "$(git rev-parse HEAD)" "$manifest"
+worktree_dirty=false
+[[ -z "$(git status --porcelain)" ]] || worktree_dirty=true
+plutil -insert worktreeDirty -bool "$worktree_dirty" "$manifest"
 plutil -insert rid -string osx-arm64 "$manifest"
 plutil -insert minimumMacOS -string 12.0 "$manifest"
 plutil -insert runtime -string "$runtime" "$manifest"

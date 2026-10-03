@@ -6,7 +6,7 @@ internal static class Program
 {
     [STAThread]
     public static int Main(string[] args) => args is ["--package-check"]
-        ? MacPackageCheck.RunAsync().GetAwaiter().GetResult()
+        ? (OperatingSystem.IsWindows() ? WindowsPackageCheck.RunAsync() : MacPackageCheck.RunAsync()).GetAwaiter().GetResult()
         : BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
 
     public static AppBuilder BuildAvaloniaApp() =>

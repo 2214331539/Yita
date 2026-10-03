@@ -1,0 +1,6 @@
+#define AppExecutable "Yita.Desktop.exe"
+#define AppProductId "{{4F136905-2FF1-40BA-BFDE-D64F5AE0EF35}"
+#define ProductName "Yita Preview"
+#define InstallFolder "Yita Desktop"
+#define StartupValueName "Yita.CrossPlatform"
+#include "Yita.iss"

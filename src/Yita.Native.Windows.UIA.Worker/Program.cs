@@ -31,6 +31,17 @@ internal static class Program
     [STAThread]
     private static async Task<int> Main(string[] args)
     {
+        if (args is ["--package-check"])
+        {
+            Console.WriteLine(JsonSerializer.Serialize(new
+            {
+                status = "passed", architecture = RuntimeInformation.ProcessArchitecture.ToString(),
+                runtime = RuntimeInformation.FrameworkDescription,
+                version = typeof(Program).Assembly.GetName().Version?.ToString(),
+                automation = typeof(AutomationElement).Assembly.GetName().Name
+            }));
+            return 0;
+        }
         var parentId = ReadParentId(args);
         if (parentId is { } id)
         {

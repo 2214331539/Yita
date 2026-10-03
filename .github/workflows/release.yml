@@ -1,52 +1,128 @@
-name: Release Windows Setup
+name: Desktop release packages
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches: ['codex/platform-host-services']
+    tags: ['v*-preview.*']
+    paths:
+      - '.github/workflows/release.yml'
+      - 'packaging/**'
+      - 'scripts/Build-DesktopSetup.ps1'
+      - 'scripts/Test-DesktopSetup.ps1'
+      - 'scripts/Verify-Windows-Package.ps1'
+      - 'scripts/Build-Mac-Preview.sh'
+      - 'scripts/Collect-DesktopLicenses.ps1'
+      - 'src/**'
+      - 'docs/releases/**'
+      - 'docs/WINDOWS_PREVIEW_TESTING.md'
+      - 'docs/MAC_PREVIEW_TESTING.md'
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  release:
-    runs-on: windows-latest
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     steps:
-      - name: Check out tagged source
-        uses: actions/checkout@v4
-
-      - name: Verify legacy installer target
+      - uses: actions/checkout@v4
+      - name: Read and validate release version
+        id: version
         shell: pwsh
         run: |
-          if (Test-Path 'src/Yita.Desktop/Yita.Desktop.csproj') {
-            throw 'This workflow packages the legacy WPF application. Avalonia main requires its own validated installer pipeline before publishing a release.'
-          }
-
-      - name: Set up .NET 8 SDK
-        uses: actions/setup-dotnet@v4
+          $version = (Get-Content packaging/release-version.json -Raw | ConvertFrom-Json).version
+          if ($version -notmatch '^\d+\.\d+\.\d+-preview\.[1-9]\d*$') { throw 'Invalid preview version.' }
+          if ($env:GITHUB_REF -like 'refs/tags/*' -and $env:GITHUB_REF_NAME -ne "v$version") { throw 'Tag and package version must match.' }
+          if (!(Test-Path "docs/releases/v$version.md")) { throw 'Release notes are missing.' }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "build=$($version -replace '^.*\.', '')" >> $env:GITHUB_OUTPUT
+      - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
+      - name: Build shared and native adapters
+        run: dotnet build Yita.CrossPlatform.sln -c Release
+      - name: Run shared and native adapter tests
+        run: dotnet test Yita.CrossPlatform.sln -c Release --no-build --logger "console;verbosity=minimal"
+      - name: Run platform service smoke checks
+        run: dotnet run --project tools/Yita.PlatformSmoke/Yita.PlatformSmoke.csproj -c Release --no-build
+      - name: Run Mac helper protocol smoke checks
+        run: dotnet run --project tools/Yita.MacHelperSmoke/Yita.MacHelperSmoke.csproj -c Release --no-build
+      - name: Build current Avalonia Windows Setup
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/Build-DesktopSetup.ps1 -Version '${{ steps.version.outputs.version }}' -SkipTests
+      - name: Test Windows install, payload, reinstall and uninstall
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/Test-DesktopSetup.ps1 -Version '${{ steps.version.outputs.version }}'
+      - name: Build and validate Apple Silicon DMG and ZIP
+        if: runner.os == 'macOS'
+        shell: bash
+        run: bash scripts/Build-Mac-Preview.sh "$GITHUB_WORKSPACE/artifacts/desktop-release" '${{ steps.version.outputs.build }}' '${{ steps.version.outputs.version }}'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ runner.os }}
+          path: artifacts/desktop-release/*
+          if-no-files-found: error
+          retention-days: 30
 
-      - name: Build self-contained Windows Setup
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: artifacts/download
+      - name: Verify matching sources and prepare release assets
         shell: pwsh
         run: |
           $version = $env:GITHUB_REF_NAME -replace '^v', ''
-          .\scripts\Build-Setup.ps1 -Version $version
-
-      - name: Publish GitHub Release
+          $win = 'artifacts/download/release-Windows'
+          $mac = 'artifacts/download/release-macOS'
+          foreach ($item in @(@($win, 'SHA256SUMS-win-x64.txt'), @($mac, 'SHA256SUMS.txt'))) {
+            Get-Content (Join-Path $item[0] $item[1]) | ForEach-Object {
+              if ($_ -notmatch '^([a-f0-9]{64})\s+(.+)$') { throw 'Invalid checksum file.' }
+              $expected = $Matches[1]; $name = $Matches[2]
+              if ([IO.Path]::GetFileName($name) -ne $name) { throw 'Unexpected checksum path.' }
+              if ((Get-FileHash (Join-Path $item[0] $name)).Hash.ToLowerInvariant() -ne $expected) { throw "Checksum mismatch: $name" }
+            }
+          }
+          foreach ($item in @(@($win, 'win-x64'), @($mac, 'osx-arm64'))) {
+            $metadata = Get-Content (Join-Path $item[0] "Yita-$version-$($item[1]).build.json") -Raw | ConvertFrom-Json
+            if ($metadata.version -ne $version -or $metadata.commit -ne $env:GITHUB_SHA -or $metadata.rid -ne $item[1] -or $metadata.worktreeDirty -ne $false) {
+              throw 'Both packages must match the tagged version and clean source commit.'
+            }
+          }
+          $null = New-Item artifacts/release -ItemType Directory
+          foreach ($file in (Get-ChildItem $win, $mac -File)) {
+            $name = if ($file.Name -eq 'SHA256SUMS.txt') { 'SHA256SUMS-osx-arm64.txt' } else { $file.Name }
+            $target = Join-Path artifacts/release $name
+            if (Test-Path $target) { throw "Duplicate release asset: $name" }
+            Copy-Item $file.FullName $target
+          }
+          foreach ($required in @("Yita-Setup-$version-win-x64.exe", "Yita-$version-osx-arm64.dmg")) {
+            if (!(Test-Path (Join-Path artifacts/release $required))) { throw "Missing installer: $required" }
+          }
+          Get-ChildItem artifacts/release -File | Sort-Object Name | ForEach-Object {
+            (Get-FileHash $_.FullName).Hash.ToLowerInvariant() + '  ' + $_.Name
+          } | Set-Content artifacts/release/SHA256SUMS.txt -Encoding ascii
+      - name: Publish both current Avalonia builds
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: Yita ${{ github.ref_name }}
-          generate_release_notes: true
-          body: |
-            Yita ${{ github.ref_name }} Windows x64 安装包。
-
-            - 支持 Windows 10 1809 及以上与 Windows 11 x64
-            - 自包含 .NET 8，无需另行安装运行环境
-            - 安装后在设置中填写 DeepSeek API Key 并测试连接
-            - 安装包目前未进行代码签名，Windows SmartScreen 可能显示“未知发布者”
-          files: |
-            artifacts/release/Yita-Setup-*-win-x64.exe
-            artifacts/release/Yita-Setup-*-win-x64.exe.sha256
-            artifacts/release/Yita-*-payload.json
+          name: Yita ${{ github.ref_name }} · Windows / Apple Silicon
+          prerelease: true
+          make_latest: false
+          body_path: docs/releases/${{ github.ref_name }}.md
+          fail_on_unmatched_files: true
+          files: artifacts/release/*

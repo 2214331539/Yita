@@ -9,7 +9,7 @@
   <img src="https://img.shields.io/badge/.NET-8-512BD4" alt=".NET 8">
   <img src="https://img.shields.io/badge/UI-Avalonia_11-24756B" alt="Avalonia 11">
   <img src="https://img.shields.io/badge/Windows-available-24756B" alt="Windows available">
-  <img src="https://img.shields.io/badge/macOS-in_development-696158" alt="macOS in development">
+  <img src="https://img.shields.io/badge/macOS-Apple_Silicon_preview-696158" alt="Apple Silicon preview">
 </p>
 <p align="center">
   <a href="#快速开始">快速开始</a> · <a href="#核心功能">核心功能</a> · <a href="#技术架构">技术架构</a> · <a href="#开发与测试">开发与测试</a> · <a href="#配置与隐私">配置与隐私</a> · <a href="#贡献">贡献</a>
@@ -17,9 +17,18 @@
 
 Yita 是一个开源桌面划词翻译工具。在外部应用中用鼠标拖选文字后，Yita 读取选区，通过 DeepSeek 流式返回译文，在选区附近显示可移动、可缩放和可固定的阅读浮窗。支持网页、Markdown、编辑器、Office 文档以及具有可复制文本层的 PDF；实际兼容性取决于目标应用的选区接口、复制能力和系统权限。
 
-**`main` 现已采用 C# + .NET 8 + Avalonia 架构。** Windows 取词、阅读浮窗、设置与 AI 辅助已实现，并完成本地功能验收。macOS 共享业务层与界面可以构建，但原生划词、权限和菜单栏功能尚未完成，不能视为已可用的 macOS 划词翻译产品。
+**当前跨平台预览采用 C# + .NET 8 + Avalonia 架构。** Windows 取词、阅读浮窗、设置与 AI 辅助已实现，并完成本地功能验收；Mac 原生 AX/Cmd+C、权限、全局输入、菜单栏、Keychain 与桌面生命周期已接入，真实设备兼容性仍待验收。
 
-> **源码与下载版本**：新架构当前从源码运行，尚未发布对应的 Setup。[GitHub Releases](https://github.com/2214331539/Yita/releases) 中已有的 `v0.8.4` 安装包属于旧 WPF 版本。更新 `main` 不会改变已上传的安装包，也不会自动更新用户电脑上的程序。
+> **源码与下载版本**：`v0.9.0-preview.1` 的 Windows 和 Apple Silicon Mac 包来自 `codex/platform-host-services` 同一源码提交，均为当前 Avalonia 应用；该功能分支尚未合入 `main`。历史 `v0.8.4` 是旧 WPF 版本，保留不变。更新源码或创建 Release 不会自动更新已安装的程序。
+
+## 下载
+
+| 系统 | 安装包 | 要求 |
+| --- | --- | --- |
+| Windows | [Avalonia Setup](https://github.com/2214331539/Yita/releases/download/v0.9.0-preview.1/Yita-Setup-0.9.0-preview.1-win-x64.exe) | Windows 10 1809+ / Windows 11 x64 |
+| macOS | [Apple Silicon DMG](https://github.com/2214331539/Yita/releases/download/v0.9.0-preview.1/Yita-0.9.0-preview.1-osx-arm64.dmg) | M 系列芯片，包元数据最低 macOS 12.0 |
+
+[完整 Release、备用 ZIP 与 SHA256](https://github.com/2214331539/Yita/releases/tag/v0.9.0-preview.1)。两端都自带运行时，无需预装 .NET。Windows 安装包尚无商业代码签名，Mac 使用 ad-hoc 签名且未公证；首次运行、权限和试用清单见 [Windows 说明](docs/WINDOWS_PREVIEW_TESTING.md) / [Mac 说明](docs/MAC_PREVIEW_TESTING.md)。本版标记为 Pre-release，构建检查不替代真机兼容性验收。
 
 ## 界面预览
 
@@ -60,7 +69,7 @@ Yita 是一个开源桌面划词翻译工具。在外部应用中用鼠标拖选
 需要 Git 和 [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)。`global.json` 使用 `8.0.425` 作为构建基线，允许 .NET 8 内更新的稳定 SDK。
 
 ```powershell
-git clone https://github.com/2214331539/Yita.git
+git clone --branch v0.9.0-preview.1 https://github.com/2214331539/Yita.git
 cd Yita
 dotnet restore Yita.CrossPlatform.sln
 dotnet build Yita.CrossPlatform.sln -c Release --no-restore
@@ -112,7 +121,8 @@ flowchart TB
     Core --> Storage[缓存 / 加密修正 / AI 记录]
     API --> Core
     Core --> Desktop
-    Mac[Yita.Native.Mac · 原生取词待实现] -.-> Desktop
+    Mac[Yita.Native.Mac · AX / Cmd+C / 原生输入] --> Desktop
+    Mac --> Helper[Swift 原生 helper]
 ```
 
 | 模块 | 职责 | 状态 |
@@ -121,7 +131,8 @@ flowchart TB
 | `Yita.Desktop` | Avalonia 设置页、阅读浮窗、解释/问答、主题、字体和桌面生命周期 | Windows 已实现；其他平台需验收 |
 | `Yita.Native.Windows` | 鼠标钩子、全局快捷键、原生控件取词、剪贴板事务、托盘、开机启动、凭据与 DPAPI | 已实现 |
 | `Yita.Native.Windows.UIA.Worker` | 在独立进程中访问第三方 UI Automation provider，隔离阻塞和崩溃 | 已实现 |
-| `Yita.Native.Mac` | Keychain、加密修正记录、helper 协议与权限入口；后续 AXUIElement、Cmd+C 与输入捕获 | 部分实现，原生取词待完成 |
+| `Yita.Native.Mac` | Keychain、加密修正记录、helper 协议、权限、AX/Cmd+C、输入与桌面生命周期 | 已接入，真实环境待验收 |
+| `Yita.Native.Mac.Helper` | Swift/AppKit/Carbon 原生进程、Accessibility、复制事务、鼠标、快捷键与睡眠通知 | 已实现，真实环境待验收 |
 
 ### 实现策略
 
@@ -147,7 +158,8 @@ src/
   Yita.Desktop/                      Avalonia 设置、浮窗与问答
   Yita.Native.Windows/               Windows 原生功能
   Yita.Native.Windows.UIA.Worker/    独立 UI Automation helper
-  Yita.Native.Mac/                   macOS 原生适配边界
+  Yita.Native.Mac/                   macOS 原生宿主与 helper 客户端
+  Yita.Native.Mac.Helper/            Swift 原生 helper
   Yita.App/                          保留的 WPF 源码与共享业务来源
 tests/
   Yita.Core.Tests/                   共享合约与可靠性
@@ -158,7 +170,7 @@ tests/
 tools/                              原生取词 smoke 与原版截图工具
 docs/                               架构、开发计划和验收说明
 assets/branding/yita/                品牌形象与图标
-scripts/ · packaging/windows/       旧 WPF 打包流程与开发辅助脚本
+scripts/ · packaging/               Avalonia 双端及保留的 WPF 打包流程
 ```
 
 ## 平台与分支
@@ -166,7 +178,7 @@ scripts/ · packaging/windows/       旧 WPF 打包流程与开发辅助脚本
 | 平台 | 当前能力 |
 | --- | --- |
 | Windows | 主开发和验收平台，支持取词、翻译、浮窗、托盘和设置 |
-| macOS | Core 与 Avalonia 界面可构建；AX 取词、Cmd+C、权限和菜单栏尚未接入，不提供完整安装版 |
+| macOS | Apple Silicon 预览包；共享 UI、AX/Cmd+C、权限和菜单栏已接入，真实授权/外部划词待验收；不支持 Intel |
 | Linux | 不属于当前产品交付范围，没有原生取词适配器 |
 
 | 分支 | 用途 |
@@ -202,9 +214,9 @@ dotnet run --project tools/Yita.WindowsSmoke/Yita.WindowsSmoke.csproj -c Release
 dotnet run --project tools/Yita.PlatformSmoke/Yita.PlatformSmoke.csproj -c Release
 ```
 
-维护者已确认朋友电脑上的旧 WPF 安装版安装与取词通过。新版 Avalonia Setup 仍未生成，按当前开发安排暂缓打包，优先完善平台宿主和 macOS 原生链路；两者验收记录分开。
+维护者已确认朋友电脑上的旧 WPF 安装版安装与取词通过。新版 Avalonia Setup 使用独立安装身份，并通过发布流水线检查安装、封装后的主程序/helper 启动、重装和卸载；更多朋友电脑的实际取词与旧版验收记录分开。
 
-GitHub Actions 的 `Cross-platform architecture` 工作流在 Windows/macOS runner 上构建当前解决方案并运行测试；`Legacy WPF regression` 在 Windows 上检查保留的 WPF 解决方案。macOS 构建通过只能证明共享代码可构建，不能证明 macOS 划词功能已实现。
+GitHub Actions 的 `Cross-platform architecture` 工作流在 Windows/macOS runner 上构建当前解决方案并运行测试；`Legacy WPF regression` 在 Windows 上检查保留的 WPF 解决方案。macOS 编译与原生 fixture 检查通过不能替代真实授权和外部划词验收。
 
 `codex/platform-host-services` 功能分支已将 Mac 的 Swift 鼠标监听、Carbon `Cmd+Shift+T`、AX 与显式 Cmd+C 回退连接到 Desktop。CI 使用实际 Swift/C# 管道验证合成拖选与取消，不请求桌面权限或读取真实选区/剪贴板。代码接入不代表 Mac 真机已验收；接口与输入约定见 [Mac helper 协议](docs/MAC_HELPER_PROTOCOL.md) 和 [Mac 原生输入](docs/MAC_NATIVE_INPUT.md)。
 
@@ -212,9 +224,9 @@ GitHub Actions 的 `Cross-platform architecture` 工作流在 Windows/macOS runn
 
 ### 安装包与更新
 
-当前 Avalonia main 尚未接入经过验收的自包含 Setup 流程。`Build-Setup.ps1`、`Publish.ps1` 和旧 `release.yml` 面向 WPF；工作流已增加检查，阻止从包含 Avalonia 项目的新标签误发布旧架构安装包。需要生成旧版安装包时，应检出 `codex/csharp-wpf-legacy` 并使用该分支的说明。
+当前预览使用 `Build-DesktopSetup.ps1` 生成 Avalonia Windows Setup，使用 `Build-Mac-Preview.sh` 生成 Apple Silicon DMG/ZIP。`release.yml` 在两个平台构建同一个标签，验证版本、源码提交、SHA256 和封装后启动，全部通过后共同发布预览 Release。`packaging/release-version.json` 是发布版本入口，标签必须与它一致。
 
-下一步分发需要为 `Yita.Desktop` 和 Windows UIA helper 一起完成自包含发布、安装/升级/卸载验证与签名策略。当前没有应用内自动更新器，源码更新、GitHub Release 和安装版更新是三个独立步骤。
+旧 `Build-Setup.ps1` / `Publish.ps1` 仍面向 WPF，需要生成旧包时检出 `codex/csharp-wpf-legacy`。新 Windows 包的 helper 在 `Native/WindowsUIA`，拥有独立运行时；Mac 采用标准 `.app` 目录和随包运行时。当前没有应用内自动更新器，更新需退出后运行新版 Setup 或替换完整 Mac 应用/ZIP；正式签名、公证、升级验收及 LTS 更新仍需继续完成。
 
 ## 配置与隐私
 
@@ -241,7 +253,7 @@ Yita 是本地客户端，默认在线翻译不是离线模型。开启个人术
 - 不承诺所有应用兼容；管理员权限窗口、受保护控件和不同应用版本会影响取词。
 - 不同 DPI、字体渲染与多屏状态仍需验收；Avalonia 与 WPF 的栅格化结果不保证逐像素一致。
 - Zotero 桥接仍为实验代码，不能视为已验证支持。
-- 没有完整 macOS 划词安装版，也没有新架构自动更新与 Setup Release。
+- Apple Silicon 安装包为预览状态，Mac 真实桌面及更多 Windows 电脑仍需验收；尚无自动更新、正式代码签名与 Mac 公证。
 
 划词无反应时，先在普通网页确认划词开关与兼容回退已开启；再尝试主动复制后使用 `Ctrl+Shift+T`。若正常复制受到影响，暂停划词并关闭两个兼容取词开关。可通过托盘修复输入捕获或复制诊断，反馈时附目标应用与版本、系统版本和复现步骤。
 
