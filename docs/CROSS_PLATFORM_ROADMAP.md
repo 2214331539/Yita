@@ -21,10 +21,10 @@
 | Windows 取词与阅读 | UIA 隔离、原生控件、复制回退、浮窗与托盘已接入；本机 WPS PDF 等已验收；朋友验收了旧 WPF 安装版 | 新 Avalonia 版的多电脑、更多目标软件、安装后兼容性与长期运行 |
 | 平台宿主接入 | 功能分支已通过共享接口连接窗口、原生事件、托盘与启动项；单实例/唤醒通过双端 CI；Mac 菜单栏、受约束的 `.app` 登录项与会话恢复已有代码；Apple Silicon 内部试用包已生成 | 合入主线、Mac 桌面/真实登录实测和正式签名分发 |
 | 共享翻译与功能 | Core 复用原版提供器、SSE、取消、缓存、解释/问答和记录；Avalonia UI 已还原 | 保持回归，补齐跨平台宿主和存储依赖 |
-| Windows 分发 | Avalonia 主程序与隔离 helper 自包含发布；本机 Setup 安装、文件校验、运行时启动、重装及卸载通过；旧 WPF Release 保留 | 双端 CI 与公开发布结果、更多电脑的升级及取词验收 |
+| Windows 分发 | Avalonia 自包含 Setup 已发布 `v0.9.0-preview.1`；本机与 Windows runner 的安装、文件校验、运行时启动、重装及卸载通过；旧 WPF Release 保留 | 更多电脑的升级、实际取词及长期使用验收 |
 | macOS UI 与存储 | Mac CI 编译和自动化通过；原生 Keychain 与 AES-GCM 修正记录、菜单栏、Spaces 属性和睡眠恢复已有代码与可控测试 | Keychain 真机授权/锁定/签名验证、真实桌面生命周期、取词、权限和菜单栏验收 |
 | macOS 划词 | `MacSelectionRuntime` 已将鼠标/快捷键、权限、AX/边界和显式 Cmd+C 接入 Desktop；通过合成输入及实际 Swift 管道检查 | 真实授权、外部 AX/复制、Retina/多屏与窗口验收 |
-| 更新 | GitHub 已有旧版 Release | 新版发布流水线、版本检查、双端升级与回退 |
+| 更新 | GitHub 已有双端 Avalonia 预览 Release、版本/来源/校验约束与构建流水线 | 应用内版本检查、双端升级与回退 |
 | 许可分发 | 仓库保留 MIT、上游与字体声明；双端 Desktop 包收集完整依赖/运行时声明，Windows helper 单独收集 | 后续新增依赖随包补齐许可 |
 
 已有自动化记录为跨平台解决方案 336 项通过，旧 WPF 回归 455 项曾通过；这是历史验收证据，不代表未来改动或 Mac 原生功能已经通过检查。每个后续阶段记录其实际版本、环境与结果。
@@ -260,7 +260,7 @@ NSPasteboard 不能原子比较序列并写入，也没有可验证的复制所�
 - [x] 更新 README 的远程分支清单，将首次迁移计划标记为历史记录。
 - [x] 按实际源码制定下一阶段计划与验收标准。
 - [ ] A1：在 `codex/windows-avalonia-release` 完成 .NET 10 LTS 升级及相关回归。
-- [x] A2 实现：新版自包含 publish、隔离 helper、双端许可清单与独立 Yita Setup；本机封装启动及安装/重装/卸载通过，双端 CI 继续记录。
+- [x] A2：新版自包含 publish、隔离 helper、双端许可清单与独立 Yita Setup；本机及双端 CI 通过，公开预览已发布。
 - [ ] A3：干净 Windows 安装/升级/卸载和不同电脑的划词验证。
 - [x] B1：宿主接口、Windows 接入、跨平台单实例及手动剪贴板回退；本机自动化和原生 smoke 通过。
 - [x] B2 实现：设置 schema/迁移保护、原生 Keychain 与 AES-GCM 修正记录、平台能力状态和可控测试。
@@ -275,6 +275,7 @@ NSPasteboard 不能原子比较序列并写入，也没有可验证的复制所�
 - [ ] D：双端兼容性矩阵、性能与阅读体验。
 - [ ] E：双端签名安装包、版本检查、升级与公开 Release。
 - [x] E 试用包：Apple Silicon 自包含 `.app`、DMG/ZIP、完整许可、包内 helper 启动与封装校验；`4004efd` 的 [Actions #36998582502](https://github.com/2214331539/Yita/actions/runs/36998582502) 已通过。真机验收见 [同学测试清单](MAC_PREVIEW_TESTING.md)。
+- [x] E 公开预览：`v0.9.0-preview.1` 同时提供当前 Avalonia Windows Setup 和 Apple Silicon DMG/ZIP；正式签名、LTS、升级及真机验收继续保留。
 
 ### Apple Silicon 内部试用包检查点
 
@@ -284,12 +285,15 @@ NSPasteboard 不能原子比较序列并写入，也没有可验证的复制所�
 - 完整许可与恢复依赖清单随包附带，覆盖 26 个恢复包及字体/上游。DMG 为 47,737,078 字节，备用 ZIP 为 40,448,488 字节。Actions artifact 为 `Yita-macos-preview-4-osx-arm64`，默认保存 30 天。
 - 产物已下载到 `F:\Project\InstantTranslate\artifacts\macos-preview\preview-4`，外层 artifact 和四项分发文件的 SHA256 均已校验。仅推送当前功能分支，`main` 保持 `dd74328`。同学真实授权、外部划词和桌面生命周期尚待反馈；不将封装检查记为真机验收。
 
-### 双端公开预览发布准备
+### 双端公开预览发布检查点
 
 - 2026-10-03，本机 Release 编译零警告/错误，489 项测试全部通过，单实例与 helper 协议 smoke 通过。
 - `0.9.0-preview.1` Windows 候选包包含 Avalonia 主程序、独立目录的 UIA worker 和各自的 .NET 8.0.31 运行时。缺少系统 .NET 的启动检查通过；Setup 安装、所有 payload 哈希、重装、卸载与设置保留检查通过。候选包来自工作区，仅用于本机验证，公开包由干净源码的 CI 重新构建。
 - 新版安装身份、目录和启动项与旧 WPF 版区分。两端公开包使用同一版本和源码提交，上传前验证构建元数据及 SHA256；任何一端失败均不发布。
 - 两端预览未做商业签名，Mac 仅 ad-hoc 签名；真机授权/外部取词、升级与长期使用仍按验收清单记录。正式 LTS、签名和更新任务继续保留。
+- 公开 [Release v0.9.0-preview.1](https://github.com/2214331539/Yita/releases/tag/v0.9.0-preview.1) 已于 2026-10-03 发布，标记为 Pre-release。源码固定为 `fe73ef7c8c8c59d6bc091c2843d628c15ace330a`；后续记录提交仅更新文档，不重写此标签或产物。
+- 分支预验证 [Actions #37132713409](https://github.com/2214331539/Yita/actions/runs/37132713409) 与标签发布 [Actions #37132927733](https://github.com/2214331539/Yita/actions/runs/37132927733) 均成功，两端各通过 489 项自动化。Windows runner 通过安装、payload、封装启动、重装和卸载；Mac 原始应用、挂载 DMG 与解压 ZIP 均通过 19 个 ARM64 原生文件的签名、运行时及 helper 检查。
+- Release 共 12 项资产：两个平台的安装包、备用 ZIP、测试说明、构建 JSON、Windows payload 清单及三份 SHA256 文件。发布任务核验两端版本、RID、干净工作区、同一标签提交与全部平台文件哈希后共同上传；旧 `v0.8.4` 及 `main` 保持不变。
 
 ## 跨平台产品完成定义
 
