@@ -233,7 +233,7 @@ NSPasteboard 不能原子比较序列并写入，也没有可验证的复制所�
 
 ## 阶段 E：双端分发与更新
 
-- Windows 输出自包含 Setup；Mac 仅构建 `osx-arm64` 的 `.app`、DMG 与备用 ZIP，不提供 Intel 或 Universal 下载。公开 Release 只附 Setup、DMG 与一份安装包校验文件；备用 ZIP、测试说明和构建清单保留在 Actions artifacts。
+- Windows 输出自包含 Setup；Mac 仅构建 `osx-arm64` 的 `.app`、DMG 与备用 ZIP，不提供 Intel 或 Universal 下载。新版公开 Release 只上传 `Yita-Setup.exe` 与 `Yita.dmg`；校验文件、备用 ZIP、测试说明和构建清单保留在 Actions artifacts。
 - 最低 macOS 版本按所用 .NET、Avalonia、原生 API 及实际验收环境的交集确定，并写入 Release 和包元数据。
 - Mac 正式公开包使用 Developer ID、Hardened Runtime、notarization 与 stapling，按正确次序签名嵌套 helper、原生库和主应用；窗口权限不依赖随意启用的 entitlement。
 - 签名、公证需要维护者的 Apple 开发者账号与证书条件；Windows 公共分发的代码签名同样需要对应证书。尚未具备时只能准确标注内部试用状态。
@@ -300,7 +300,7 @@ NSPasteboard 不能原子比较序列并写入，也没有可验证的复制所�
 - 2026-10-04，按维护者要求清理当前及上一版 Release。`v0.9.0-preview.1` 仅保留 Windows Setup、Apple Silicon DMG 与只覆盖两份安装包的 `SHA256SUMS.txt`；`v0.8.4` 仅保留原 Windows Setup 与其 SHA256 文件。GitHub 自动生成的两项源码下载仍显示，页面分别为 5 项与 4 项。
 - 已核对安装包的资产 ID、SHA256 与下载地址均未变化，两个 Release 的稳定/预览状态及源码标签未变化；发布说明中的未完成文字已删除。此次没有修改应用代码、已安装程序或 `main`。
 - 一次性清理 [Actions #37137163311](https://github.com/2214331539/Yita/actions/runs/37137163311) 成功，清理前后元数据保存在 `release-cleanup-record` artifact（30 天）。完成后移除该临时工作流，保留执行记录。
-- 后续发布继续核验两端全部内部产物的元数据和 SHA256，再只公开 Setup、DMG 与一份校验文件；ZIP、测试说明和构建清单仅留在 Actions。已验证实际发布暂存脚本只输出这三份文件，并拒绝遭修改的内部 payload。
+- 此检查点的发布规则为核验两端全部内部产物的元数据和 SHA256，再公开 Setup、DMG 与一份校验文件；ZIP、测试说明和构建清单仅留在 Actions。当时已验证实际发布暂存脚本只输出这三份文件，并拒绝遭修改的内部 payload。`v0.9.0-preview.2` 起按维护者最新要求，仅上传统一命名的两个安装包，内部校验继续执行。
 
 ## 跨平台产品完成定义
 

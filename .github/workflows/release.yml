@@ -104,14 +104,11 @@ jobs:
             }
           }
           $null = New-Item artifacts/release -ItemType Directory
-          foreach ($item in @(@($win, "Yita-Setup-$version-win-x64.exe"), @($mac, "Yita-$version-osx-arm64.dmg"))) {
+          foreach ($item in @(@($win, "Yita-Setup-$version-win-x64.exe", 'Yita-Setup.exe'), @($mac, "Yita-$version-osx-arm64.dmg", 'Yita.dmg'))) {
             $source = Join-Path $item[0] $item[1]
             if (!(Test-Path $source -PathType Leaf)) { throw "Missing installer: $($item[1])" }
-            Copy-Item $source (Join-Path artifacts/release $item[1])
+            Copy-Item $source (Join-Path artifacts/release $item[2])
           }
-          Get-ChildItem artifacts/release -File | Sort-Object Name | ForEach-Object {
-            (Get-FileHash $_.FullName).Hash.ToLowerInvariant() + '  ' + $_.Name
-          } | Set-Content artifacts/release/SHA256SUMS.txt -Encoding ascii
       - name: Publish both current Avalonia builds
         uses: softprops/action-gh-release@v2
         with:
@@ -121,4 +118,6 @@ jobs:
           make_latest: false
           body_path: docs/releases/${{ github.ref_name }}.md
           fail_on_unmatched_files: true
-          files: artifacts/release/*
+          files: |
+            artifacts/release/Yita-Setup.exe
+            artifacts/release/Yita.dmg

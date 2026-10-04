@@ -19,16 +19,16 @@ Yita 是一个开源桌面划词翻译工具。在外部应用中用鼠标拖选
 
 **当前跨平台预览采用 C# + .NET 8 + Avalonia 架构。** Windows 取词、阅读浮窗、设置与 AI 辅助已实现，并完成本地功能验收；Mac 原生 AX/Cmd+C、权限、全局输入、菜单栏、Keychain 与桌面生命周期已接入，真实设备兼容性仍待验收。
 
-> **源码与下载版本**：`v0.9.0-preview.1` 的 Windows 和 Apple Silicon Mac 包来自 `codex/platform-host-services` 同一源码提交，均为当前 Avalonia 应用；该功能分支尚未合入 `main`。历史 `v0.8.4` 是旧 WPF 版本，保留不变。更新源码或创建 Release 不会自动更新已安装的程序。
+> **源码与下载版本**：`v0.9.0-preview.2` 的 Windows 和 Apple Silicon Mac 包来自 `codex/platform-host-services` 同一源码提交，均为当前 Avalonia 应用；该功能分支尚未合入 `main`。历史 `v0.8.4` 是旧 WPF 版本，保留不变。更新源码或创建 Release 不会自动更新已安装的程序。
 
 ## 下载
 
 | 系统 | 安装包 | 要求 |
 | --- | --- | --- |
-| Windows | [Avalonia Setup](https://github.com/2214331539/Yita/releases/download/v0.9.0-preview.1/Yita-Setup-0.9.0-preview.1-win-x64.exe) | Windows 10 1809+ / Windows 11 x64 |
-| macOS | [Apple Silicon DMG](https://github.com/2214331539/Yita/releases/download/v0.9.0-preview.1/Yita-0.9.0-preview.1-osx-arm64.dmg) | M 系列芯片，包元数据最低 macOS 12.0 |
+| Windows | [Yita-Setup.exe](https://github.com/2214331539/Yita/releases/download/v0.9.0-preview.2/Yita-Setup.exe) | Windows 10 1809+ / Windows 11 x64 |
+| macOS | [Yita.dmg](https://github.com/2214331539/Yita/releases/download/v0.9.0-preview.2/Yita.dmg) | M 系列芯片，包元数据最低 macOS 12.0 |
 
-[完整 Release 与 SHA256](https://github.com/2214331539/Yita/releases/tag/v0.9.0-preview.1)。只需下载对应系统的安装包，两端都自带运行时，无需预装 .NET。ZIP、构建 JSON 和测试文件保留在 Actions 产物中。Windows 安装包尚无商业代码签名，Mac 使用 ad-hoc 签名且未公证；首次运行、权限和试用清单见 [Windows 说明](docs/WINDOWS_PREVIEW_TESTING.md) / [Mac 说明](docs/MAC_PREVIEW_TESTING.md)。本版标记为 Pre-release，构建检查不替代真机兼容性验收。
+[完整 Release](https://github.com/2214331539/Yita/releases/tag/v0.9.0-preview.2)。上传附件仅有两个安装包，两端都自带运行时，无需预装 .NET。SHA256 校验、ZIP、构建 JSON 和测试文件保留在 Actions 产物中。Windows 安装包尚无商业代码签名，Mac 使用 ad-hoc 签名且未公证；首次运行、权限和试用清单见 [Windows 说明](docs/WINDOWS_PREVIEW_TESTING.md) / [Mac 说明](docs/MAC_PREVIEW_TESTING.md)。本版标记为 Pre-release，构建检查不替代真机兼容性验收。
 
 ## 界面预览
 
@@ -69,7 +69,7 @@ Yita 是一个开源桌面划词翻译工具。在外部应用中用鼠标拖选
 需要 Git 和 [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)。`global.json` 使用 `8.0.425` 作为构建基线，允许 .NET 8 内更新的稳定 SDK。
 
 ```powershell
-git clone --branch v0.9.0-preview.1 https://github.com/2214331539/Yita.git
+git clone --branch v0.9.0-preview.2 https://github.com/2214331539/Yita.git
 cd Yita
 dotnet restore Yita.CrossPlatform.sln
 dotnet build Yita.CrossPlatform.sln -c Release --no-restore
@@ -188,7 +188,7 @@ scripts/ · packaging/               Avalonia 双端及保留的 WPF 打包流�
 | `codex/csharp-wpf-upstream-baseline` | 切换前本地 main 的上游 WPF 基线，单独保留其历史 |
 | `codex/platform-host-services` | 共享宿主、单实例、设置版本迁移和 Mac 安全存储开发，尚未合入 main |
 
-旧 WPF 与新 Avalonia 都使用 C#，旧分支名中的 `csharp-wpf` 用来区分界面与原生组织方式。已有版本标签与安装包保留；下载附件仅保留安装包和校验文件。
+旧 WPF 与新 Avalonia 都使用 C#，旧分支名中的 `csharp-wpf` 用来区分界面与原生组织方式。已有版本标签与安装包保留；新版上传附件仅保留安装包。
 
 早期迁移和 Windows 还原的提交均已包含在 `main` 中。历史分支保持参考用途；后续功能从最新 `main` 创建独立分支，验收后通过 Pull Request 合入。
 
@@ -224,7 +224,7 @@ GitHub Actions 的 `Cross-platform architecture` 工作流在 Windows/macOS runn
 
 ### 安装包与更新
 
-当前预览使用 `Build-DesktopSetup.ps1` 生成 Avalonia Windows Setup，使用 `Build-Mac-Preview.sh` 生成 Apple Silicon DMG/ZIP。`release.yml` 在两个平台构建同一个标签，验证版本、源码提交、SHA256 和封装后启动，全部通过后共同发布预览 Release。公开附件仅有 Setup、DMG 和一份安装包校验文件；ZIP、构建信息和完整测试产物保留在 Actions 中。`packaging/release-version.json` 是发布版本入口，标签必须与它一致。
+当前预览使用 `Build-DesktopSetup.ps1` 生成 Avalonia Windows Setup，使用 `Build-Mac-Preview.sh` 生成 Apple Silicon DMG/ZIP。`release.yml` 在两个平台构建同一个标签，验证版本、源码提交、SHA256 和封装后启动，全部通过后共同发布预览 Release。上传附件仅有 `Yita-Setup.exe` 和 `Yita.dmg`；校验文件、ZIP、构建信息和完整测试产物保留在 Actions 中。GitHub 另会自动显示两项源码归档，它们不属于上传的安装附件。`packaging/release-version.json` 是发布版本入口，标签必须与它一致。
 
 旧 `Build-Setup.ps1` / `Publish.ps1` 仍面向 WPF，需要生成旧包时检出 `codex/csharp-wpf-legacy`。新 Windows 包的 helper 在 `Native/WindowsUIA`，拥有独立运行时；Mac 采用标准 `.app` 目录和随包运行时。当前没有应用内自动更新器，更新需退出后运行新版 Setup 或替换完整 Mac 应用/ZIP；正式签名、公证、升级验收及 LTS 更新仍需继续完成。
 
