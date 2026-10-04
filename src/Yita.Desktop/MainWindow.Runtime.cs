@@ -252,6 +252,7 @@ public sealed partial class MainWindow
     {
         try
         {
+            if (_permissionService is not null) await RefreshPlatformPermissionsAsync();
             if (Clipboard is { } clipboard)
                 await clipboard.SetTextAsync(CreatePlatformDiagnostics() + "\n\n"
                     + _performance.CreateReport(_settings.UiLanguage == "zh-CN") + "\n\n"
@@ -274,6 +275,9 @@ public sealed partial class MainWindow
         "Permission helper: " + (_permissionStatus?.Service.ToString() ?? "not configured"),
         "Accessibility: " + (_permissionStatus?.Permissions.Accessibility == true ? "granted" : "unavailable"),
         "Input monitoring: " + (_permissionStatus?.Permissions.InputMonitoring == true ? "granted" : "unavailable"),
+        "Mac app location: " + (OperatingSystem.IsMacOS()
+            ? Yita.Native.Mac.MacApplicationBundle.GetLocation(Environment.ProcessPath,
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)).ToString() : "not applicable"),
         "Encrypted memory: " + (_memoryInitializationFailed || _memory?.LoadFailed == true ? "unreadable"
             : _memory is null ? "unavailable" : "available"),
     });

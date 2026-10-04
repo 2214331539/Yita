@@ -21,25 +21,7 @@ internal sealed class DesktopPlatformServices
 
     internal ISelectionRuntime? CreateSelectionRuntime() => OperatingSystem.IsWindows()
         ? new WindowsSelectionRuntime()
-        : OperatingSystem.IsMacOS() ? new MacSelectionRuntime(IsOwnWindowAsync) : null;
-
-    internal static async Task<bool> IsOwnWindowAsync(ScreenPoint point, CancellationToken cancellationToken) =>
-        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
-        {
-            if (Avalonia.Application.Current?.ApplicationLifetime is not Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
-                return true;
-            return desktop.Windows.Any(window => ContainsScreenPoint(window, point));
-        }, Avalonia.Threading.DispatcherPriority.Input, cancellationToken);
-
-    internal static bool ContainsScreenPoint(Avalonia.Controls.Window window, ScreenPoint point)
-    {
-        if (!window.IsVisible || window.WindowState == Avalonia.Controls.WindowState.Minimized || !point.IsFinite) return false;
-        var size = window.FrameSize ?? window.Bounds.Size;
-        // Avalonia.Native 11.2.6 uses Quartz points for screen and window positions, including Retina.
-        var scale = window.Screens.ScreenFromWindow(window)?.Scaling ?? 1;
-        return point.X >= window.Position.X && point.Y >= window.Position.Y
-            && point.X < window.Position.X + size.Width * scale && point.Y < window.Position.Y + size.Height * scale;
-    }
+        : OperatingSystem.IsMacOS() ? new MacSelectionRuntime() : null;
 
     internal IStatusIcon? CreateStatusIcon(string iconPath) => OperatingSystem.IsWindows()
         ? new WindowsTrayIcon(iconPath) : null;

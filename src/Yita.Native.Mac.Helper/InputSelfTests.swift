@@ -38,6 +38,18 @@ func runInputSelfTests() -> Int32 {
             queue.record("pointerUp", point: point, timestamp: 10)
             try expect(queue.drain(now: 10).events.allSatisfy { $0.kind == "cancel" }, "own process")
         }
+        try test("Window filtering respects occlusion and Quartz points on Retina") {
+            let own = NativeWindowFrame(ownerPID: 99, bounds: CGRect(x: 100, y: 100, width: 400, height: 200), alpha: 1)
+            let external = NativeWindowFrame(ownerPID: 42, bounds: own.bounds, alpha: 1)
+            let inside = SelectionPoint(x: 200, y: 150)
+            try expect(isYitaWindow(at: inside, windows: [own, external], ownerPID: 99), "visible own window")
+            try expect(!isYitaWindow(at: inside, windows: [external, own], ownerPID: 99), "covered own window")
+            try expect(!isYitaWindow(at: SelectionPoint(x: 650, y: 350), windows: [own], ownerPID: 99), "no Retina multiplication")
+            let transparent = NativeWindowFrame(ownerPID: 99, bounds: own.bounds, alpha: 0)
+            try expect(!isYitaWindow(at: inside, windows: [transparent, external], ownerPID: 99), "transparent own window")
+            let floating = NativeWindowFrame(ownerPID: getpid(), bounds: own.bounds, alpha: 1)
+            try expect(isYitaWindow(at: inside, windows: [floating], ownerPID: 99), "helper window")
+        }
         try test("Missing source identity cancels pointer input") {
             let queue = NativeInputQueue(ownerPID: 99)
             queue.record("pointerDown", point: point, timestamp: 10)

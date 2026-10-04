@@ -1,6 +1,7 @@
 using Avalonia.Interactivity;
 using Yita.Core;
 using Yita.Core.Selection;
+using Yita.Native.Mac;
 
 namespace Yita.Desktop;
 
@@ -26,10 +27,24 @@ public sealed partial class MainWindow
 
     private void UpdateInputAvailability()
     {
-        PlatformStatusText.IsVisible = _selectionRuntime?.IsRunning != true;
+        PlatformStatusText.IsVisible = _selectionRuntime?.IsRunning != true || NeedsSelectionPermissions;
         PlatformStatusText.Text = _selectionRuntime is null
             ? Localize("Automatic selection and global shortcuts are unavailable in this preview. Clipboard translation remains available from the menu.", "此预览版尚未提供自动划词和全局快捷键，可通过菜单手动翻译剪贴板内容。")
-            : Localize("Input capture is not running. Check permissions or repair input capture from the menu.", "输入捕获尚未运行，请检查权限或通过菜单修复输入捕获。");
+            : NeedsSelectionPermissions
+                ? Localize("Selection translation needs Accessibility and Input Monitoring access. Grant the missing permissions in General, then check permissions. Clipboard translation remains available from the menu.", "划词翻译需要辅助功能和输入监控权限。请在“常规”中授予缺少的权限，再检查权限；仍可通过菜单翻译剪贴板。")
+                : Localize("Input capture is not running. Check permissions or repair input capture from the menu.", "输入捕获尚未运行，请检查权限或通过菜单修复输入捕获。");
+    }
+
+    private bool NeedsSelectionPermissions => _permissionStatus is { Service: NativeServiceState.Available }
+        && (!_permissionStatus.Permissions.Accessibility || (_permissionStatus.GlobalInputSupported && !_permissionStatus.Permissions.InputMonitoring));
+
+    internal void UpdateMacInstallationStatus(MacApplicationLocation location)
+    {
+        MacInstallationStatusText.IsVisible = location is MacApplicationLocation.DiskImage
+            or MacApplicationLocation.Translocated or MacApplicationLocation.OtherDirectory;
+        MacInstallationStatusText.Text = location == MacApplicationLocation.DiskImage
+            ? Localize("Yita is running from the disk image. Drag Yita.app to Applications, quit this copy, eject the disk image, and open Yita from Applications before granting permissions.", "Yita 正在磁盘镜像中运行。请将 Yita.app 拖入“应用程序”，退出当前副本、弹出磁盘镜像，再从“应用程序”启动并授权。")
+            : Localize("Move Yita.app to Applications, quit this copy, and reopen the installed application before granting permissions.", "请将 Yita.app 移入“应用程序”，退出当前副本，再从“应用程序”启动并授权。");
     }
 
     internal async Task RefreshPlatformPermissionsAsync(PermissionAction action = PermissionAction.Check)
@@ -48,7 +63,14 @@ public sealed partial class MainWindow
             else if (action == PermissionAction.OpenInputSettings)
                 await _permissionService.OpenInputMonitoringSettingsAsync(pending.Token);
             var status = await _permissionService.GetStatusAsync(pending.Token);
-            if (!_shuttingDown && pending.IsCurrent) _permissionStatus = status;
+            if (!_shuttingDown && pending.IsCurrent)
+            {
+                var previouslyBlocked = NeedsSelectionPermissions;
+                _permissionStatus = status;
+                if (status.Service == NativeServiceState.Available && !NeedsSelectionPermissions
+                    && (previouslyBlocked || _selectionRuntime?.IsRunning == false))
+                    _selectionRuntime?.RepairInputCapture();
+            }
         }
         catch (OperationCanceledException) { }
         catch

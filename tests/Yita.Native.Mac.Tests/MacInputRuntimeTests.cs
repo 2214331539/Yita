@@ -33,6 +33,9 @@ public sealed class MacInputRuntimeTests
         Assert.Equal(SelectionSource.Accessibility, selection.Result.Source);
         Assert.NotNull(selection.ReadDuration);
         Assert.True(selection.ReadDuration >= TimeSpan.Zero);
+        var diagnostics = runtime.CreateDiagnostics(false);
+        Assert.Contains("Events=2; Reads=1; Captured=1", diagnostics);
+        Assert.DoesNotContain(selection.Result.Text!, diagnostics);
     }
 
     [Fact]

@@ -7,6 +7,7 @@ using Avalonia.LogicalTree;
 using Yita.Core.Platform;
 using Yita.Core.Selection;
 using Yita.Core.Settings;
+using Yita.Native.Mac;
 
 namespace Yita.Desktop.Tests;
 
@@ -25,6 +26,8 @@ public sealed class PlatformHostTests
         await fixture.Window.RefreshPlatformPermissionsAsync(MainWindow.PermissionAction.RequestInputMonitoring);
         Assert.Equal(1, runtime.Permissions.InputRequests);
         Assert.False(fixture.Window.FindControl<Button>("RequestInputMonitoringButton")!.IsEnabled);
+        Assert.True(fixture.Window.FindControl<TextBlock>("PlatformStatusText")!.IsVisible);
+        await fixture.Window.RefreshPlatformPermissionsAsync(MainWindow.PermissionAction.RequestAccessibility);
         Assert.False(fixture.Window.FindControl<TextBlock>("PlatformStatusText")!.IsVisible);
         await fixture.Window.RefreshPlatformPermissionsAsync(MainWindow.PermissionAction.OpenInputSettings);
         Assert.Equal(1, runtime.Permissions.InputSettingsOpened);
@@ -35,19 +38,43 @@ public sealed class PlatformHostTests
     }
 
     [AvaloniaFact]
-    public void OwnWindowHitTestingUsesScreenCoordinatesAndIgnoresHiddenWindows()
+    public async Task SavingModelConfigurationWithMissingNativePermissionsKeepsThePermissionsPageOpen()
     {
-        var window = new Window { Width = 400, Height = 200, Position = new(-800, -300) };
-        window.Show();
-        try
-        {
-            Assert.True(DesktopPlatformServices.ContainsScreenPoint(window, new(-700, -250)));
-            Assert.False(DesktopPlatformServices.ContainsScreenPoint(window, new(700, 250)));
-            Assert.False(DesktopPlatformServices.ContainsScreenPoint(window, new(double.NaN, 0)));
-            window.Hide();
-            Assert.False(DesktopPlatformServices.ContainsScreenPoint(window, new(-700, -250)));
-        }
-        finally { window.Close(); }
+        using var runtime = new TestPermissionRuntime();
+        using var fixture = await Fixture.CreateAsync(runtime);
+        fixture.Window.FindControl<ListBox>("SettingsNavigation")!.SelectedIndex = 3;
+        Click(fixture.Window.FindControl<Button>("SaveSettingsButton")!);
+        await UntilAsync(() => fixture.Window.FindControl<ListBox>("SettingsNavigation")!.SelectedIndex == 0);
+        Assert.True(fixture.Window.IsVisible);
+        Assert.True(fixture.Window.FindControl<TextBlock>("PlatformStatusText")!.IsVisible);
+        Assert.Contains("Accessibility", fixture.Window.FindControl<TextBlock>("PlatformStatusText")!.Text);
+        Assert.True(fixture.Window.SavedSettings.IsEnabled);
+    }
+
+    [AvaloniaFact]
+    public async Task ReturningFromSystemSettingsRepairsInputAndRefreshesPermissionState()
+    {
+        using var runtime = new TestPermissionRuntime();
+        using var fixture = await Fixture.CreateAsync(runtime);
+        await runtime.Permissions.RequestAccessibilityPermissionAsync();
+        await runtime.Permissions.RequestInputMonitoringPermissionAsync();
+        await fixture.Window.RefreshPlatformPermissionsAsync();
+        Assert.False(fixture.Window.FindControl<TextBlock>("PlatformStatusText")!.IsVisible);
+        Assert.Equal(1, runtime.Repairs);
+    }
+
+    [AvaloniaFact]
+    public async Task DiskImageInstallationNoticeIsVisibleFromModelConfiguration()
+    {
+        using var fixture = await Fixture.CreateAsync();
+        fixture.Window.FindControl<ListBox>("SettingsNavigation")!.SelectedIndex = 3;
+        fixture.Window.UpdateMacInstallationStatus(MacApplicationLocation.DiskImage);
+        var notice = fixture.Window.FindControl<TextBlock>("MacInstallationStatusText")!;
+        Assert.True(notice.IsVisible);
+        Assert.Contains("disk image", notice.Text);
+        Assert.DoesNotContain(fixture.Window.FindControl<StackPanel>("GeneralPage")!, notice.GetLogicalAncestors());
+        fixture.Window.UpdateMacInstallationStatus(MacApplicationLocation.Applications);
+        Assert.False(notice.IsVisible);
     }
 
     [AvaloniaFact]

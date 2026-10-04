@@ -104,6 +104,21 @@ private let mouseCallback: CGEventTapCallBack = { _, type, event, context in
     return Unmanaged.passUnretained(event)
 }
 
+struct NativeWindowFrame {
+    let ownerPID: Int32
+    let bounds: CGRect
+    let alpha: Double
+}
+
+func isYitaWindow(at point: SelectionPoint, windows: [NativeWindowFrame], ownerPID: Int32?) -> Bool {
+    guard point.isValid else { return false }
+    for window in windows.prefix(512) where window.alpha > 0 && window.bounds.contains(CGPoint(x: point.x, y: point.y)) {
+        // CGWindowList is ordered front to back. Covered Yita windows must not suppress external selections.
+        return window.ownerPID == getpid() || window.ownerPID == ownerPID
+    }
+    return false
+}
+
 // This dedicated run loop continues to invalidate old selections during synchronous AX calls.
 final class NativeMouseMonitor {
     private let queue: NativeInputQueue
@@ -315,25 +330,22 @@ final class NativeInputManager {
             queue.record("pointerUp", point: SelectionPoint(x: -700, y: 150), timestamp: now)
         }
         let batch = queue.drain(now: ProcessInfo.processInfo.systemUptime)
-        // Filter nonactivating Yita windows outside the low-level callback as well as in Desktop.
+        // Filter nonactivating Yita windows in native z-order, outside the low-level callback.
         let windows = !selfTest && !batch.events.isEmpty
             ? CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] : nil
+        let frames = (windows ?? []).prefix(512).compactMap { window -> NativeWindowFrame? in
+            guard let bounds = window[kCGWindowBounds as String] as? [String: Any],
+                  let rectangle = CGRect(dictionaryRepresentation: bounds as CFDictionary),
+                  let pid = window[kCGWindowOwnerPID as String] as? NSNumber else { return nil }
+            return NativeWindowFrame(ownerPID: pid.int32Value, bounds: rectangle,
+                alpha: (window[kCGWindowAlpha as String] as? NSNumber)?.doubleValue ?? 1)
+        }
         let events = batch.events.map { item -> NativeInputEvent in
-            guard item.kind == "pointerDown" || item.kind == "pointerUp", let windows = windows else { return item }
-            for window in windows.prefix(512) {
-                guard let bounds = window[kCGWindowBounds as String] as? [String: Any],
-                      let rectangle = CGRect(dictionaryRepresentation: bounds as CFDictionary),
-                      let pid = window[kCGWindowOwnerPID as String] as? NSNumber,
-                      (window[kCGWindowAlpha as String] as? NSNumber)?.doubleValue != 0,
-                      rectangle.contains(CGPoint(x: item.pointer.x, y: item.pointer.y)) else { continue }
-                if pid.int32Value == getpid() || pid.int32Value == ownerProcessId {
-                    return NativeInputEvent(kind: "cancel", sequence: item.sequence, pointer: item.pointer,
-                        ageMilliseconds: item.ageMilliseconds, foregroundProcessId: item.foregroundProcessId,
-                        foregroundApplication: item.foregroundApplication, modified: item.modified)
-                }
-                break
-            }
-            return item
+            guard item.kind == "pointerDown" || item.kind == "pointerUp",
+                  isYitaWindow(at: item.pointer, windows: frames, ownerPID: ownerProcessId) else { return item }
+            return NativeInputEvent(kind: "cancel", sequence: item.sequence, pointer: item.pointer,
+                ageMilliseconds: item.ageMilliseconds, foregroundProcessId: item.foregroundProcessId,
+                foregroundApplication: item.foregroundApplication, modified: item.modified)
         }
         return NativeInputSnapshot(sessionActive: sessionActive, sessionGeneration: session.generation,
             mouseRunning: sessionActive && (selfTest ? configured && wanted && fixture != nil : monitor?.isRunning == true),

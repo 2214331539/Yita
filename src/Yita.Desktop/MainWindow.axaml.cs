@@ -77,6 +77,11 @@ public sealed partial class MainWindow : Window
         ModelComboBox.ItemsSource = new[] { "deepseek-v4-flash", "deepseek-v4-pro", "deepseek-chat", "deepseek-reasoner" };
         AiHistoryEnabledCheckBox.IsCheckedChanged += (_, _) => UpdateAiHistoryControls();
         Opened += async (_, _) => { await InitializeAsync(); ReferenceMotion.Reveal(SettingsRoot); };
+        Activated += async (_, _) =>
+        {
+            if (_initialization?.IsCompletedSuccessfully == true && !_shuttingDown && PermissionActionsPanel.IsEnabled)
+                await RefreshPlatformPermissionsAsync();
+        };
         Closed += (_, _) => ShutdownServices();
         if (_selectionRuntime is not null)
         {
@@ -263,6 +268,15 @@ public sealed partial class MainWindow : Window
             }
             finally { _settingsGate.Release(); }
             ApplyRuntimeSettings();
+            if (_permissionService is not null)
+            {
+                await RefreshPlatformPermissionsAsync();
+                if (_settings.IsEnabled && (_permissionStatus?.Service != NativeServiceState.Available || NeedsSelectionPermissions))
+                {
+                    SettingsNavigation.SelectedIndex = 0;
+                    return;
+                }
+            }
             Hide();
         }
         catch (SettingsStoreException exception)
@@ -358,6 +372,10 @@ public sealed partial class MainWindow : Window
         SaveSettingsButton.IsEnabled = _settingsFailure is null;
         UpdateInputAvailability();
         UpdatePermissionControls();
+        UpdateMacInstallationStatus(OperatingSystem.IsMacOS()
+            ? Yita.Native.Mac.MacApplicationBundle.GetLocation(Environment.ProcessPath,
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile))
+            : Yita.Native.Mac.MacApplicationLocation.Unpackaged);
         UpdateSelectionStatus();
         if (OperatingSystem.IsMacOS())
             TranslationServiceDescriptionText.Text = Localize("Your API key is stored in macOS Keychain on this device.", "API Key 保存在本机 macOS Keychain 中。");

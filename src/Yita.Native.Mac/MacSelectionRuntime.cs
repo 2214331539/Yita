@@ -29,6 +29,14 @@ public sealed class MacSelectionRuntime : ISelectionRuntime, IPlatformPermission
     private volatile bool _hotkeyRunning;
     private volatile bool _disposed;
     private NativeServiceState _state = NativeServiceState.Unavailable;
+    private string? _inputDiagnostic;
+    private long _inputEvents;
+    private long _selectionReads;
+    private long _successfulSelections;
+    private SelectionFailureKind _lastSelectionFailure;
+
+    // The native helper filters the frontmost window; geometric UI checks also hit covered windows.
+    public MacSelectionRuntime() : this(new MacHelperClient(), isMac: OperatingSystem.IsMacOS) { }
 
     public MacSelectionRuntime(Func<ScreenPoint, CancellationToken, Task<bool>> isOwnWindow)
         : this(new MacHelperClient(), isOwnWindow, OperatingSystem.IsMacOS) { }
@@ -81,14 +89,15 @@ public sealed class MacSelectionRuntime : ISelectionRuntime, IPlatformPermission
                     cancellationToken: _stop, input: configure ? new(MouseEnabled: true) : null).ConfigureAwait(false);
                 if (exchange is not { State: NativeServiceState.Available, Response.Status: "ok", Response.Input: { } input })
                 {
-                    SetStatus(exchange.State, false, false);
+                    SetStatus(exchange.State, false, false, exchange.DiagnosticCode);
                     CancelSelection();
                     _sequence = 0;
                     RepairInputCapture();
                     await Task.Delay(TimeSpan.FromSeconds(5), _stop).ConfigureAwait(false);
                     continue;
                 }
-                SetStatus(exchange.State, input.MouseRunning, input.HotkeyRunning);
+                SetStatus(exchange.State, input.MouseRunning, input.HotkeyRunning,
+                    exchange.Response.DiagnosticCode is { } code ? MacHelperProtocol.SafeDiagnostic(code) : null);
                 if (exchange.Response.DiagnosticCode == "input-not-configured" || input.Sequence < _sequence)
                 {
                     CancelSelection();
@@ -105,7 +114,7 @@ public sealed class MacSelectionRuntime : ISelectionRuntime, IPlatformPermission
             catch (ObjectDisposedException) when (_disposed) { break; }
             catch
             {
-                SetStatus(NativeServiceState.Unavailable, false, false);
+                SetStatus(NativeServiceState.Unavailable, false, false, "mac-input-loop-failed");
                 CancelSelection();
                 RepairInputCapture();
                 try { await Task.Delay(TimeSpan.FromSeconds(5), _stop).ConfigureAwait(false); }
@@ -125,6 +134,7 @@ public sealed class MacSelectionRuntime : ISelectionRuntime, IPlatformPermission
             if (_disposed) return;
             if (item.Sequence <= _sequence) continue;
             _sequence = item.Sequence;
+            Interlocked.Increment(ref _inputEvents);
             _pointer = item.Pointer;
             if (item.AgeMilliseconds + System.Diagnostics.Stopwatch.GetElapsedTime(received).TotalMilliseconds > 500)
             { CancelSelection(); continue; }
@@ -169,10 +179,15 @@ public sealed class MacSelectionRuntime : ISelectionRuntime, IPlatformPermission
             var request = new SelectionRequest(SelectionTrigger.MouseGesture, gesture.End, input.ForegroundApplication,
                 gesture.Bounds, settings.Context, input.ForegroundProcessId);
             var started = System.Diagnostics.Stopwatch.GetTimestamp();
+            Interlocked.Increment(ref _selectionReads);
             var result = await _reader.ReadForInputAsync(request, settings.Copy, input.Sequence, pending.Token).ConfigureAwait(false);
             var duration = System.Diagnostics.Stopwatch.GetElapsedTime(started);
             if (!_disposed && _sessionActive && pending.IsCurrent && settings.Enabled && settings == Volatile.Read(ref _configuration))
+            {
+                _lastSelectionFailure = result.Failure;
+                if (result.Succeeded) Interlocked.Increment(ref _successfulSelections);
                 SelectionCaptured?.Invoke(this, new(request, result, duration));
+            }
         }
         catch { }
     }
@@ -218,14 +233,16 @@ public sealed class MacSelectionRuntime : ISelectionRuntime, IPlatformPermission
         if (_sessionActive) { try { SessionActivityChanged?.Invoke(this, true); } catch { } }
     }
 
-    private void SetStatus(NativeServiceState state, bool mouse, bool hotkey)
+    private void SetStatus(NativeServiceState state, bool mouse, bool hotkey, string? diagnostic = null)
     {
-        var changed = _state != state || _mouseRunning != mouse || _hotkeyRunning != hotkey;
+        var changed = _state != state || _mouseRunning != mouse || _hotkeyRunning != hotkey || _inputDiagnostic != diagnostic;
         _state = state; _mouseRunning = mouse; _hotkeyRunning = hotkey;
+        _inputDiagnostic = diagnostic;
         if (changed && !_disposed) { try { StatusChanged?.Invoke(this, EventArgs.Empty); } catch { } }
     }
 
-    public string CreateDiagnostics(bool chinese) => $"macOS native input: {_state}; Mouse={IsRunning}; Hotkey={IsHotkeyRunning}; Session={IsSessionActive}; Protocol={MacHelperProtocol.Version}";
+    public string CreateDiagnostics(bool chinese) => $"macOS native input: {_state}; Mouse={IsRunning}; Hotkey={IsHotkeyRunning}; Session={IsSessionActive}; Protocol={MacHelperProtocol.Version}\n"
+        + $"Input diagnostic: {_inputDiagnostic ?? "none"}; Events={Interlocked.Read(ref _inputEvents)}; Reads={Interlocked.Read(ref _selectionReads)}; Captured={Interlocked.Read(ref _successfulSelections)}; LastSelection={_lastSelectionFailure}";
     public Task<PermissionState> GetStateAsync(CancellationToken cancellationToken = default) => _reader.GetStateAsync(cancellationToken);
     public Task<PlatformPermissionStatus> GetStatusAsync(CancellationToken cancellationToken = default) => _reader.GetStatusAsync(cancellationToken);
     public async Task RequestAccessibilityPermissionAsync(CancellationToken cancellationToken = default)

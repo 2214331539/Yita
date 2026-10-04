@@ -4,6 +4,16 @@ namespace Yita.Native.Mac.Tests;
 
 public sealed class MacDesktopLifecycleTests
 {
+    [Theory]
+    [InlineData("/Volumes/Yita Preview/Yita.app/Contents/MacOS/Yita.Desktop", MacApplicationLocation.DiskImage)]
+    [InlineData("/private/var/folders/test/AppTranslocation/random/d/Yita.app/Contents/MacOS/Yita.Desktop", MacApplicationLocation.Translocated)]
+    [InlineData("/Applications/Yita.app/Contents/MacOS/Yita.Desktop", MacApplicationLocation.Applications)]
+    [InlineData("/Users/test/Applications/Yita.app/Contents/MacOS/Yita.Desktop", MacApplicationLocation.Applications)]
+    [InlineData("/Users/test/Downloads/Yita.app/Contents/MacOS/Yita.Desktop", MacApplicationLocation.OtherDirectory)]
+    [InlineData("/usr/local/share/dotnet/dotnet", MacApplicationLocation.Unpackaged)]
+    public void InstallationLocationDistinguishesTemporaryLaunchesFromInstalledApps(string executable, MacApplicationLocation location) =>
+        Assert.Equal(location, MacApplicationBundle.GetLocation(executable, "/Users/test"));
+
     [Fact]
     public void LoginAgentUsesSeparateArgumentsAndRunsOnlyAtTheNextGuiLogin()
     {

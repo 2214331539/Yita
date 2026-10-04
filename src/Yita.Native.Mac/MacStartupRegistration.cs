@@ -71,6 +71,7 @@ public sealed class MacStartupRegistration : IStartupRegistration
     private static bool IsPackagedExecutable(string? executable)
     {
         if (executable is null || !Path.IsPathFullyQualified(executable) || !File.Exists(executable)) return false;
+        if (MacApplicationBundle.GetLocation(executable) is MacApplicationLocation.DiskImage or MacApplicationLocation.Translocated) return false;
         try
         {
             var macOS = Path.GetDirectoryName(executable);
