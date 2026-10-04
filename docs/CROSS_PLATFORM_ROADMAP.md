@@ -310,6 +310,8 @@ NSPasteboard 不能原子比较序列并写入，也没有可验证的复制所�
 - 确认重复的 Desktop 窗口几何过滤忽略遮挡，可将其他应用内的拖选误判为后台 Yita 操作。生产 Mac runtime 改由原生 helper 按窗口前后层级过滤；Swift fixture 覆盖可见/被遮挡/透明/自身窗口和 Quartz 边界。核对 Avalonia 11.2.6 的 `Screens.mm` 后确认其 Mac 屏幕缩放为 1，此次没有将 Retina 倍率当作已确认原因，也未更改通用定位算法。
 - 缺少辅助功能/输入监控权限时，在各设置页持续显示阻塞状态；保存模型配置后保留并打开“常规”，返回系统设置后刷新权限并尝试恢复输入捕获。诊断增加进程内输入/读取/成功计数、原生原因和应用位置分类，不包含正文、Key 或用户完整路径。
 - 本机 Release 构建 0 警告/0 错误，497 项回归及单实例/helper 协议 smoke 通过；Mac Swift 编译、封装与真机授权/外部划词仍按其实际环境分别验证。本次继续使用功能分支，既有 Release 安装包不会因源码修改自动更新。
+- 最终代码提交 `b6aab45` 补充手动剪贴板宿主无需原生权限即可保存的回归用例。[架构 CI #37172685524](https://github.com/2214331539/Yita/actions/runs/37172685524) 在 Windows/macOS 各通过 498 项测试及 smoke；Mac 实际 Swift 自测确认窗口遮挡过滤不误拦截外部选区。
+- [Mac 包 #37172685543](https://github.com/2214331539/Yita/actions/runs/37172685543) 成功生成 `Yita-0.9.0-macos-preview.8-osx-arm64.dmg`。原始应用、挂载 DMG、解压 ZIP 各通过 19 个 ARM64 原生二进制/签名/自带运行时/helper 检查。测试包在 `Yita-macos-preview-8-osx-arm64` Actions artifact 中，保留至 2026-11-03；未覆盖公开 Release，真实辅助功能授权与外部划词仍待用户复验。
 
 ### 继续开发顺序
 
