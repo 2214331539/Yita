@@ -1,6 +1,6 @@
 # Mac 原生输入与 Desktop 接入
 
-本实现位于 `codex/platform-host-services`，尚未合入 `main`。Swift helper 的全局输入、C# `MacSelectionRuntime` 和 Avalonia 阅读浮窗已接入代码链路；真实 Mac 授权、外部划词、Retina、Spaces 与全屏行为仍待验收。此文档不表示已提供可分发的 Mac 安装版。
+本实现位于 `codex/platform-host-services`，尚未合入 `main`。Swift helper 的全局输入、C# `MacSelectionRuntime` 和 Avalonia 阅读浮窗已接入代码链路；Apple Silicon 公开预览 DMG 已提供，真实 Mac 授权、外部划词、Retina、Spaces 与全屏行为继续按验收记录确认。此文档不表示真机验收已完成。
 
 ## 输入到翻译
 
@@ -30,7 +30,7 @@
 - 队列最多 64 项，只传事件类别、坐标、序号、年龄、修饰键状态与来源身份。键盘事件仅使旧读取失效，不保留键码或输入文字；序号和身份不写入诊断。
 - 超过 500ms 的排队事件、未来时间、溢出和前台变化转换为取消事件，不能完成一段旧拖选。C# 也计入收到批次后的处理时间，防止 UI 查询等待后使用旧事件。
 - 前台身份通过 NSWorkspace 激活通知与定期刷新缓存；若拖选期间应用激活变化，两端来源不一致会放弃本次读取。首次从未激活窗口直接拖选可能需要重新选取，实际行为待兼容性验收。
-- helper 在回调外检查可见窗口元数据，过滤自身和父进程窗口；Desktop 另检查自己的可见窗口范围，覆盖不抢前台焦点的阅读浮窗。窗口检查不查询或记录标题。
+- helper 在回调外按窗口前后层级检查可见窗口元数据，只过滤指针处最上层的自身或父进程窗口，覆盖不抢前台焦点的阅读浮窗。Desktop 不再按所有可见窗口的几何范围重复过滤，以免后台被遮挡的设置窗口阻止其他应用划词。窗口检查不查询或记录标题。
 - 标记为 Yita 注入的复制事件不进入输入队列，避免回退再次触发翻译。真实系统对标记和 HID 计数的行为仍需验证。
 - tap 停止后每 30 秒最多尝试创建 3 次；客户端另有 helper 重启限制。退出、EOF 和父进程消失释放监听、Carbon 注册及通知订阅；已有剪贴板事务先收尾。
 
@@ -48,6 +48,6 @@ CGEvent 和 AX 边界均使用 Quartz 全局点、左上角原点。当前 Avalo
 
 `--self-test --selection-fixture range --input-fixture drag` 将合成拖选通过实际 Swift/C# 管道送入 `MacSelectionRuntime`，再读取合成 AX 选区；另验证旧序号被拒绝、手动剪贴板、无重复事件和禁用授权动作。C# 回归覆盖暂停、过滤自身窗口、来源切换、取消被忽略后的迟到结果与权限宿主复用。
 
-恢复 Mac 验收后仍需完成：实际 tap 权限/撤销/恢复、Carbon 快捷键冲突和释放、浏览器/Preview/编辑器取词、普通复制、富文本恢复、非激活浮窗交互、Retina/多屏/Spaces/全屏、睡眠唤醒与长期运行。菜单栏暂复用 Avalonia NativeMenu/TrayIcon，独立原生菜单栏 helper、登录启动和正式分发尚未完成。
+Mac 真机仍需复验：实际 tap 权限/撤销/恢复、Carbon 快捷键冲突和释放、浏览器/Preview/编辑器取词、普通复制、富文本恢复、非激活浮窗交互、Retina/多屏/Spaces/全屏、睡眠唤醒与长期运行。菜单栏复用 Avalonia NativeMenu/TrayIcon；登录启动和预览分发已有实现，正式签名公证与实际平台验收仍待完成。
 
 2026-10-02，代码提交 `2f02aa2` 的 [GitHub Actions #36980861240](https://github.com/2214331539/Yita/actions/runs/36980861240) 在 Windows/macOS 各通过 434 项测试并零警告/错误构建。Mac 另通过实际 Swift/C# 管道的 27 项检查，以及 17 组 AX、22 组剪贴板和 12 组输入策略测试。此记录验证构建和可控链路，不替代上述真机验收。

@@ -52,6 +52,15 @@ public sealed class PlatformHostTests
     }
 
     [AvaloniaFact]
+    public async Task ManualClipboardOnlyHostCanSaveWithoutNativeSelectionPermissions()
+    {
+        using var fixture = await Fixture.CreateAsync(permissions: new TestPermissionService());
+        Click(fixture.Window.FindControl<Button>("SaveSettingsButton")!);
+        await UntilAsync(() => !fixture.Window.IsVisible);
+        Assert.False(fixture.Window.IsVisible);
+    }
+
+    [AvaloniaFact]
     public async Task ReturningFromSystemSettingsRepairsInputAndRefreshesPermissionState()
     {
         using var runtime = new TestPermissionRuntime();

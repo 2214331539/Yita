@@ -268,7 +268,7 @@ public sealed partial class MainWindow : Window
             }
             finally { _settingsGate.Release(); }
             ApplyRuntimeSettings();
-            if (_permissionService is not null)
+            if (_selectionRuntime is IPlatformPermissionService && _permissionService is not null)
             {
                 await RefreshPlatformPermissionsAsync();
                 if (_settings.IsEnabled && (_permissionStatus?.Service != NativeServiceState.Available || NeedsSelectionPermissions))
