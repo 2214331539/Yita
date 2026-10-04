@@ -21,7 +21,7 @@
 | Windows 取词与阅读 | UIA 隔离、原生控件、复制回退、浮窗与托盘已接入；本机 WPS PDF 等已验收；朋友验收了旧 WPF 安装版 | 新 Avalonia 版的多电脑、更多目标软件、安装后兼容性与长期运行 |
 | 平台宿主接入 | 功能分支已通过共享接口连接窗口、原生事件、托盘与启动项；单实例/唤醒通过双端 CI；Mac 菜单栏、受约束的 `.app` 登录项与会话恢复已有代码；Apple Silicon 内部试用包已生成 | 合入主线、Mac 桌面/真实登录实测和正式签名分发 |
 | 共享翻译与功能 | Core 复用原版提供器、SSE、取消、缓存、解释/问答和记录；Avalonia UI 已还原 | 保持回归，补齐跨平台宿主和存储依赖 |
-| Windows 分发 | Avalonia 自包含 Setup 已发布 `v0.9.0-preview.1`；本机与 Windows runner 的安装、文件校验、运行时启动、重装及卸载通过；旧 WPF Release 保留 | 更多电脑的升级、实际取词及长期使用验收 |
+| Windows 分发 | Avalonia 自包含 Setup 已发布 `v0.9.0-preview.2`；本机与 Windows runner 的安装、文件校验、运行时启动、重装及卸载通过；旧 WPF Release 保留 | 更多电脑的升级、实际取词及长期使用验收 |
 | macOS UI 与存储 | Mac CI 编译和自动化通过；原生 Keychain 与 AES-GCM 修正记录、菜单栏、Spaces 属性和睡眠恢复已有代码与可控测试 | Keychain 真机授权/锁定/签名验证、真实桌面生命周期、取词、权限和菜单栏验收 |
 | macOS 划词 | `MacSelectionRuntime` 已将鼠标/快捷键、权限、AX/边界和显式 Cmd+C 接入 Desktop；通过合成输入及实际 Swift 管道检查 | 真实授权、外部 AX/复制、Retina/多屏与窗口验收 |
 | 更新 | GitHub 已有双端 Avalonia 预览 Release、版本/来源/校验约束与构建流水线 | 应用内版本检查、双端升级与回退 |
@@ -312,6 +312,14 @@ NSPasteboard 不能原子比较序列并写入，也没有可验证的复制所�
 - 本机 Release 构建 0 警告/0 错误，497 项回归及单实例/helper 协议 smoke 通过；Mac Swift 编译、封装与真机授权/外部划词仍按其实际环境分别验证。本次继续使用功能分支，既有 Release 安装包不会因源码修改自动更新。
 - 最终代码提交 `b6aab45` 补充手动剪贴板宿主无需原生权限即可保存的回归用例。[架构 CI #37172685524](https://github.com/2214331539/Yita/actions/runs/37172685524) 在 Windows/macOS 各通过 498 项测试及 smoke；Mac 实际 Swift 自测确认窗口遮挡过滤不误拦截外部选区。
 - [Mac 包 #37172685543](https://github.com/2214331539/Yita/actions/runs/37172685543) 成功生成 `Yita-0.9.0-macos-preview.8-osx-arm64.dmg`。原始应用、挂载 DMG、解压 ZIP 各通过 19 个 ARM64 原生二进制/签名/自带运行时/helper 检查。测试包在 `Yita-macos-preview-8-osx-arm64` Actions artifact 中，保留至 2026-11-03；未覆盖公开 Release，真实辅助功能授权与外部划词仍待用户复验。
+
+### 最新双端安装包统一发布
+
+- 2026-10-04，[Release v0.9.0-preview.2](https://github.com/2214331539/Yita/releases/tag/v0.9.0-preview.2) 已公开，使用 Pre-release 标记；Windows x64 与 Apple Silicon 包均来自干净提交 `11f48db94d1fa2bcb1b16712a544bd66a2baa283`，包含上述 Mac 修复。历史 Release、既有标签及 `main` 保持不变。
+- [标签发布 Actions #37173828040](https://github.com/2214331539/Yita/actions/runs/37173828040) 的两个构建及发布任务成功；两端各通过 498 项测试，构建 0 警告/0 错误。Windows 安装、payload、运行时/helper、重装和卸载通过；Mac 原始应用、挂载 DMG、解压 ZIP 各通过 19 个 ARM64 原生文件、签名和运行时/helper 检查。
+- Release API 确认只有两项上传资产：`Yita-Setup.exe`（84,506,961 字节）与 `Yita.dmg`（48,522,738 字节），没有额外 ZIP、清单或校验文件。GitHub 自动显示两份 Source code 归档；内部产物仍保留 SHA256，并在公开上传前验证同一版本、提交、RID 和干净源码。
+- 两份公开下载均返回 HTTP 200，本地整理到 `artifacts/published/v0.9.0-preview.2/`，目录只含两个安装包。SHA256 与 Release digest 一致：Windows `c495fb4789add2826417831dd19f730d209f6e10d90e8aa5c57a025b87670efb`，Mac `f584fa872c04f6e2c8b1412c003d4cd132dae45d396dbffa29808e1a85cfe559`。
+- 发布暂存验证覆盖准确的两文件输出、改名后内容不变，以及内部文件遭修改、提交不一致和工作区非干净时拒绝发布。此次安装包命名整理不代表 Mac 真机划词或正式签名/公证已验收；后续文档记录不会重写已发布标签。
 
 ### 继续开发顺序
 

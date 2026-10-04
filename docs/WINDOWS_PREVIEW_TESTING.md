@@ -7,11 +7,11 @@
 ## 安装
 
 1. 退出旧 Yita 和源码预览，避免多个版本同时捕获鼠标或争用 `Ctrl+Shift+T`。
-2. 运行 `Yita-Setup-*-preview.*-win-x64.exe`，按照 Yita 安装向导操作。默认仅为当前用户安装到 `%LOCALAPPDATA%\Programs\Yita Desktop`，无需管理员权限。
+2. 运行 Release 下载的 `Yita-Setup.exe`（内部构建保留 `Yita-Setup-*-preview.*-win-x64.exe` 名称），按照 Yita 安装向导操作。默认仅为当前用户安装到 `%LOCALAPPDATA%\Programs\Yita Desktop`，无需管理员权限。
 3. 从开始菜单/桌面的 `Yita Preview` 打开。预览版使用独立安装标识及快捷方式，保留旧 WPF 版，不自动卸载旧版。
 4. 设置页配置 API Key、服务地址和模型，测试连接并保存。自动划词开关及 WPS/复制回退按需要设置。
 
-尚未使用商业代码签名证书，Windows 可能提示未知发布者。请核对本仓库下载来源及 SHA256。备用 ZIP 必须完整解压，在 `Yita` 目录运行 `Yita.Desktop.exe`；不要只复制单个 EXE 或移动/删除 `Native/WindowsUIA`。
+尚未使用商业代码签名证书，Windows 可能提示未知发布者。请从本仓库 Release 下载；SHA256 校验文件保留在 Actions 内部产物中，不是额外安装依赖。备用 ZIP 必须完整解压，在 `Yita` 目录运行 `Yita.Desktop.exe`；不要只复制单个 EXE 或移动/删除 `Native/WindowsUIA`。
 
 ## 验收
 
