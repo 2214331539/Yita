@@ -13,14 +13,18 @@ internal static class ReferenceTypography
         block.Inlines ??= new InlineCollection();
         block.Text = null;
         block.Inlines.Clear();
+        Append(block.Inlines, text, settings);
+    }
+    internal static void Append(InlineCollection inlines, string text, AppSettings settings, FontWeight? weight = null)
+    {
         foreach (var segment in TranslationTypography.Segment(text))
-            block.Inlines.Add(new Run(segment.Text)
+            inlines.Add(new Run(segment.Text)
             {
                 FontFamily = CreateFont(segment.UsesChineseFont
                     ? settings.ChineseTranslationFontFamily : settings.EnglishTranslationFontFamily),
+                FontWeight = weight ?? FontWeight.Normal,
             });
     }
     internal static string GetText(TextBlock block) => block.Inlines?.Text ?? block.Text ?? "";
-    internal static FontFamily CreateFont(string name) => new(name == "Source Sans Pro"
-        ? "avares://Yita.Desktop/Assets/Fonts#Source Sans Pro" : name);
+    internal static FontFamily CreateFont(string name) => DesktopFontResolver.Resolve(name);
 }

@@ -1,6 +1,6 @@
 # Yita 跨平台产品开发路线图
 
-更新日期：2026-10-02。状态：计划已制定；以下未完成阶段尚未实施。当前代码事实见 [技术架构](ARCHITECTURE.md)，已完成的 Windows 验收见 [验收记录](WINDOWS_AVALONIA_ACCEPTANCE.md)。
+更新日期：2026-10-10。状态：平台宿主、Mac 原生适配、权限、菜单栏、登录项、睡眠恢复与浮窗目标语言快捷切换已合入 `main`，进入 `v0.9.0-preview.3` 双端发布。Mac Keychain、外部取词、真实登录和窗口行为仍待真机验证。维护者授权新版发布成功后清理旧 Release 记录与附件，保留源码历史、标签及 WPF 分支。朋友此前验收的是旧 WPF 安装版，不作为 Avalonia Setup 的验收证据。当前代码事实见 [技术架构](ARCHITECTURE.md)，已完成的 Windows 验收见 [验收记录](WINDOWS_AVALONIA_ACCEPTANCE.md)。
 
 ## 产品目标与边界
 
@@ -8,7 +8,7 @@
 
 核心流程为：拖选文本 -> 读取选区 -> 在附近显示浮窗 -> 增量显示译文。读取失败时保留“手动复制后翻译”的入口；失败、取消与权限不足不能导致程序退出或破坏正常复制。
 
-- 首要支持 Windows x64、macOS Apple Silicon；macOS Intel 单独构建和验收后列入正式支持。Windows ARM64 与 Linux 不属于本轮交付范围。
+- 目标平台为 Windows x64、macOS Apple Silicon；按维护者要求不制作 Intel Mac 包。Windows ARM64 与 Linux 不属于本轮交付范围。
 - 保持现有设置、阅读浮窗、解释/问答、术语、修正、AI 记录、语言切换与 Yita 品牌风格。Mac 使用系统可用字体和原生菜单规则，保持相同信息结构与功能，不要求两种系统逐像素一致。
 - 优先覆盖网页、Markdown、代码编辑器、Office 和可复制 PDF。拖选自动触发为主要入口；双击选词、键盘扩选在完成主链路后补充。
 - 不加入 OCR、截图翻译、账号系统或云端同步，不为本轮重新更换语言或 UI 框架。
@@ -18,13 +18,14 @@
 
 | 能力 | 当前证据 | 尚缺工作 |
 | --- | --- | --- |
-| Windows 取词与阅读 | UIA 隔离、原生控件、复制回退、浮窗与托盘已接入；本机 WPS PDF 等已验收 | 多电脑、更多目标软件、安装后兼容性与长期运行 |
+| Windows 取词与阅读 | UIA 隔离、原生控件、复制回退、浮窗与托盘已接入；本机 WPS PDF 等已验收；朋友验收了旧 WPF 安装版 | 新 Avalonia 版的多电脑、更多目标软件、安装后兼容性与长期运行 |
+| 平台宿主接入 | 已合入主线，通过共享接口连接窗口、原生事件、托盘与启动项；单实例/唤醒通过双端 CI；Mac 菜单栏、受约束的 `.app` 登录项与会话恢复已有代码；Apple Silicon 预览包已生成 | Mac 桌面/真实登录实测和正式签名分发 |
 | 共享翻译与功能 | Core 复用原版提供器、SSE、取消、缓存、解释/问答和记录；Avalonia UI 已还原 | 保持回归，补齐跨平台宿主和存储依赖 |
-| Windows 分发 | 当前只能使用源码构建入口；旧 Release 是 WPF | Avalonia 自包含发布、helper 配套、新版 Setup、安装升级 |
-| macOS UI 与存储 | 项目与构建工作流已存在；Keychain 有待真机验证的实现 | 应用生命周期、原生取词、权限、菜单栏、修正数据加密 |
-| macOS 划词 | `MacSelectionAdapter` 目前是占位实现 | AX、Cmd+C、全局输入、坐标与 Desktop 接入 |
-| 更新 | GitHub 已有旧版 Release | 新版发布流水线、版本检查、双端升级与回退 |
-| 许可分发 | 仓库保留 MIT、上游与字体声明；旧 Setup 有许可检查 | 新 Desktop 输出尚未复制声明；新增依赖也需随包附许可 |
+| Windows 分发 | Avalonia 自包含 Setup 已发布 `v0.9.0-preview.2`；本机与 Windows runner 的安装、文件校验、运行时启动、重装及卸载通过；旧 WPF Release 保留 | 更多电脑的升级、实际取词及长期使用验收 |
+| macOS UI 与存储 | Mac CI 编译和自动化通过；原生 Keychain 与 AES-GCM 修正记录、菜单栏、Spaces 属性和睡眠恢复已有代码与可控测试 | Keychain 真机授权/锁定/签名验证、真实桌面生命周期、取词、权限和菜单栏验收 |
+| macOS 划词 | `MacSelectionRuntime` 已将鼠标/快捷键、权限、AX/边界和显式 Cmd+C 接入 Desktop；通过合成输入及实际 Swift 管道检查 | 真实授权、外部 AX/复制、Retina/多屏与窗口验收 |
+| 更新 | GitHub 已有双端 Avalonia 预览 Release、版本/来源/校验约束与构建流水线 | 应用内版本检查、双端升级与回退 |
+| 许可分发 | 仓库保留 MIT、上游与字体声明；双端 Desktop 包收集完整依赖/运行时声明，Windows helper 单独收集 | 后续新增依赖随包补齐许可 |
 
 已有自动化记录为跨平台解决方案 336 项通过，旧 WPF 回归 455 项曾通过；这是历史验收证据，不代表未来改动或 Mac 原生功能已经通过检查。每个后续阶段记录其实际版本、环境与结果。
 
@@ -34,7 +35,7 @@
 - `codex/csharp-wpf-legacy` 和 `codex/csharp-wpf-upstream-baseline` 保留为历史基准，不用于新产品日常开发。
 - 已按维护者要求删除远程 `codex/cross-platform-migration`，以及本地 `codex/windows-avalonia-parity`、`codex/yita-branding`；删除前已确认三者提交均包含在 `main` 中。
 - 本地 `codex/cross-platform-migration` 按本次仅删除其远程分支的范围保留，不作为下一阶段开发入口。
-- 不重写既有提交、标签或 Release。新架构使用新版本；试用版先标记 Pre-release，完成安装验收后再升级发布状态。
+- 不重写既有提交、标签或已发布安装包；经维护者授权可整理 Release 说明和附件。新架构使用新版本；试用版先标记 Pre-release，完成安装验收后再升级发布状态。
 - 不再以分支名区分是否运行 CI。后续 CI 支持 `main`、新功能分支与 PR，并移除已删除分支的触发配置。
 
 ## 交付顺序
@@ -47,7 +48,7 @@
 | D | 双端兼容性与阅读体验达到试用标准 | `codex/cross-platform-polish` | C 已在交互式 Mac 环境实际运行 |
 | E | 双端安装、版本检查、升级及正式 Release | `codex/cross-platform-distribution` | D 的核心场景通过，签名与分发条件就绪 |
 
-这是实施顺序，不是固定日期承诺。Mac 环境和签名条件未满足时，可继续 Windows 分发、共享接口及协议测试，但不能宣称 Mac 原生功能已完成。
+这是默认实施顺序，不是固定日期承诺。最新授权提前完成两端自包含打包并公开预览 Release，供用户测试；预览包使用现有 .NET 8，Windows 无商业签名，Mac 为 ad-hoc 签名。稳定版仍需完成受支持的 LTS、正式签名公证与实际安装/桌面验收。没有真实桌面证据时不能宣称 Mac 已正式支持。
 
 ## 阶段 A：Windows 安装与发布基线
 
@@ -85,11 +86,103 @@
 
 验收：Windows 原有链路和 UI 回归通过；Desktop 可用可控的原生事件驱动同一浮窗；不支持的服务返回可读状态，而非假装成功。
 
+### B1. 宿主与单实例检查点
+
+`codex/platform-host-services` 的本批交付：
+
+- Core 增加 `ISelectionRuntime`、共享选区事件、`ISingleInstanceGuard`、`IStartupRegistration` 与 `IStatusIcon`。现有 Windows 实现遵循这些接口，不改写 UIA、复制或鼠标手势算法。
+- Desktop 通过 `DesktopPlatformServices` 选择平台实现。设置窗口直接订阅共享输入事件，将后台事件派发到 UI，并在退出时解除订阅；排队的旧事件无法重新打开已关闭的服务。
+- 非 Windows 宿主接入 `PortableSingleInstanceGuard`，使用保留的锁文件与当前用户专用的命名管道。接收通道在创建时开始监听，窗口尚未准备好时保留待唤醒状态，发送/读取均有超时。
+- 无原生输入服务时，可以从平台菜单手动翻译现有剪贴板，定位暂用主屏中心；没有实现 Mac 全局快捷键、自动复制或鼠标附近定位。暂停自动划词不影响手动翻译。
+- 非 Windows 菜单补充剪贴板翻译、诊断与关于入口并同步语言；没有输入服务时禁用自动划词菜单项，没有登录启动实现时禁用对应设置。
+- 本机 Release 构建通过；344 项自动化通过（Core 32、原版业务 258、Windows 适配 22、Desktop 32）。实际跨进程锁定与唤醒、真实 Windows UIA/Ctrl+C/剪贴板恢复/托盘/快捷键 smoke 通过；没有调用真实翻译 API。
+- 新增 `tools/Yita.PlatformSmoke`，Windows/macOS CI 执行不需要 GUI 授权的单实例跨进程检查；修复 Unix 文件锁冲突返回原始 errno、与 Windows 错误码不同的问题，仅将明确的锁冲突识别为重复实例。
+- 2026-10-02，代码提交 `3d8b3ed` 的 [GitHub Actions #36969943525](https://github.com/2214331539/Yita/actions/runs/36969943525) 在 Windows/macOS 均通过：各自 Release 编译 0 警告/0 错误、344 项自动化测试及 6 项跨进程检查。此结果不替代 Mac Accessibility 权限、其他应用划词、Keychain 或真实桌面验收。
+
+### B2. 设置迁移与安全存储检查点
+
+- 设置 schema 1，旧预览配置从 0 迁移；加载不修改文件，首次保存升级创建原字节备份。损坏、不可读、重复/非法版本和未来版本均拒绝覆盖；保存前检查版本，避免先变更 API Key 再发现版本不兼容。
+- 设置保存串行化、原子替换、限制文件大小并支持取消；旧 WPF 偏好导入保持原文件、独立启动项及记录目的地。
+- Mac 凭据由命令行工具改为原生 SecItem API；区分缺失与访问失败。密钥和记录在后台初始化，Key 不进入进程参数、设置 JSON 或诊断。
+- Mac 修正记忆接入共享 AES-GCM，独立密钥由 Keychain 保存；竞争创建只复用获胜密钥，密钥丢失、错误格式或密文篡改均保留原文件并禁止覆盖，没有明文回退。
+- 设置页说明缺失的自动取词/快捷键能力、禁用相应控件，显示设置只读与加密存储失败状态；诊断只记录能力、版本和状态。
+- 本机 Release 构建 0 警告/0 错误，376 项测试通过：Core 47、原版业务 258、Windows 适配 22、Mac 可控存储 14、Desktop 35。Mac 测试没有访问真实 Keychain；没有调用真实翻译 API。
+- 代码提交 `47928d0` 的 [GitHub Actions #36971410773](https://github.com/2214331539/Yita/actions/runs/36971410773) 在 Windows/macOS 均通过：各自 Release 编译 0 警告/0 错误、376 项测试和 6 项跨进程检查。本机更新后的 Windows 源码预览已启动；此记录不代表 Mac Keychain 原生调用或外部划词已验收。
+
+helper 协议与权限状态已进入下面的 C1 准备工作。Mac 真机验收仍暂缓：Keychain 首次创建/更新/删除、锁定与拒绝访问、重启解密、签名变化均待验证。阶段 B 的真实平台验收和 Mac 产品尚未标记为全部完成。
+
 ## 阶段 C：macOS 原生链路
+
+### C1 准备：helper 协议与权限入口
+
+- Swift/AppKit helper 使用稳定 Bundle ID，生成开发 `.app` 并 ad-hoc 签名；源码构建入口和 CI 已接入，不生成正式安装包。
+- C# 客户端验证版本、身份声明、实际 PID 与请求编号，限制字节长度，总请求默认 3 秒；取消/超时或异常进程不能污染下次请求。
+- helper 支持权限查询、用户主动请求 Accessibility 和打开系统设置；全局输入、取词和 Cmd+C 能力保持明确的未实现状态，不会自动申请权限。
+- 设置页增加平台权限入口与状态，旧刷新不会覆盖新结果，关闭后释放 helper；Windows 真实设置页保持原有布局。
+- 客户端限制 30 秒内最多 3 次启动；helper 监控父进程并在 EOF/父进程退出后结束。
+- 本机 Release 构建 0 警告/0 错误，398 项测试通过：Core 47、原版业务 258、Windows 适配 22、Mac 存储/协议 34、Desktop 37；可控子进程 smoke 通过。
+- 代码提交 `f85a8d8` 的 [GitHub Actions #36973376654](https://github.com/2214331539/Yita/actions/runs/36973376654) 在 Windows/macOS 均通过：各自 Release 编译 0 警告/0 错误、398 项测试、6 项单实例跨进程检查及 5 项可控 helper 检查。Mac 另通过真实 Swift helper 的 5 项 self-test；包含开发签名校验与 C#/Swift 连续请求通信，不请求真实授权或访问外部选区。
+- 首次 Swift 通信检查发现 `FileHandle.read(upToCount:)` 等待管道数据的问题，已改为读取当前可用字节的 `Darwin.read`；保持 stdin 打开的连续短请求现已通过 CI。本机 Windows 源码预览已重新启动，真实 Mac 桌面验证继续暂缓。
+
+本批完成 C1 的协议和权限代码准备，未完成拖选/快捷键输入、正式签名或真实授权验收。下一批实现 AX 取词与坐标，然后推进安全 Cmd+C 回退和输入捕获；必须经真实 Mac 验收后才宣称可用。协议细节见 [Mac helper 协议](MAC_HELPER_PROTOCOL.md)。
+
+### C2 准备：AX 选区与范围边界
+
+- helper 仅查询前台应用，校验可选来源 PID/Bundle ID，排除自身目标，读取期间目标切换则取消并丢弃文本。
+- 检查聚焦/命中元素及各自最多 16 层祖先；密码控件、循环或超深路径停止读取。直接 `AXSelectedText` 优先，合法 `AXSelectedTextRange` / `AXStringForRange` 回退，不查询全文。
+- 范围可用时读取 `AXBoundsForRange`；边界缺失或非法时保留文本并返回 null。原生坐标为 Quartz 全局点，Avalonia/DPI 转换与 Retina/多屏验收尚未完成。
+- 一次 AX 读取总预算 1.2 秒，每次 AX 远程消息最多 150ms，仍受 C# 3 秒进程时限保护。空选区、不支持、权限拒绝、保护内容、超时和来源改变返回不同失败；失败帧不允许携带选区正文。
+- 文本最多 20,000 个 UTF-16 单位，超限停止而不静默截断；上下文只在明确开启时读取附近最多 2,000 单位。
+- 本机 Release 构建 0 警告/0 错误，409 项测试通过：Core 47、原版业务 258、Windows 适配 22、Mac 存储/协议 45、Desktop 37。
+- 代码提交 `502d864` 的 [GitHub Actions #36974694338](https://github.com/2214331539/Yita/actions/runs/36974694338) 在 Windows/macOS 均通过：各自 Release 编译 0 警告/0 错误、409 项测试、6 项单实例跨进程检查及 5 项可控 helper 检查。Mac 另通过 10 项真实 Swift 管道检查和 17 项 AX 策略 fixture 测试，包含成功选区、范围回退、负坐标、上下文选择、保护内容和来源改变；不读取真实桌面内容或请求授权。
+- AX messaging timeout 设置失败时停止读取，不继续使用不可确认的时限；Windows 源码预览已重新启动。上述结果验证代码构建与可控行为，不作为真实 AX/Retina/应用兼容性验收。
+
+本批提供 AX 读取代码，尚未接入 Mac 输入事件或 Desktop 自动触发；真实应用授权、选区及坐标验收仍暂缓。下一批继续安全 Cmd+C 回退，随后接入全局鼠标/快捷键和宿主坐标转换。
+
+### C2 准备：Cmd+C 剪贴板事务与取消
+
+- helper 协议升级到 2，区分事件投递权限，根请求显式启用复制，默认 AX 读取不会自动发送 Cmd+C。只有 AX 空选区/不支持才进入安全回退。
+- 复制前保存有界的多项/多格式字节，检查前台、焦点、安全祖先、文本角色、修饰键和终端；无法可靠保存时停止复制，保留手动入口。
+- private CGEventSource 向原 PID 投递标记的复制事件。使用 changeCount 单次变化、HID 输入计数、文本/格式稳定和来源检查，在仍为原序列时恢复备份；不携带旧内容或推测的上下文。
+- 取消控制帧可在等待复制时到达。客户端保留原有界读取任务，等待收尾后丢弃旧结果；EOF/父进程退出也先取消收尾，新 helper 等待旧 helper 清理结束。卡死进程仍有有界的结束策略。
+- 本机 Release 构建 0 警告/0 错误、418 项测试通过：Core 47、原版业务 258、Windows 适配 22、Mac 存储/协议 54、Desktop 37。
+- 代码提交 `71c0ddc` 的 [GitHub Actions #36977995806](https://github.com/2214331539/Yita/actions/runs/36977995806) 在 Windows/macOS 均通过：各自 Release 编译 0 警告/0 错误、418 项测试、6 项单实例及 5 项可控 helper 检查。Mac 另通过实际 Swift helper 的 20 项管道检查、17 组 AX 策略和 22 组剪贴板事务测试，包含取消后复用、客户端释放与 EOF 后恢复/正常退出。
+- 跨进程复制 fixture 使用真实单调时钟，避免 runner 调度延迟拖慢虚拟时间；纯策略测试继续使用确定性虚拟时钟。EOF 的退出码检查由实际启动子进程的句柄完成，避免 Unix 外部进程句柄无法取得退出码的问题。两项修正仅涉及测试，不扩大生产超时。本机 Windows 源码预览已重新启动。
+
+NSPasteboard 不能原子比较序列并写入，也没有可验证的复制所有者；这套策略不能保证消除所有竞态。它保存已物化数据，不能重建任意 provider；强制终止或时限后才发生的复制也可能无法恢复。真实权限、输入计数、changeCount 与格式行为必须经 Mac 验收后才能标记可用。详见 [Mac Cmd+C 回退](MAC_CLIPBOARD_FALLBACK.md)。下一批接入全局拖选/快捷键与 Desktop，随后验证坐标和菜单栏。
+
+### C1/C3 准备：输入与 Desktop 链路
+
+- 协议升级到 3。只读 CGEvent tap 在独立 run loop 入队，C# 定期获取最多 64 项/500ms 内的事件；溢出、过期、来源变化和键盘输入使旧手势失效。键盘事件不保存文字或键码，注入复制事件受标记过滤。
+- Carbon 注册 `Cmd+Shift+T`，按住时不重复触发。快捷键/菜单只读取用户主动复制的内容，暂停自动翻译或没有 AX/鼠标权限时仍保留手动入口。
+- `MacSelectionRuntime` 复用同一 helper 的权限与读取服务，携带来源和输入序号，接入现有浮窗、翻译、设置、相对偏移与外部点击。权限操作导致 helper 重建时重新配置监听；UI 查询等待后过期的手势也被放弃。
+- 原生回调外检查窗口元数据，Desktop 再检查自身窗口；CGEvent/AX 的 Quartz 点直接符合当前 Avalonia.Native 11.2.6 的位置约定，不乘 Retina 渲染倍率。真实坐标和非激活窗口行为仍待验收。
+- 设置页新增用户显式的 Input Monitoring 授权/系统设置入口，保留 Accessibility 入口；启动不自动申请权限。tap 恢复限频，EOF/父进程退出释放监听、快捷键与订阅，并先完成已有复制清理。
+- 本机 Release 构建无警告/错误；本机全量 432 项通过后，新增恢复/过期回归的 Mac 测试共 68 项通过。最终代码提交 `2f02aa2` 的 [GitHub Actions #36980861240](https://github.com/2214331539/Yita/actions/runs/36980861240) 在 Windows/macOS 均通过：各自 434 项测试（Core 47、原版业务 258、Windows 22、Mac 68、Desktop 39）和零警告/错误编译。Mac 另通过 27 项实际 Swift 管道检查、17 组 AX、22 组剪贴板和 12 组输入策略测试。
+
+本批完成输入到共享读取/呈现的代码接入，不作为真实桌面产品验收。下一批完善 Mac 菜单栏/登录启动、Spaces/全屏和窗口生命周期；Keychain、权限、目标应用和 Retina/多屏真机验收仍按维护者安排暂缓。实现与验证边界见 [Mac 原生输入](MAC_NATIVE_INPUT.md)。
+
+### C3 准备：菜单栏、登录项与睡眠恢复
+
+- 核对 Avalonia.Native 11.2.6 的托盘实现直接使用 NSStatusItem/NSMenu；复用现有入口，补齐输入修复、本地化、暂停状态、异常隔离和释放后命令过滤，不重复创建 helper 菜单栏。
+- `MacStartupRegistration` 为符合 `com.yita.desktop` 身份、XML 元数据和可执行路径的 `.app` 配置当前用户下次 GUI 登录项；源码预览不注册。独立参数、冲突/链接保护、原子替换和自身项删除已实现；注册/存储失败不静默保存错误偏好。
+- 协议升级为 4，每帧携带持久会话状态和代数。系统/显示器/用户会话暂停原因分别合并，清空旧输入、停止 tap/快捷键，恢复时重新配置；旧 AX/复制及模型请求取消，遗漏中间暂停帧也使旧手势失效。
+- Desktop 暂停时隐藏固定窗口，取消正在流式的工作，关闭/隐藏其他窗口；恢复原先可见的固定窗口，限制到现有工作区，不激活窗口或重新请求翻译。
+- 同一 Avalonia NSWindow 在 Cocoa 主线程设置 CanJoinAllSpaces/Transient/IgnoresCycle/FullScreenAuxiliary，清除冲突标志；保留当前 UI 和置顶级别，不建立第二套窗口渲染。
+- 本机 Release 构建 0 警告/0 错误，456 项测试通过：Core 47、原版业务 258、Windows 22、Mac 86、Desktop 43；可控 helper 通信通过。代码提交 `4b391b5` 的 [GitHub Actions #36982899304](https://github.com/2214331539/Yita/actions/runs/36982899304) 已在 Windows/macOS 各通过同样的 456 项测试和零警告/错误构建；Mac 另通过 34 项实际 Swift/C# 管道检查、17 组 AX、22 组剪贴板和 16 组输入策略测试。
+
+本批是 C3 的代码与可控验证准备。没有注册 runner 的真实登录项、请求授权或读取桌面数据；真实登录、锁屏、焦点、Spaces/全屏、Retina、多屏和签名验收仍暂缓。方案、限制与待验收项目见 [Mac 桌面生命周期](MAC_DESKTOP_LIFECYCLE.md)。
+
+### D 准备：字体、动效与取词诊断
+
+- Windows 保留已验收的字体和外观；Mac 按系统已安装字体回退，保留原偏好 ID，设置选项显示解析后的字体。问答混排与非 Windows 图标不依赖 Segoe 私有字形。
+- 新增减少动效开关，立即预览、取消恢复及持久保存；系统偏好优先，UI 每 2 秒检查变化。连续揭示、分离和取消会恢复可见状态及原变换。
+- 原生读取附带独立耗时；诊断只有枚举、计数和有界样本，自动失败只显示常规页状态，手动失败给出本地化原因，不调用模型。正文、来源应用、路径与密钥不进入新诊断容器。
+- 代码 `1772046` 的 [GitHub Actions #36994976722](https://github.com/2214331539/Yita/actions/runs/36994976722) 在 Windows/macOS 各通过 Release 零警告/错误和 487 项测试；本机同样通过。Mac 新增 2 项实际 Cocoa 偏好/线程 probe，原有 34 项 Swift 管道及 AX/复制/输入策略继续通过。真实桌面和新安装包仍暂缓。详见 [实现与验收](CROSS_PLATFORM_APPEARANCE_DIAGNOSTICS.md)。
 
 ### C1. helper、权限与输入
 
-- 使用 Swift/Cocoa helper 承载 AX、全局输入和菜单栏；C# 保持业务和 Avalonia UI。helper 在自己的 Cocoa 主循环运行，不把跨进程阻塞放在 UI 回调内。
+- 使用 Swift/Cocoa helper 承载 AX 和全局输入；菜单栏复用 Avalonia 的原生 NSStatusItem/NSMenu，C# 保持业务和 Avalonia UI。helper 在自己的 Cocoa 主循环运行，不把跨进程阻塞放在 UI 回调内。
 - 使用结构化 IPC、请求编号、协议版本、超时与响应长度约束。区分权限拒绝、无选区、目标消失和 helper 故障；限制 helper 重启频率，防止重启循环。
 - 先固定 `.app` 的 Bundle ID、helper 身份和开发签名策略，再实施 Accessibility 授权，避免测试二进制和正式包被系统视为不同应用。
 - 根据实际使用的事件 API检测 Accessibility/Input Monitoring 能力，只引导用户授予所需权限。覆盖首次拒绝、之后开启、运行时撤销和系统设置跳转。
@@ -140,7 +233,7 @@
 
 ## 阶段 E：双端分发与更新
 
-- Windows 输出自包含 Setup；Mac 首先输出独立 `osx-arm64` 的 `.app` 与 DMG，再加入经验证的 `osx-x64` 包，不把多个 .NET 包简单合并就宣称 Universal。
+- Windows 输出自包含 Setup；Mac 仅构建 `osx-arm64` 的 `.app`、DMG 与备用 ZIP，不提供 Intel 或 Universal 下载。新版公开 Release 只上传 `Yita-Setup.exe` 与 `Yita.dmg`；校验文件、备用 ZIP、测试说明和构建清单保留在 Actions artifacts。
 - 最低 macOS 版本按所用 .NET、Avalonia、原生 API 及实际验收环境的交集确定，并写入 Release 和包元数据。
 - Mac 正式公开包使用 Developer ID、Hardened Runtime、notarization 与 stapling，按正确次序签名嵌套 helper、原生库和主应用；窗口权限不依赖随意启用的 entitlement。
 - 签名、公证需要维护者的 Apple 开发者账号与证书条件；Windows 公共分发的代码签名同样需要对应证书。尚未具备时只能准确标注内部试用状态。
@@ -158,8 +251,8 @@
 - 本机 Windows 可以验证 Windows 原生输入、PDF 兼容、真实 UI 和 Setup，也可完成共享协议与可控响应测试。
 - GitHub macOS runner 用于编译 Swift/C#、核心测试、打包与允许的原生检查。托管 runner 的 GUI 与 TCC 授权条件不能替代用户桌面验收。
 - Mac 首次授权、授权撤销、全局鼠标、其他应用选区、Spaces、复制恢复和升级后权限，需要可交互 Mac 或具备对应条件的自托管环境。
-- 维护者此前暂缓 Mac 验证；本路线图列出恢复后的工作与门槛，本次没有启动 Mac 实现或改变已暂缓的验证安排。
-- Apple Silicon 与 Intel 的构建、运行和应用兼容性分别记录。只验证一种架构时，另一种保留为待验收。
+- 维护者此前暂缓 Mac 真机验证；当前推进 helper 协议、权限入口和 CI 编译检查，真实桌面验收仍待恢复，不以 CI 通过替代授权及外部划词验收。
+- 本轮只记录 Apple Silicon 构建、运行和应用兼容性；Intel 不在支持范围内。
 
 ## 近期执行清单
 
@@ -167,14 +260,72 @@
 - [x] 更新 README 的远程分支清单，将首次迁移计划标记为历史记录。
 - [x] 按实际源码制定下一阶段计划与验收标准。
 - [ ] A1：在 `codex/windows-avalonia-release` 完成 .NET 10 LTS 升级及相关回归。
-- [ ] A2：新版自包含 publish、helper、许可清单与 Yita Setup。
+- [x] A2：新版自包含 publish、隔离 helper、双端许可清单与独立 Yita Setup；本机及双端 CI 通过，公开预览已发布。
 - [ ] A3：干净 Windows 安装/升级/卸载和不同电脑的划词验证。
-- [ ] B：平台宿主与安全存储接入，Windows 行为不回退。
-- [ ] C：具备 Mac 条件后实现原生链路并完成真实桌面验收。
+- [x] B1：宿主接口、Windows 接入、跨平台单实例及手动剪贴板回退；本机自动化和原生 smoke 通过。
+- [x] B2 实现：设置 schema/迁移保护、原生 Keychain 与 AES-GCM 修正记录、平台能力状态和可控测试。
+- [ ] B2 验收：真实 Mac Keychain、重启解密及签名身份检查；整个阶段 B 尚未完成。
+- [x] C1 准备：版本化 helper 协议、子进程隔离与重启限制、权限状态及显式授权入口；本机协议和 Desktop 回归通过。
+- [x] C2 AX 代码：前台来源校验、直接/范围取词、安全控件过滤、结构化失败与边界查询；真实 Mac 验收待恢复。
+- [x] C2 复制代码：显式 Cmd+C、多格式备份、序列/来源检查、取消和 EOF 收尾；真实 Mac 复制验收待恢复。
+- [x] C1/C3 输入代码：全局鼠标、Carbon 快捷键、有界事件、来源/序号失效与 Desktop 接入；合成输入和 Swift 通信通过。
+- [x] C3 代码：原生菜单栏入口、受约束的 `.app` 登录项、Spaces 属性和睡眠/会话恢复；本机可控回归通过。
+- [ ] C3 验收：Mac 编译与合成管道检查已通过；具备真机条件时完成菜单、登录、锁屏、焦点、Retina/多屏、Spaces/全屏与窗口生命周期验收。
+- [x] D 准备代码：平台字体、减少动效、失败原因反馈及有界隐私诊断；本机及双端 CI 各 487 项通过，实际 Cocoa 偏好 probe 通过。
 - [ ] D：双端兼容性矩阵、性能与阅读体验。
 - [ ] E：双端签名安装包、版本检查、升级与公开 Release。
+- [x] E 试用包：Apple Silicon 自包含 `.app`、DMG/ZIP、完整许可、包内 helper 启动与封装校验；`4004efd` 的 [Actions #36998582502](https://github.com/2214331539/Yita/actions/runs/36998582502) 已通过。真机验收见 [同学测试清单](MAC_PREVIEW_TESTING.md)。
+- [x] E 公开预览：`v0.9.0-preview.1` 同时提供当前 Avalonia Windows Setup 和 Apple Silicon DMG，备用 ZIP 保留在 Actions artifacts；正式签名、LTS、升级及真机验收继续保留。
+
+### Apple Silicon 内部试用包检查点
+
+- 2026-10-02，`4004efd` 生成 `0.9.0-macos-preview.4`，RID `osx-arm64`，SDK 8.0.425、自带 .NET 8.0.31。仅 Apple Silicon，包元数据最低 macOS 12.0；没有 Intel/Universal 包、Developer ID、公证或自动更新。
+- 标准 `.app` 将主 apphost 放在 `Contents/MacOS`，托管运行时放在 `Contents/Resources/Runtime`，原生 helper 放在 `Contents/Helpers`。使用 SDK 创建带相对托管入口的 apphost；源码运行目录仍受支持。嵌套代码由内到外 ad-hoc 签名。
+- macOS 打包工作流通过 488 项自动化、单实例与 helper 检查，验证 19 个 ARM64 原生二进制及完整签名。原始 `.app`、挂载 DMG 和解压 ZIP 均通过自带运行时启动与 fixture helper 通信；包内 AX/剪贴板/输入策略检查也通过，不读取真实桌面、Keychain 或 API。
+- 完整许可与恢复依赖清单随包附带，覆盖 26 个恢复包及字体/上游。DMG 为 47,737,078 字节，备用 ZIP 为 40,448,488 字节。Actions artifact 为 `Yita-macos-preview-4-osx-arm64`，默认保存 30 天。
+- 产物已下载到 `F:\Project\InstantTranslate\artifacts\macos-preview\preview-4`，外层 artifact 和四项分发文件的 SHA256 均已校验。仅推送当前功能分支，`main` 保持 `dd74328`。同学真实授权、外部划词和桌面生命周期尚待反馈；不将封装检查记为真机验收。
+
+### 双端公开预览发布检查点
+
+- 2026-10-03，本机 Release 编译零警告/错误，489 项测试全部通过，单实例与 helper 协议 smoke 通过。
+- `0.9.0-preview.1` Windows 候选包包含 Avalonia 主程序、独立目录的 UIA worker 和各自的 .NET 8.0.31 运行时。缺少系统 .NET 的启动检查通过；Setup 安装、所有 payload 哈希、重装、卸载与设置保留检查通过。候选包来自工作区，仅用于本机验证，公开包由干净源码的 CI 重新构建。
+- 新版安装身份、目录和启动项与旧 WPF 版区分。两端公开包使用同一版本和源码提交，上传前验证构建元数据及 SHA256；任何一端失败均不发布。
+- 两端预览未做商业签名，Mac 仅 ad-hoc 签名；真机授权/外部取词、升级与长期使用仍按验收清单记录。正式 LTS、签名和更新任务继续保留。
+- 公开 [Release v0.9.0-preview.1](https://github.com/2214331539/Yita/releases/tag/v0.9.0-preview.1) 已于 2026-10-03 发布，标记为 Pre-release。源码固定为 `fe73ef7c8c8c59d6bc091c2843d628c15ace330a`；后续记录提交仅更新文档，不重写此标签或产物。
+- 分支预验证 [Actions #37132713409](https://github.com/2214331539/Yita/actions/runs/37132713409) 与标签发布 [Actions #37132927733](https://github.com/2214331539/Yita/actions/runs/37132927733) 均成功，两端各通过 489 项自动化。Windows runner 通过安装、payload、封装启动、重装和卸载；Mac 原始应用、挂载 DMG 与解压 ZIP 均通过 19 个 ARM64 原生文件的签名、运行时及 helper 检查。
+- 初次发布时 Release 共上传 12 项资产：两个平台的安装包、备用 ZIP、测试说明、构建 JSON、Windows payload 清单及三份 SHA256 文件。发布任务核验两端版本、RID、干净工作区、同一标签提交与全部平台文件哈希后共同上传；随后按下述记录精简公开附件。
+
+### Release 附件精简检查点
+
+- 2026-10-04，按维护者要求清理当前及上一版 Release。`v0.9.0-preview.1` 仅保留 Windows Setup、Apple Silicon DMG 与只覆盖两份安装包的 `SHA256SUMS.txt`；`v0.8.4` 仅保留原 Windows Setup 与其 SHA256 文件。GitHub 自动生成的两项源码下载仍显示，页面分别为 5 项与 4 项。
+- 已核对安装包的资产 ID、SHA256 与下载地址均未变化，两个 Release 的稳定/预览状态及源码标签未变化；发布说明中的未完成文字已删除。此次没有修改应用代码、已安装程序或 `main`。
+- 一次性清理 [Actions #37137163311](https://github.com/2214331539/Yita/actions/runs/37137163311) 成功，清理前后元数据保存在 `release-cleanup-record` artifact（30 天）。完成后移除该临时工作流，保留执行记录。
+- 此检查点的发布规则为核验两端全部内部产物的元数据和 SHA256，再公开 Setup、DMG 与一份校验文件；ZIP、测试说明和构建清单仅留在 Actions。当时已验证实际发布暂存脚本只输出这三份文件，并拒绝遭修改的内部 payload。`v0.9.0-preview.2` 起按维护者最新要求，仅上传统一命名的两个安装包，内部校验继续执行。
 
 ## 跨平台产品完成定义
+
+### Mac 首轮用户反馈修复
+
+- 2026-10-04，用户反馈“可打开配置但找不到已安装应用、划词没有反应”。DMG 挂载不等于安装，`LSUIElement` 应用常驻菜单栏而不默认出现在 Dock；已增加设置页顶部的磁盘镜像/系统转移路径/其他目录提示，临时路径禁止登记登录启动。
+- 确认重复的 Desktop 窗口几何过滤忽略遮挡，可将其他应用内的拖选误判为后台 Yita 操作。生产 Mac runtime 改由原生 helper 按窗口前后层级过滤；Swift fixture 覆盖可见/被遮挡/透明/自身窗口和 Quartz 边界。核对 Avalonia 11.2.6 的 `Screens.mm` 后确认其 Mac 屏幕缩放为 1，此次没有将 Retina 倍率当作已确认原因，也未更改通用定位算法。
+- 缺少辅助功能/输入监控权限时，在各设置页持续显示阻塞状态；保存模型配置后保留并打开“常规”，返回系统设置后刷新权限并尝试恢复输入捕获。诊断增加进程内输入/读取/成功计数、原生原因和应用位置分类，不包含正文、Key 或用户完整路径。
+- 本机 Release 构建 0 警告/0 错误，497 项回归及单实例/helper 协议 smoke 通过；Mac Swift 编译、封装与真机授权/外部划词仍按其实际环境分别验证。本次继续使用功能分支，既有 Release 安装包不会因源码修改自动更新。
+- 最终代码提交 `b6aab45` 补充手动剪贴板宿主无需原生权限即可保存的回归用例。[架构 CI #37172685524](https://github.com/2214331539/Yita/actions/runs/37172685524) 在 Windows/macOS 各通过 498 项测试及 smoke；Mac 实际 Swift 自测确认窗口遮挡过滤不误拦截外部选区。
+- [Mac 包 #37172685543](https://github.com/2214331539/Yita/actions/runs/37172685543) 成功生成 `Yita-0.9.0-macos-preview.8-osx-arm64.dmg`。原始应用、挂载 DMG、解压 ZIP 各通过 19 个 ARM64 原生二进制/签名/自带运行时/helper 检查。测试包在 `Yita-macos-preview-8-osx-arm64` Actions artifact 中，保留至 2026-11-03；未覆盖公开 Release，真实辅助功能授权与外部划词仍待用户复验。
+
+### 最新双端安装包统一发布
+
+- 2026-10-04，[Release v0.9.0-preview.2](https://github.com/2214331539/Yita/releases/tag/v0.9.0-preview.2) 已公开，使用 Pre-release 标记；Windows x64 与 Apple Silicon 包均来自干净提交 `11f48db94d1fa2bcb1b16712a544bd66a2baa283`，包含上述 Mac 修复。历史 Release、既有标签及 `main` 保持不变。
+- [标签发布 Actions #37173828040](https://github.com/2214331539/Yita/actions/runs/37173828040) 的两个构建及发布任务成功；两端各通过 498 项测试，构建 0 警告/0 错误。Windows 安装、payload、运行时/helper、重装和卸载通过；Mac 原始应用、挂载 DMG、解压 ZIP 各通过 19 个 ARM64 原生文件、签名和运行时/helper 检查。
+- Release API 确认只有两项上传资产：`Yita-Setup.exe`（84,506,961 字节）与 `Yita.dmg`（48,522,738 字节），没有额外 ZIP、清单或校验文件。GitHub 自动显示两份 Source code 归档；内部产物仍保留 SHA256，并在公开上传前验证同一版本、提交、RID 和干净源码。
+- 两份公开下载均返回 HTTP 200，本地整理到 `artifacts/published/v0.9.0-preview.2/`，目录只含两个安装包。SHA256 与 Release digest 一致：Windows `c495fb4789add2826417831dd19f730d209f6e10d90e8aa5c57a025b87670efb`，Mac `f584fa872c04f6e2c8b1412c003d4cd132dae45d396dbffa29808e1a85cfe559`。
+- 发布暂存验证覆盖准确的两文件输出、改名后内容不变，以及内部文件遭修改、提交不一致和工作区非干净时拒绝发布。此次安装包命名整理不代表 Mac 真机划词或正式签名/公证已验收；后续文档记录不会重写已发布标签。
+
+### 继续开发顺序
+
+1. 字体、动效偏好与取词诊断准备代码已完成。下一批在现有 Windows 条件下完善可重复的应用兼容性记录与连续请求/长时运行检查；继续区分可控测试和真实有效选区数据，不扩大未测平台的支持声明。
+2. 恢复 Mac 条件后执行阶段 B/C 的真机清单和应用兼容性矩阵，根据焦点、授权、全屏等实测结果调整原生实现；只有实际通过才标记支持。
+3. 当前授权生成同一源码的 Windows Avalonia Setup 和 Apple Silicon 包并公开预览 Release；正式分发阶段继续完成 .NET LTS、更多 Windows 安装验收、Mac 签名/公证、版本检查和更新。
 
 只有同时满足以下条件，才将下载入口和 README 标记为 Windows/macOS 均可用：
 

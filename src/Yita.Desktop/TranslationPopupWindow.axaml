@@ -8,7 +8,10 @@
     <Border x:Name="ActionBarSurface" Margin="0,0,18,7" Padding="5,4" HorizontalAlignment="Right"
             Background="{DynamicResource PopupButtonBrush}" CornerRadius="{DynamicResource PopupActionBarCornerRadius}">
       <StackPanel Orientation="Horizontal">
-        <TextBlock x:Name="NoticeText" IsVisible="False" Margin="7,0,6,0" VerticalAlignment="Center" FontSize="11" Foreground="{DynamicResource AccentBrush}" />
+        <TextBlock x:Name="NoticeText" IsVisible="False" MaxWidth="160" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Text, RelativeSource={RelativeSource Self}}"
+                   Margin="7,0,6,0" VerticalAlignment="Center" FontSize="11" Foreground="{DynamicResource AccentBrush}" />
+        <ComboBox x:Name="PopupTargetLanguageComboBox" Classes="popup-language" Margin="0,0,6,0"
+                  VerticalAlignment="Center" SelectionChanged="TargetLanguageSelectionChanged" />
         <Border Padding="3" Margin="0,0,6,0" CornerRadius="10" Background="{DynamicResource PopupBackgroundBrush}">
           <StackPanel Orientation="Horizontal">
             <Button x:Name="OriginalButton" Classes="reading-action text-action" Content="Source" ToolTip.Tip="Show source" Click="OriginalClick" />

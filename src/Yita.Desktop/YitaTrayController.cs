@@ -2,56 +2,74 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Threading;
+using Yita.Core.Platform;
 using Yita.Core.Selection;
-using Yita.Native.Windows;
 
 namespace Yita.Desktop;
 
 internal sealed class YitaTrayController : IDisposable
 {
     private readonly TrayIcon? _tray;
-    private readonly WindowsTrayIcon? _windowsTray;
+    private readonly IStatusIcon? _statusIcon;
     private readonly Action _showSettings;
     private readonly Action _toggleEnabled;
     private readonly Action _exit;
-    private readonly WindowsSelectionRuntime? _runtime;
+    private readonly ISelectionRuntime? _runtime;
+    private readonly Action _translateClipboard;
     private readonly Action _diagnostics;
     private readonly Action _about;
     private readonly NativeMenuItem? _enabledItem;
     private readonly NativeMenuItem? _settingsItem;
     private readonly NativeMenuItem? _exitItem;
+    private readonly NativeMenuItem? _clipboardItem;
+    private readonly NativeMenuItem? _diagnosticsItem;
+    private readonly NativeMenuItem? _aboutItem;
+    private readonly NativeMenuItem _repairItem;
+    private readonly NativeMenu _nativeMenu;
     private Window? _menu;
     private ScreenPoint _menuAnchor;
     private bool _enabled;
     private bool _chinese;
     private bool _disposed;
     internal Window? MenuWindow => _menu;
+    internal NativeMenu NativeMenu => _nativeMenu;
 
     internal YitaTrayController(Action showSettings, Action toggleEnabled, Action exit, bool isEnabled,
-        WindowsSelectionRuntime? runtime = null, Action? diagnostics = null, Action? about = null, bool createIcon = true)
+        ISelectionRuntime? runtime = null, Action? diagnostics = null, Action? about = null, bool createIcon = true,
+        Action? translateClipboard = null, Func<string, IStatusIcon?>? createStatusIcon = null)
     {
         (_showSettings, _toggleEnabled, _exit, _enabled, _runtime) = (showSettings, toggleEnabled, exit, isEnabled, runtime);
         _diagnostics = diagnostics ?? (() => { });
         _about = about ?? (() => { });
+        _translateClipboard = translateClipboard ?? (() => _runtime?.TranslateClipboard());
+        var menu = _nativeMenu = new NativeMenu();
+        _clipboardItem = new NativeMenuItem("Translate clipboard"); _clipboardItem.Click += (_, _) => Execute(_translateClipboard); menu.Items.Add(_clipboardItem);
+        _settingsItem = new NativeMenuItem("Settings…"); _settingsItem.Click += (_, _) => Execute(_showSettings); menu.Items.Add(_settingsItem);
+        _enabledItem = new NativeMenuItem("Enable selection translation") { ToggleType = NativeMenuItemToggleType.CheckBox, IsChecked = isEnabled, IsEnabled = _runtime is not null };
+        _enabledItem.Click += (_, _) => Execute(_toggleEnabled); menu.Items.Add(_enabledItem);
+        menu.Items.Add(new NativeMenuItemSeparator());
+        _repairItem = new NativeMenuItem("Repair input capture") { IsEnabled = _runtime is not null };
+        _repairItem.Click += (_, _) => Execute(RepairInput); menu.Items.Add(_repairItem);
+        _diagnosticsItem = new NativeMenuItem("Copy performance diagnostics"); _diagnosticsItem.Click += (_, _) => Execute(_diagnostics); menu.Items.Add(_diagnosticsItem);
+        _aboutItem = new NativeMenuItem("About Yita"); _aboutItem.Click += (_, _) => Execute(_about); menu.Items.Add(_aboutItem);
+        menu.Items.Add(new NativeMenuItemSeparator());
+        _exitItem = new NativeMenuItem("Exit"); _exitItem.Click += (_, _) => Execute(_exit); menu.Items.Add(_exitItem);
         if (!createIcon) return;
         var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "Yita.ico");
-        if (OperatingSystem.IsWindows())
+        _statusIcon = (createStatusIcon ?? new DesktopPlatformServices().CreateStatusIcon)(iconPath);
+        if (_statusIcon is not null)
         {
-            _windowsTray = new WindowsTrayIcon(iconPath);
-            _windowsTray.MenuRequested += (_, point) => Dispatcher.UIThread.Post(() => ShowMenu(point));
-            _windowsTray.OpenRequested += (_, _) => Dispatcher.UIThread.Post(() => { if (!_disposed) _showSettings(); });
+            _statusIcon.MenuRequested += OnMenuRequested;
+            _statusIcon.OpenRequested += OnOpenRequested;
             return;
         }
-        var menu = new NativeMenu();
-        _settingsItem = new NativeMenuItem("Settings…"); _settingsItem.Click += (_, _) => _showSettings(); menu.Items.Add(_settingsItem);
-        _enabledItem = new NativeMenuItem("Enable selection translation") { ToggleType = NativeMenuItemToggleType.CheckBox, IsChecked = isEnabled };
-        _enabledItem.Click += (_, _) => _toggleEnabled(); menu.Items.Add(_enabledItem);
-        menu.Items.Add(new NativeMenuItemSeparator());
-        _exitItem = new NativeMenuItem("Exit"); _exitItem.Click += (_, _) => _exit(); menu.Items.Add(_exitItem);
         _tray = new TrayIcon { ToolTipText = "Yita", Menu = menu, IsVisible = true };
         if (File.Exists(iconPath)) _tray.Icon = new WindowIcon(iconPath);
-        _tray.Clicked += (_, _) => _showSettings();
+        _tray.Clicked += (_, _) => Execute(_showSettings);
     }
+
+    private void OnMenuRequested(object? sender, ScreenPoint point) => Dispatcher.UIThread.Post(() => ShowMenu(point));
+    private void OnOpenRequested(object? sender, EventArgs args) => Dispatcher.UIThread.Post(() => { if (!_disposed) _showSettings(); });
 
     internal void SetEnabled(bool enabled)
     {
@@ -65,6 +83,10 @@ internal sealed class YitaTrayController : IDisposable
         if (_settingsItem is not null) _settingsItem.Header = L("Settings…", "设置…");
         if (_enabledItem is not null) _enabledItem.Header = L("Enable selection translation", "启用划词翻译");
         if (_exitItem is not null) _exitItem.Header = L("Exit", "退出");
+        if (_clipboardItem is not null) _clipboardItem.Header = L("Translate clipboard", "翻译剪贴板");
+        if (_diagnosticsItem is not null) _diagnosticsItem.Header = L("Copy performance diagnostics", "复制性能诊断");
+        if (_aboutItem is not null) _aboutItem.Header = L("About Yita", "关于 Yita");
+        _repairItem.Header = L("Repair input capture", "修复划词捕获");
         RefreshMenu();
     }
 
@@ -83,7 +105,8 @@ internal sealed class YitaTrayController : IDisposable
         var window = new Window
         {
             SystemDecorations = SystemDecorations.None, ShowInTaskbar = false, Topmost = true, CanResize = false,
-            WindowStartupLocation = WindowStartupLocation.Manual, FontFamily = new FontFamily("Microsoft YaHei UI"), FontSize = 40d / 3,
+            WindowStartupLocation = WindowStartupLocation.Manual, FontFamily = OperatingSystem.IsWindows()
+                ? new FontFamily("Microsoft YaHei UI") : DesktopFontResolver.InterfaceFont, FontSize = 40d / 3,
             Background = ReferenceTheme.Brush("#FFFCF7"), Foreground = ReferenceTheme.Brush("#302D29"),
         };
         RenderOptions.SetTextRenderingMode(window, TextRenderingMode.Antialias);
@@ -106,11 +129,11 @@ internal sealed class YitaTrayController : IDisposable
         stack.Children.Add(new TextBlock { Text = "Yita · " + L(_enabled ? "Enabled" : "Paused", _enabled ? "已启用" : "已暂停"),
             Margin = new Thickness(24, 6, 12, 6), FontWeight = FontWeight.Bold });
         Separator(stack);
-        Command(stack, L("Translate clipboard (Ctrl+Shift+T)", "翻译剪贴板（Ctrl+Shift+T）"), () => _runtime?.TranslateClipboard());
+        Command(stack, L("Translate clipboard (Ctrl+Shift+T)", "翻译剪贴板（Ctrl+Shift+T）"), _translateClipboard);
         Command(stack, L("Enable selection translation", "启用划词翻译"), _toggleEnabled, _enabled);
         Separator(stack);
         Command(stack, L("Settings…", "设置…"), _showSettings);
-        Command(stack, L("Repair input capture", "修复划词捕获"), () => _ = Task.Run(() => _runtime?.RepairInputCapture()));
+        Command(stack, L("Repair input capture", "修复划词捕获"), RepairInput);
         Command(stack, L("Copy performance diagnostics", "复制性能诊断"), _diagnostics);
         Command(stack, L("About Yita", "关于 Yita"), _about);
         Separator(stack);
@@ -143,21 +166,45 @@ internal sealed class YitaTrayController : IDisposable
     private void Command(StackPanel stack, string label, Action action, bool check = false)
     {
         var content = new Grid { ColumnDefinitions = new ColumnDefinitions("20,*") };
-        if (check) content.Children.Add(new TextBlock { Text = "\uE73E", FontFamily = new FontFamily("Segoe Fluent Icons"), VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center });
+        if (check)
+        {
+            Control mark = OperatingSystem.IsWindows()
+                ? new TextBlock { Text = "\uE73E", FontFamily = new FontFamily("Segoe Fluent Icons"), VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center }
+                : new Avalonia.Controls.Shapes.Path { Data = Geometry.Parse("M2,6 L5,9 L11,2"), Stroke = ReferenceTheme.Brush("#302D29"),
+                    StrokeThickness = 1.5, Width = 12, Height = 12, Stretch = Stretch.Uniform, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center };
+            content.Children.Add(mark);
+        }
         var text = new TextBlock { Text = label, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center }; Grid.SetColumn(text, 1); content.Children.Add(text);
         var button = new Button { Content = content, Classes = { "tray-command" }, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch };
-        button.Click += (_, _) => { _menu?.Close(); if (!_disposed) action(); };
+        button.Click += (_, _) => { _menu?.Close(); Execute(action); };
         stack.Children.Add(button);
     }
     private static void Separator(StackPanel stack) => stack.Children.Add(new Border
     { Height = 1, Margin = new Thickness(5, 4), Background = ReferenceTheme.Brush("#E3DCD0") });
     private string L(string english, string chinese) => _chinese ? chinese : english;
+    private void Execute(Action action)
+    {
+        if (_disposed) return;
+        try { action(); }
+        catch (Exception exception) { System.Diagnostics.Trace.TraceError("Tray command failed: {0}", exception.GetType().Name); }
+    }
+    private void RepairInput() => _ = Task.Run(() =>
+    {
+        if (_disposed) return;
+        try { _runtime?.RepairInputCapture(); }
+        catch (Exception exception) { System.Diagnostics.Trace.TraceError("Input repair failed: {0}", exception.GetType().Name); }
+    });
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
         _menu?.Close();
-        _windowsTray?.Dispose();
-        _tray?.Dispose();
+        if (_statusIcon is not null)
+        {
+            _statusIcon.MenuRequested -= OnMenuRequested;
+            _statusIcon.OpenRequested -= OnOpenRequested;
+            _statusIcon.Dispose();
+        }
+        if (_tray is not null) { _tray.IsVisible = false; _tray.Dispose(); }
     }
 }

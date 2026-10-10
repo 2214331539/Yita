@@ -5,7 +5,7 @@ using Yita.Core.Selection;
 
 namespace Yita.Native.Windows;
 
-public sealed class WindowsTrayIcon : IDisposable
+public sealed class WindowsTrayIcon : Yita.Core.Platform.IStatusIcon
 {
     private const uint CallbackMessage = 0x8001;
     private readonly string _iconPath;

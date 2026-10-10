@@ -13,7 +13,7 @@
     <fluent:FluentTheme />
     <StyleInclude Source="avares://Yita.Desktop/Styles/ReferenceControls.axaml" />
     <Style Selector="Window">
-      <Setter Property="FontFamily" Value="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, sans-serif" />
+      <Setter Property="FontFamily" Value="{DynamicResource InterfaceFont}" />
       <Setter Property="FontSize" Value="14" />
     </Style>
   </Application.Styles>

@@ -42,6 +42,20 @@ internal sealed partial class QuestionAnswerWindow : Window
         (_settings, _source, _translation, _explanation, _kind, _runtime, _records, _context) =
             (settings, source, translation, explanation, kind, runtime, records, context);
         InitializeComponent();
+        if (!OperatingSystem.IsWindows())
+        {
+            PinButton.Content = new Avalonia.Controls.Shapes.Path
+            {
+                Data = Geometry.Parse("M16,9V4L17,3V2H7V3L8,4V9C8,10.66 6.66,12 5,12V14H11V21H13V14H19V12C17.34,12 16,10.66 16,9Z"),
+                Fill = ReferenceTheme.Brush("#302D29"), Stretch = Stretch.Uniform, Width = 12, Height = 12,
+            };
+            CloseButton.Content = new Avalonia.Controls.Shapes.Path
+            {
+                Data = Geometry.Parse("M6,6 L18,18 M18,6 L6,18"),
+                Stroke = ReferenceTheme.Brush("#302D29"), StrokeThickness = 2, Stretch = Stretch.Uniform, Width = 12, Height = 12,
+            };
+        }
+        DesktopFloatingWindowBehavior.Apply(this);
         ReferenceTheme.Apply(Resources, settings);
         ApplyUiLanguage(settings.UiLanguage);
         var chat = kind == QuestionContextKind.GeneralChat;
@@ -161,8 +175,8 @@ internal sealed partial class QuestionAnswerWindow : Window
                 // WPF paragraphs leave a compact gap, rather than a full blank text line.
                 TranscriptText.Inlines.Add(new Run("\n") { FontSize = 5.5 });
             }
-            TranscriptText.Inlines.Add(new Run(Role(turn)) { FontWeight = FontWeight.Bold, FontSize = TranscriptText.FontSize });
-            TranscriptText.Inlines.Add(new Run("\n" + turn.Content) { FontSize = TranscriptText.FontSize });
+            ReferenceTypography.Append(TranscriptText.Inlines, Role(turn), _settings, FontWeight.Bold);
+            ReferenceTypography.Append(TranscriptText.Inlines, "\n" + turn.Content, _settings);
         }
         string Role(ConversationTurn turn) => turn.Role == "user" ? (_settings.UiLanguage == "zh-CN" ? "你" : "You") : "AI";
     }
@@ -171,6 +185,16 @@ internal sealed partial class QuestionAnswerWindow : Window
     private void StopClick(object? sender, RoutedEventArgs e)
     {
         _requests.Cancel(); SetIdle();
+        RetryButton.IsVisible = true;
+    }
+
+    internal void SuspendSession()
+    {
+        if (!_streaming) return;
+        _requests.Cancel();
+        if (_waitingForAnswer) _pendingAnswer = _settings.UiLanguage == "zh-CN" ? "已停止。" : "Stopped.";
+        SetIdle();
+        RenderTranscript();
         RetryButton.IsVisible = true;
     }
     private async void RetryClick(object? sender, RoutedEventArgs e) => await AskAsync(_question);

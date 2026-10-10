@@ -2,6 +2,12 @@ using Microsoft.Win32;
 
 namespace Yita.Native.Windows;
 
+public sealed class WindowsStartupService : Yita.Core.Platform.IStartupRegistration
+{
+    public bool IsSupported => OperatingSystem.IsWindows();
+    public void Apply(bool enabled) => WindowsStartupRegistration.Apply(enabled);
+}
+
 /// <summary>
 /// Registers Yita for the current Windows user without requiring elevation.
 /// </summary>
@@ -30,7 +36,8 @@ public static class WindowsStartupRegistration
         var assemblyPath = System.Reflection.Assembly.GetEntryAssembly()?.Location;
         var runtimeRoot = Environment.GetEnvironmentVariable("DOTNET_ROOT");
         var portableHost = string.IsNullOrEmpty(runtimeRoot) ? null : Path.Combine(runtimeRoot, "dotnet.exe");
-        var command = portableHost is not null && File.Exists(portableHost) && !string.IsNullOrEmpty(assemblyPath)
+        var command = !File.Exists(Path.Combine(AppContext.BaseDirectory, "coreclr.dll"))
+            && portableHost is not null && File.Exists(portableHost) && !string.IsNullOrEmpty(assemblyPath)
             ? Quote(portableHost) + " " + Quote(assemblyPath) + " --background"
             : Path.GetFileNameWithoutExtension(executable).Equals("dotnet", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(assemblyPath)
                 ? Quote(executable) + " " + Quote(assemblyPath) + " --background"

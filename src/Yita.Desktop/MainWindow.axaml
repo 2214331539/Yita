@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Window x:Class="Yita.Desktop.MainWindow" Title="Yita Settings" Icon="avares://Yita.Desktop/Assets/Yita.ico" Width="980" Height="760" MinWidth="760" MinHeight="500" WindowStartupLocation="CenterScreen" ShowInTaskbar="True" UseLayoutRounding="True" FontFamily="Microsoft YaHei" FontSize="14" Background="{DynamicResource AppWindowBackgroundBrush}" Foreground="{DynamicResource AppTextBrush}" xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" CanResize="True" RenderOptions.TextRenderingMode="Antialias" x:CompileBindings="False">
+<Window x:Class="Yita.Desktop.MainWindow" Title="Yita Settings" Icon="avares://Yita.Desktop/Assets/Yita.ico" Width="980" Height="760" MinWidth="760" MinHeight="500" WindowStartupLocation="CenterScreen" ShowInTaskbar="True" UseLayoutRounding="True" FontFamily="{DynamicResource InterfaceFont}" FontSize="14" Background="{DynamicResource AppWindowBackgroundBrush}" Foreground="{DynamicResource AppTextBrush}" xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" CanResize="True" RenderOptions.TextRenderingMode="Antialias" x:CompileBindings="False">
   <Grid x:Name="SettingsRoot" Background="{DynamicResource AppWindowBackgroundBrush}">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
@@ -18,6 +18,9 @@
       <StackPanel Grid.Column="1" VerticalAlignment="Center">
         <TextBlock FontSize="24" FontWeight="SemiBold" Foreground="{DynamicResource AppTextBrush}" Tag="loc:HeaderTitle" Text="Settings" LineHeight="31" />
         <TextBlock Margin="0,3,0,0" Tag="loc:HeaderSubtitle" Text="Translation behavior, appearance, and connection" Classes="supporting" LineHeight="20" />
+        <TextBlock x:Name="SettingsStatusText" Margin="0,6,0,0" TextWrapping="Wrap" IsVisible="False" Classes="supporting" LineHeight="20" />
+        <TextBlock x:Name="MacInstallationStatusText" Margin="0,6,0,0" TextWrapping="Wrap" IsVisible="False" Classes="supporting" LineHeight="20" />
+        <TextBlock x:Name="PlatformStatusText" Margin="0,6,0,0" TextWrapping="Wrap" IsVisible="False" Classes="supporting" LineHeight="20" />
       </StackPanel>
       <StackPanel Grid.Column="2" VerticalAlignment="Center">
         <TextBlock Margin="0,0,0,6" HorizontalAlignment="Right" Tag="loc:InterfaceLanguage" Text="Interface language" Classes="label" LineHeight="19" />
@@ -40,6 +43,15 @@
               <StackPanel>
                 <TextBlock Tag="loc:GeneralTitle" Text="General" Classes="section" LineHeight="20" />
                 <TextBlock Margin="0,4,0,17" Tag="loc:GeneralDescription" Text="Control availability and selection behavior." Classes="supporting" LineHeight="20" />
+                <TextBlock x:Name="SelectionStatusText" Margin="0,0,0,14" TextWrapping="Wrap" IsVisible="False" Classes="supporting" LineHeight="20" />
+                <TextBlock x:Name="NativePermissionStatusText" TextWrapping="Wrap" IsVisible="False" Classes="supporting" LineHeight="20" />
+                <WrapPanel x:Name="PermissionActionsPanel" Margin="0,8,0,14" IsVisible="False">
+                  <Button Margin="0,0,8,6" Content="Check permissions" Tag="loc:CheckPermissions" Click="CheckPermissions_Click" Classes="secondary" />
+                  <Button x:Name="RequestAccessibilityButton" Margin="0,0,8,6" Content="Grant access" Tag="loc:RequestAccessibility" Click="RequestAccessibility_Click" Classes="secondary" />
+                  <Button x:Name="OpenPermissionSettingsButton" Margin="0,0,0,6" Content="System settings" Tag="loc:OpenPermissionSettings" Click="OpenPermissionSettings_Click" Classes="secondary" />
+                  <Button x:Name="RequestInputMonitoringButton" Margin="0,0,8,6" Content="Allow input monitoring" Tag="loc:RequestInputMonitoring" Click="RequestInputMonitoring_Click" Classes="secondary" />
+                  <Button x:Name="OpenInputSettingsButton" Margin="0,0,0,6" Content="Input settings" Tag="loc:OpenInputSettings" Click="OpenInputSettings_Click" Classes="secondary" />
+                </WrapPanel>
                 <Grid>
                   <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -58,7 +70,7 @@
                     <ColumnDefinition Width="Auto" />
                   </Grid.ColumnDefinitions>
                   <StackPanel>
-                    <TextBlock FontWeight="SemiBold" Tag="loc:StartWithWindows" Text="Start with Windows" LineHeight="20" />
+                    <TextBlock x:Name="StartWithSystemTitleText" FontWeight="SemiBold" Tag="loc:StartWithWindows" Text="Start with Windows" LineHeight="20" />
                     <TextBlock Margin="0,3,18,0" Tag="loc:StartWithWindowsDescription" Text="Stay ready in the background after sign-in." Classes="supporting" LineHeight="20" />
                   </StackPanel>
                   <ToggleSwitch x:Name="StartWithWindowsCheckBox" Grid.Column="1" VerticalAlignment="Center" AutomationProperties.Name="Start with Windows" Classes="switch" />
@@ -164,12 +176,7 @@
                   </StackPanel>
                   <StackPanel Grid.Column="2">
                     <TextBlock Tag="loc:TargetLanguage" Text="Target language" Classes="label" LineHeight="19" />
-                    <ComboBox x:Name="TargetLanguageComboBox">
-                      <ComboBoxItem Content="Choose automatically" Tag="自动判断" />
-                      <ComboBoxItem Content="Simplified Chinese" Tag="简体中文" />
-                      <ComboBoxItem Content="English" Tag="英语" />
-                      <ComboBoxItem Content="Japanese" Tag="日语" />
-                    </ComboBox>
+                    <ComboBox x:Name="TargetLanguageComboBox" />
                   </StackPanel>
                 </Grid>
                 <Border Height="1" Margin="0,17" Background="{DynamicResource AppCardBorderBrush}" />
@@ -314,6 +321,10 @@
                     </Border>
                   </Grid>
                 </Grid>
+                <Grid Margin="0,17,0,0" ColumnDefinitions="*,Auto">
+                  <TextBlock Tag="loc:ReduceMotion" Text="Reduce motion" FontWeight="SemiBold" LineHeight="20" VerticalAlignment="Center" />
+                  <ToggleSwitch x:Name="ReduceMotionSwitch" Grid.Column="1" Classes="switch" AutomationProperties.Name="Reduce motion" IsCheckedChanged="ReduceMotionChanged" />
+                </Grid>
                 <Grid Margin="0,17,0,0" IsVisible="False">
                   <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -366,7 +377,7 @@
             <Border Margin="0,14,0,0" Classes="card">
               <StackPanel>
                 <TextBlock Tag="loc:TranslationServiceTitle" Text="Translation service" Classes="section" LineHeight="20" />
-                <TextBlock Margin="0,4,0,17" Tag="loc:TranslationServiceDescription" Text="Your API key is stored only in Windows Credential Manager on this device." Classes="supporting" LineHeight="20" />
+                <TextBlock x:Name="TranslationServiceDescriptionText" Margin="0,4,0,17" Tag="loc:TranslationServiceDescription" Text="Your API key is stored only in Windows Credential Manager on this device." Classes="supporting" LineHeight="20" />
                 <Grid>
                   <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -419,7 +430,7 @@
         <TextBlock VerticalAlignment="Center" Tag="loc:FooterHint" Text="Changes take effect immediately after saving" Classes="supporting" LineHeight="20" />
         <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
           <Button Margin="0,0,8,0" Content="Cancel" Tag="loc:Cancel" IsCancel="True" Classes="secondary" Click="CancelButton_Click" />
-          <Button Content="Save settings" Tag="loc:SaveSettings" IsDefault="True" Click="SaveButton_Click" Classes="primary" />
+          <Button x:Name="SaveSettingsButton" Content="Save settings" Tag="loc:SaveSettings" IsDefault="True" Click="SaveButton_Click" Classes="primary" />
         </StackPanel>
       </Grid>
     </Border>

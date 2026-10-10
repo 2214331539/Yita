@@ -1,11 +1,11 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using Yita.Settings;
 
 namespace Yita.Core.Settings;
 
 public sealed record YitaSettings
 {
+    public const int CurrentSchemaVersion = 1;
+    public int SchemaVersion { get; init; }
     public bool IsEnabled { get; init; } = true;
     public bool StartWithSystem { get; init; }
     public string UiLanguage { get; init; } = "en";
@@ -24,6 +24,7 @@ public sealed record YitaSettings
     public string ColorTheme { get; init; } = "yita";
     public string CustomAccentColor { get; init; } = "#24756B";
     public string PopupVisualStyle { get; init; } = "minimal";
+    public bool ReduceMotion { get; init; }
     public double DefaultTranslationFontSize { get; init; } = 16.5;
     public string EnglishTranslationFontFamily { get; init; } = TranslationFontCatalog.DefaultEnglishFontFamily;
     public string ChineseTranslationFontFamily { get; init; } = TranslationFontCatalog.DefaultChineseFontFamily;
@@ -35,7 +36,8 @@ public sealed record YitaSettings
     public string ProviderId { get; init; } = "deepseek";
     public string DeepSeekEndpoint { get; init; } = "https://api.deepseek.com";
     public string DeepSeekModel { get; init; } = "deepseek-v4-flash";
-    public static YitaSettings Default { get; } = new() { SelectionCompatibilityVersion = 1 };
+    public static YitaSettings Default { get; } = new()
+        { SchemaVersion = CurrentSchemaVersion, SelectionCompatibilityVersion = 1 };
 
     internal AppSettings ToOriginal(string apiKey = "") => SettingsStore.NormalizeSettings(new AppSettings
     {
@@ -81,6 +83,8 @@ public interface ISettingsStore
 {
     Task<YitaSettings> LoadAsync(CancellationToken cancellationToken = default);
 
+    Task ValidateWriteAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
     Task SaveAsync(YitaSettings settings, CancellationToken cancellationToken = default);
 }
 
@@ -102,76 +106,5 @@ public sealed class MemorySecretStore : ISecretStore
     {
         _apiKey = value?.Trim();
         return Task.CompletedTask;
-    }
-}
-
-public sealed class JsonSettingsStore : ISettingsStore
-{
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { WriteIndented = true };
-    private readonly string _path;
-    private readonly string? _fallbackPath;
-
-    public JsonSettingsStore(string? path = null, string? fallbackPath = null)
-    {
-        _fallbackPath = fallbackPath;
-        _path = path ?? Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Yita", "settings.json");
-    }
-
-    public async Task<YitaSettings> LoadAsync(CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var readPath = File.Exists(_path) ? _path : _fallbackPath;
-            if (readPath is null || !File.Exists(readPath)) return YitaSettings.Default;
-            await using var stream = File.OpenRead(readPath);
-            if (readPath == _fallbackPath)
-            {
-                var original = await JsonSerializer.DeserializeAsync<AppSettings>(stream,
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true,
-                        Converters = { new JsonStringEnumConverter() } }, cancellationToken);
-                // The preview imports preferences but starts with its own record destination.
-                original = original is null ? AppSettings.Default : original with
-                { SourceLanguage = YitaSettings.FromOriginal(original).ToOriginal().SourceLanguage,
-                    TargetLanguage = YitaSettings.FromOriginal(original).ToOriginal().TargetLanguage };
-                return YitaSettings.FromOriginal(SettingsStore.NormalizeSettings(original)) with
-                {
-                    AiHistoryEnabled = false, AiHistoryDirectory = string.Empty, StartWithSystem = false,
-                    UseClipboardFallback = true, SelectionCompatibilityVersion = 1,
-                };
-            }
-            var settings = await JsonSerializer.DeserializeAsync<YitaSettings>(stream, JsonOptions, cancellationToken)
-                ?? YitaSettings.Default;
-            return YitaSettings.FromOriginal(settings.ToOriginal()) with
-            {
-                PopupOffsetX = settings.PopupOffsetX, PopupOffsetY = settings.PopupOffsetY,
-                // Upgrade the preview's old opt-in default once. A later explicit
-                // opt-out is persisted with this version and remains respected.
-                UseClipboardFallback = settings.SelectionCompatibilityVersion < 1 || settings.UseClipboardFallback,
-                SelectionCompatibilityVersion = 1,
-            };
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
-        {
-            return YitaSettings.Default;
-        }
-    }
-
-    public async Task SaveAsync(YitaSettings settings, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(settings);
-        var directory = Path.GetDirectoryName(_path)!;
-        Directory.CreateDirectory(directory);
-        var temporaryPath = _path + "." + Guid.NewGuid().ToString("N") + ".tmp";
-        try
-        {
-            await using (var stream = File.Create(temporaryPath))
-                await JsonSerializer.SerializeAsync(stream, settings, JsonOptions, cancellationToken);
-            File.Move(temporaryPath, _path, true);
-        }
-        finally
-        {
-            try { File.Delete(temporaryPath); } catch (IOException) { }
-        }
     }
 }

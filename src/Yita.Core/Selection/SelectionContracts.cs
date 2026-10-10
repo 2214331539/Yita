@@ -46,7 +46,8 @@ public sealed record SelectionRequest(
     ScreenPoint Pointer,
     string? ForegroundApplication = null,
     SelectionBounds? GestureBounds = null,
-    bool IncludeContext = false);
+    bool IncludeContext = false,
+    int? ForegroundProcessId = null);
 
 public readonly record struct SelectionGesture(
     ScreenPoint Start,
@@ -147,5 +148,29 @@ public interface IPlatformPermissionService
 {
     Task<PermissionState> GetStateAsync(CancellationToken cancellationToken = default);
 
+    async Task<PlatformPermissionStatus> GetStatusAsync(CancellationToken cancellationToken = default) =>
+        new(NativeServiceState.Available, await GetStateAsync(cancellationToken).ConfigureAwait(false));
+
+    Task RequestAccessibilityPermissionAsync(CancellationToken cancellationToken = default) =>
+        OpenAccessibilitySettingsAsync(cancellationToken);
+
     Task OpenAccessibilitySettingsAsync(CancellationToken cancellationToken = default);
+
+    Task RequestInputMonitoringPermissionAsync(CancellationToken cancellationToken = default) =>
+        throw new PlatformNotSupportedException("Input monitoring permission is unavailable.");
+
+    Task OpenInputMonitoringSettingsAsync(CancellationToken cancellationToken = default) =>
+        OpenAccessibilitySettingsAsync(cancellationToken);
 }
+
+public enum NativeServiceState
+{
+    Available, NotSupported, Missing, Timeout, ProtocolMismatch, Unavailable, RestartBackoff,
+}
+
+public sealed record PlatformPermissionStatus(
+    NativeServiceState Service,
+    PermissionState Permissions,
+    bool SelectionSupported = false,
+    bool GlobalInputSupported = false,
+    string? DiagnosticCode = null);

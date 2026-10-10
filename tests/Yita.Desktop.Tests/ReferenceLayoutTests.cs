@@ -102,8 +102,8 @@ public sealed class ReferenceLayoutTests
             popup.ApplySettings((YitaSettings.Default with { EnglishTranslationFontFamily = "Georgia", ChineseTranslationFontFamily = "SimHei" }).ToOriginal());
             popup.SetText("English 中文");
             var text = popup.FindControl<SelectableTextBlock>("TranslationText")!;
-            Assert.Equal("Georgia", ((Run)text.Inlines![0]).FontFamily!.Name);
-            Assert.Equal("SimHei", ((Run)text.Inlines[1]).FontFamily!.Name);
+            Assert.Equal(ReferenceTypography.CreateFont("Georgia").Name, ((Run)text.Inlines![0]).FontFamily!.Name);
+            Assert.Equal(ReferenceTypography.CreateFont("SimHei").Name, ((Run)text.Inlines[1]).FontFamily!.Name);
             text.SelectAll();
             Assert.Equal("English 中文", text.SelectedText);
         }
@@ -180,6 +180,7 @@ public sealed class ReferenceLayoutTests
             Assert.InRange(popup.Height, popup.MinHeight, popup.MaxHeight);
             if (Environment.GetEnvironmentVariable("YITA_PARITY_CAPTURE_DIRECTORY") is { Length: > 0 } directory)
             {
+                Directory.CreateDirectory(directory);
                 using var bitmap = new RenderTargetBitmap(new PixelSize((int)Math.Ceiling(popup.Width * scale), (int)Math.Ceiling(popup.Height * scale)), new Vector(96 * scale, 96 * scale));
                 bitmap.Render(popup);
                 bitmap.Save(Path.Combine(directory, $"avalonia-{theme}-{style}-scale-{scale:0.0}.png"));
@@ -199,7 +200,7 @@ public sealed class ReferenceLayoutTests
         {
             window.Show();
             await window.Initialization;
-            Assert.Equal("Microsoft YaHei", window.FontFamily.Name);
+            Assert.Equal(DesktopFontResolver.InterfaceFont.Name, window.FontFamily.Name);
             Assert.NotNull(window.GetVisualDescendants().OfType<Image>().Single().Source);
             Assert.Equal("今天", window.FindControl<ComboBox>("AiSummaryRangeComboBox")!.SelectionBoxItem);
             Assert.Equal("自动检测", window.FindControl<ComboBox>("SourceLanguageComboBox")!.SelectionBoxItem);
@@ -252,6 +253,58 @@ public sealed class ReferenceLayoutTests
     }
 
     [AvaloniaFact]
+    public void PopupLanguageSelectorFitsTheToolbarAndUsesTheReadingTheme()
+    {
+        var motion = ReferenceMotion.Enabled;
+        ReferenceMotion.Enabled = false;
+        try
+        {
+            foreach (var language in new[] { "zh-CN", "en" })
+            foreach (var theme in new[] { "yita", "ocean" })
+            {
+                var popup = new TranslationPopupWindow();
+                try
+                {
+                    popup.ApplySettings((YitaSettings.Default with { UiLanguage = language, ColorTheme = theme }).ToOriginal());
+                    popup.Show();
+                    popup.BeginTranslation("这个 feature 可以帮我 review 中英文混合的句子。");
+                    popup.SetText(language == "zh-CN" ? "这个功能可以帮助我检查中英文混合的句子。" : "This feature helps me review sentences mixing Chinese and English.");
+                    popup.CompleteTranslation(); popup.UpdateLayout(); Dispatcher.UIThread.RunJobs();
+                    var combo = popup.FindControl<ComboBox>("PopupTargetLanguageComboBox")!;
+                    var original = popup.FindControl<Button>("OriginalButton")!;
+                    var close = popup.FindControl<Button>("CloseButton")!;
+                    var comboPoint = combo.TranslatePoint(default, popup)!.Value;
+                    var originalPoint = original.TranslatePoint(default, popup)!.Value;
+                    var closePoint = close.TranslatePoint(default, popup)!.Value;
+                    Assert.True(comboPoint.X >= 0);
+                    Assert.True(comboPoint.X + combo.Bounds.Width <= originalPoint.X);
+                    Assert.True(closePoint.X + close.Bounds.Width <= popup.Width);
+                    Assert.Equal(popup.Resources["PopupTextBrush"], combo.Foreground);
+                    var scroll = popup.FindControl<ScrollViewer>("ReadingScroll")!;
+                    Assert.True(popup.FindControl<SelectableTextBlock>("TranslationText")!.Bounds.Height <= scroll.Viewport.Height);
+                    Capture(popup, $"avalonia-target-language-{language}-{theme}");
+                    combo.IsDropDownOpen = true;
+                    popup.UpdateLayout(); Dispatcher.UIThread.RunJobs();
+                    var dropdown = combo.GetVisualDescendants().OfType<Avalonia.Controls.Primitives.Popup>().Single();
+                    Assert.True(dropdown.IsOpen);
+                    Assert.NotNull(dropdown.Child);
+                    Assert.True(dropdown.Child.Bounds.Height >= 4 * 30);
+                    if (Environment.GetEnvironmentVariable("YITA_PARITY_CAPTURE_DIRECTORY") is { Length: > 0 } directory)
+                    {
+                        using var bitmap = new RenderTargetBitmap(new PixelSize((int)Math.Ceiling(dropdown.Child.Bounds.Width), (int)Math.Ceiling(dropdown.Child.Bounds.Height)));
+                        bitmap.Render(dropdown.Child);
+                        bitmap.Save(Path.Combine(directory, $"avalonia-target-language-menu-{language}-{theme}.png"));
+                    }
+                    combo.IsDropDownOpen = false;
+                    Assert.True(popup.IsVisible);
+                }
+                finally { popup.Close(); }
+            }
+        }
+        finally { ReferenceMotion.Enabled = motion; }
+    }
+
+    [AvaloniaFact]
     public void PopupReadingSurfaceRendersWithoutClippingTheLastLine()
     {
         ReferenceMotion.Enabled = false;
@@ -275,9 +328,17 @@ public sealed class ReferenceLayoutTests
     {
         if (Environment.GetEnvironmentVariable("YITA_PARITY_CAPTURE_DIRECTORY") is not { Length: > 0 } directory) return;
         Directory.CreateDirectory(directory);
-        using var bitmap = window.CaptureRenderedFrame();
-        Assert.NotNull(bitmap);
-        bitmap.Save(Path.Combine(directory, name + ".png"));
+        var motion = ReferenceMotion.Enabled;
+        try
+        {
+            ReferenceMotion.Enabled = false;
+            window.UpdateLayout(); Dispatcher.UIThread.RunJobs();
+            AvaloniaHeadlessPlatform.ForceRenderTimerTick(3);
+            using var bitmap = window.CaptureRenderedFrame();
+            Assert.NotNull(bitmap);
+            bitmap.Save(Path.Combine(directory, name + ".png"));
+        }
+        finally { ReferenceMotion.Enabled = motion; }
         var metrics = window.GetVisualDescendants().OfType<Control>()
             .Where(control => control.IsEffectivelyVisible && (!string.IsNullOrEmpty(control.Name) || control.Tag is string))
             .Select(control =>

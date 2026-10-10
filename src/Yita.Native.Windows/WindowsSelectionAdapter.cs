@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Text;
 using Yita.Core;
+using Yita.Core.Platform;
 using Yita.Core.Selection;
 using Yita.Services;
 
@@ -477,7 +478,7 @@ public sealed class WindowsGlobalHotkeyService : IWindowsHotkeyService
     }
 }
 
-public sealed class WindowsSelectionRuntime : IDisposable
+public sealed class WindowsSelectionRuntime : ISelectionRuntime
 {
     public event EventHandler<ScreenPoint>? ExternalPointerPressed;
     private readonly WindowsGlobalHotkeyService _hotkey = new();
@@ -559,9 +560,11 @@ public sealed class WindowsSelectionRuntime : IDisposable
             if (!WindowsNativeMethods.GetCursorPos(out var point)) return;
             using var pending = _requests.Begin();
             var request = new SelectionRequest(SelectionTrigger.TranslateShortcut, new ScreenPoint(point.X, point.Y));
+            var started = System.Diagnostics.Stopwatch.GetTimestamp();
             var result = await _reader.ReadAsync(request, pending.Token).ConfigureAwait(false);
+            var duration = System.Diagnostics.Stopwatch.GetElapsedTime(started);
             if (pending.IsCurrent)
-                SelectionCaptured?.Invoke(this, new SelectionCapturedEventArgs(request, result));
+                SelectionCaptured?.Invoke(this, new SelectionCapturedEventArgs(request, result, duration));
         }
         catch { }
     }
@@ -585,9 +588,11 @@ public sealed class WindowsSelectionRuntime : IDisposable
                 gesture.End,
                 GetProcessNameAt(gesture.End),
                 gesture.Bounds);
+            var started = System.Diagnostics.Stopwatch.GetTimestamp();
             var result = await _reader.ReadAsync(request, pending.Token).ConfigureAwait(false);
+            var duration = System.Diagnostics.Stopwatch.GetElapsedTime(started);
             if (_isEnabled && pending.IsCurrent)
-                SelectionCaptured?.Invoke(this, new SelectionCapturedEventArgs(request, result));
+                SelectionCaptured?.Invoke(this, new SelectionCapturedEventArgs(request, result, duration));
         }
         catch
         {
@@ -662,10 +667,4 @@ public sealed class WindowsSelectionRuntime : IDisposable
         _mouse.Dispose();
         _reader.Dispose();
     }
-}
-
-public sealed class SelectionCapturedEventArgs(SelectionRequest request, SelectionResult result) : EventArgs
-{
-    public SelectionRequest Request { get; } = request;
-    public SelectionResult Result { get; } = result;
 }

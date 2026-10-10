@@ -4,8 +4,7 @@ on:
   push:
     branches:
       - main
-      - codex/cross-platform-migration
-      - codex/windows-avalonia-parity
+      - 'codex/**'
   pull_request:
     paths:
       - 'Yita.CrossPlatform.sln'
@@ -15,10 +14,15 @@ on:
       - 'src/Yita.Native.Windows/**'
       - 'src/Yita.Native.Windows.UIA.Worker/**'
       - 'src/Yita.Native.Mac/**'
+      - 'src/Yita.Native.Mac.Helper/**'
+      - 'scripts/Build-Mac-Helper.sh'
       - 'tests/Yita.Core.Tests/**'
       - 'tests/Yita.Core.Parity.Tests/**'
       - 'tests/Yita.Native.Windows.Tests/**'
+      - 'tests/Yita.Native.Mac.Tests/**'
       - 'tests/Yita.Desktop.Tests/**'
+      - 'tools/Yita.PlatformSmoke/**'
+      - 'tools/Yita.MacHelperSmoke/**'
       - '.github/workflows/cross-platform.yml'
   workflow_dispatch:
 
@@ -46,3 +50,29 @@ jobs:
 
       - name: Run Core, native adapter and desktop interaction tests
         run: dotnet test Yita.CrossPlatform.sln --configuration Release --no-build --logger "console;verbosity=minimal"
+
+      - name: Verify cross-process single instance and activation
+        run: dotnet run --project tools/Yita.PlatformSmoke/Yita.PlatformSmoke.csproj --configuration Release --no-build
+
+      - name: Verify native helper client against an isolated test peer
+        run: dotnet run --project tools/Yita.MacHelperSmoke/Yita.MacHelperSmoke.csproj --configuration Release --no-build
+
+      - name: Verify Swift helper protocol without GUI authorization
+        if: runner.os == 'macOS'
+        run: dotnet run --project tools/Yita.MacHelperSmoke/Yita.MacHelperSmoke.csproj --configuration Release --no-build -- --helper src/Yita.Desktop/bin/Release/net8.0/Yita.Native.Mac.Helper.app/Contents/MacOS/Yita.Native.Mac.Helper
+
+      - name: Verify Cocoa reduced-motion preference without changing system settings
+        if: runner.os == 'macOS'
+        run: dotnet run --project tools/Yita.MacHelperSmoke/Yita.MacHelperSmoke.csproj --configuration Release --no-build -- --display-preferences
+
+      - name: Verify AX selection policy against deterministic fixtures
+        if: runner.os == 'macOS'
+        run: src/Yita.Desktop/bin/Release/net8.0/Yita.Native.Mac.Helper.app/Contents/MacOS/Yita.Native.Mac.Helper --selection-self-test
+
+      - name: Verify clipboard transactions without touching the system pasteboard
+        if: runner.os == 'macOS'
+        run: src/Yita.Desktop/bin/Release/net8.0/Yita.Native.Mac.Helper.app/Contents/MacOS/Yita.Native.Mac.Helper --clipboard-self-test
+
+      - name: Verify native input queue without desktop permissions
+        if: runner.os == 'macOS'
+        run: src/Yita.Desktop/bin/Release/net8.0/Yita.Native.Mac.Helper.app/Contents/MacOS/Yita.Native.Mac.Helper --input-self-test

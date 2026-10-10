@@ -8,11 +8,11 @@ using Avalonia.LogicalTree;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Yita.Core;
+using Yita.Core.Platform;
 using Yita.Core.Parity;
+using Yita.Core.Selection;
 using Yita.Core.Settings;
 using Yita.Core.Translation;
-using Yita.Native.Mac;
-using Yita.Native.Windows;
 using Yita.Services;
 using Yita.Settings;
 using Yita.Translation;
@@ -23,10 +23,15 @@ public sealed partial class MainWindow : Window
 {
     private readonly ISettingsStore _settingsStore;
     private readonly ISecretStore _secretStore;
-    private readonly WindowsSelectionRuntime? _windowsRuntime;
+    private readonly ISelectionRuntime? _selectionRuntime;
+    private readonly IStartupRegistration _startupRegistration;
+    private readonly IPlatformPermissionService? _permissionService;
     private readonly ITranslationProviderFactory _providerFactory;
-    private readonly ReferenceTranslationRuntime _translationRuntime;
-    private readonly TranslationMemoryStore? _memory;
+    private ReferenceTranslationRuntime _translationRuntime;
+    private TranslationMemoryStore? _memory;
+    private IDisposable? _memoryProtector;
+    private readonly bool _usePlatformMemory;
+    private readonly DesktopPlatformServices _platform = new();
     private readonly HttpClient? _injectedClient;
     private readonly AiHistoryStore _records = new();
     private readonly SemaphoreSlim _settingsGate = new(1, 1);
@@ -39,6 +44,9 @@ public sealed partial class MainWindow : Window
     private bool _apiKeyClearRequested;
     private bool _shuttingDown;
     private Task? _initialization;
+    private SettingsFailureKind? _settingsFailure;
+    private bool _memoryInitializationFailed;
+    private bool _credentialsAvailable;
 
     public bool IsSelectionTranslationEnabled => _settings.IsEnabled;
     public event EventHandler? SettingsChanged;
@@ -48,27 +56,41 @@ public sealed partial class MainWindow : Window
 
     public MainWindow() : this(null) { }
 
-    public MainWindow(WindowsSelectionRuntime? windowsRuntime, ISettingsStore? settingsStore = null,
-        ISecretStore? secretStore = null, JsonlTranslationHistoryStore? historyStore = null, HttpClient? httpClient = null)
+    public MainWindow(ISelectionRuntime? selectionRuntime, ISettingsStore? settingsStore = null,
+        ISecretStore? secretStore = null, JsonlTranslationHistoryStore? historyStore = null, HttpClient? httpClient = null,
+        IStartupRegistration? startupRegistration = null, IPlatformPermissionService? permissionService = null)
     {
-        _windowsRuntime = windowsRuntime;
-        var directory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Yita");
+        _selectionRuntime = selectionRuntime;
+        var platform = _platform;
+        _startupRegistration = startupRegistration ?? platform.Startup;
+        _permissionService = permissionService ?? selectionRuntime as IPlatformPermissionService ?? platform.CreatePermissionService();
+        var directory = platform.DataDirectory;
         _settingsStore = settingsStore ?? new JsonSettingsStore(Path.Combine(directory, "desktop-settings.json"),
             Path.Combine(directory, "settings.json"));
-        _secretStore = secretStore ?? (OperatingSystem.IsWindows() ? SecretStoreFactory.CreateDefault()
-            : OperatingSystem.IsMacOS() ? new MacKeychainSecretStore() : new MemorySecretStore());
+        _secretStore = secretStore ?? platform.CreateSecretStore();
         _injectedClient = httpClient;
         _providerFactory = httpClient is null ? new TranslationProviderFactory() : new InjectedTranslationProviderFactory(httpClient);
-        if (OperatingSystem.IsWindows() && settingsStore is null)
-            _memory = new TranslationMemoryStore(Path.Combine(directory, "desktop-translation-memory.dat"),
-                new WindowsTranslationMemoryProtector());
+        _usePlatformMemory = settingsStore is null;
         _translationRuntime = new ReferenceTranslationRuntime(_providerFactory, _memory);
         InitializeComponent();
+        TargetLanguageComboBox.ItemsSource = TargetLanguageOptions.CreateItems();
         _ready = true;
         ModelComboBox.ItemsSource = new[] { "deepseek-v4-flash", "deepseek-v4-pro", "deepseek-chat", "deepseek-reasoner" };
         AiHistoryEnabledCheckBox.IsCheckedChanged += (_, _) => UpdateAiHistoryControls();
         Opened += async (_, _) => { await InitializeAsync(); ReferenceMotion.Reveal(SettingsRoot); };
+        Activated += async (_, _) =>
+        {
+            if (_initialization?.IsCompletedSuccessfully == true && !_shuttingDown && PermissionActionsPanel.IsEnabled)
+                await RefreshPlatformPermissionsAsync();
+        };
         Closed += (_, _) => ShutdownServices();
+        if (_selectionRuntime is not null)
+        {
+            _selectionRuntime.SelectionCaptured += OnSelectionCaptured;
+            _selectionRuntime.ExternalPointerPressed += OnExternalPointerPressed;
+            if (_selectionRuntime is IDesktopSessionRuntime session) session.SessionActivityChanged += OnDesktopSessionActivityChanged;
+            if (_selectionRuntime is Yita.Native.Mac.MacSelectionRuntime mac) mac.StatusChanged += OnNativeInputStatusChanged;
+        }
     }
 
     private Task InitializeAsync() => _initialization ??= LoadSettingsAsync();
@@ -77,9 +99,16 @@ public sealed partial class MainWindow : Window
     {
         try
         {
-            _settings = await _settingsStore.LoadAsync();
-            try { _savedApiKey = await _secretStore.ReadApiKeyAsync() ?? ""; }
-            catch { SetStatus(ConnectionStatusText, Localize("Could not read credentials. Enter your API key again.", "无法读取凭据，请重新填写 API Key。"), true); }
+            try { _settings = await _settingsStore.LoadAsync(); }
+            catch (SettingsStoreException exception)
+            {
+                _settingsFailure = exception.Kind;
+                _settings = YitaSettings.Default with { IsEnabled = false };
+            }
+            try { _savedApiKey = await _secretStore.ReadApiKeyAsync() ?? ""; _credentialsAvailable = true; }
+            catch { SetStatus(ConnectionStatusText, Localize("Could not read credentials. Unlock the system credential store or enter your API key again.", "无法读取凭据，请解锁系统凭据存储或重新填写 API Key。"), true); }
+            if (_usePlatformMemory) await InitializeMemoryAsync();
+            if (_permissionService is not null) await RefreshPlatformPermissionsAsync();
             if (_shuttingDown) return;
             PopulateSettings();
             ApplyRuntimeSettings();
@@ -87,14 +116,39 @@ public sealed partial class MainWindow : Window
         catch (Exception exception) { await ShowMessageAsync(Localize("Could not load settings: ", "加载设置失败：") + exception.Message); }
     }
 
+    private async Task InitializeMemoryAsync()
+    {
+        ITranslationMemoryProtector? protector = null;
+        try
+        {
+            var path = Path.Combine(_platform.DataDirectory, "desktop-translation-memory.dat");
+            protector = await _platform.CreateMemoryProtectorAsync(path);
+            if (protector is null) return;
+            var memory = await Task.Run(() => new TranslationMemoryStore(path, protector));
+            if (_shuttingDown) { (protector as IDisposable)?.Dispose(); return; }
+            _memoryProtector = protector as IDisposable;
+            _memory = memory;
+            _translationRuntime = new ReferenceTranslationRuntime(_providerFactory, memory);
+        }
+        catch
+        {
+            (protector as IDisposable)?.Dispose();
+            _memoryInitializationFailed = true;
+        }
+    }
+
     private void PopulateSettings()
     {
         _ready = false;
         var value = _settings.ToOriginal(_savedApiKey);
         EnabledCheckBox.IsChecked = value.IsEnabled;
+        EnabledCheckBox.IsEnabled = _selectionRuntime is not null;
         StartWithWindowsCheckBox.IsChecked = value.StartWithWindows;
+        StartWithWindowsCheckBox.IsEnabled = _startupRegistration.IsSupported;
         ClipboardFallbackCheckBox.IsChecked = value.UseClipboardFallback;
+        ClipboardFallbackCheckBox.IsEnabled = _selectionRuntime is not null;
         WpsPdfCompatibilityCheckBox.IsChecked = value.UseWpsPdfCompatibility;
+        WpsPdfCompatibilityCheckBox.IsEnabled = OperatingSystem.IsWindows() && _selectionRuntime is not null;
         UseSelectionContextCheckBox.IsChecked = value.UseSelectionContext;
         SelectionDelayTextBox.Text = value.SelectionDelayMilliseconds.ToString(CultureInfo.InvariantCulture);
         MaximumSelectionTextBox.Text = value.MaximumSelectionCharacters.ToString(CultureInfo.InvariantCulture);
@@ -108,6 +162,9 @@ public sealed partial class MainWindow : Window
         SetCombo(ColorThemeComboBox, value.ColorTheme);
         CustomAccentColorTextBox.Text = value.CustomAccentColor;
         SetCombo(PopupVisualStyleComboBox, value.PopupVisualStyle);
+        ReduceMotionSwitch.IsChecked = _settings.ReduceMotion;
+        ReferenceMotion.SetReduceMotion(_settings.ReduceMotion);
+        RefreshMotionResources();
         DefaultFontSizeSlider.Value = value.DefaultTranslationFontSize;
         SetCombo(ProviderComboBox, value.ProviderId);
         ModelComboBox.Text = value.DeepSeekModel;
@@ -157,7 +214,7 @@ public sealed partial class MainWindow : Window
         return _settings with
         {
             UiLanguage = _uiLanguage, IsEnabled = EnabledCheckBox.IsChecked == true,
-            StartWithSystem = StartWithWindowsCheckBox.IsChecked == true,
+            StartWithSystem = _startupRegistration.IsSupported && StartWithWindowsCheckBox.IsChecked == true,
             UseClipboardFallback = ClipboardFallbackCheckBox.IsChecked == true,
             UseWpsPdfCompatibility = WpsPdfCompatibilityCheckBox.IsChecked == true,
             UseSelectionContext = UseSelectionContextCheckBox.IsChecked == true,
@@ -169,6 +226,7 @@ public sealed partial class MainWindow : Window
             EnglishTranslationFontFamily = ReadCombo(EnglishTranslationFontComboBox),
             ChineseTranslationFontFamily = ReadCombo(ChineseTranslationFontComboBox),
             ColorTheme = theme, CustomAccentColor = color, PopupVisualStyle = ReadCombo(PopupVisualStyleComboBox),
+            ReduceMotion = ReduceMotionSwitch.IsChecked == true,
             DefaultTranslationFontSize = Math.Round(DefaultFontSizeSlider.Value, 1),
             ProviderId = provider, DeepSeekEndpoint = endpoint, DeepSeekModel = model,
             AiHistoryEnabled = AiHistoryEnabledCheckBox.IsChecked == true, AiHistoryDirectory = folder,
@@ -181,20 +239,51 @@ public sealed partial class MainWindow : Window
         try
         {
             await InitializeAsync();
+            if (_settingsFailure is not null) return;
             var settings = ReadSettings(true);
             var key = ApiKeyPasswordBox.Text?.Trim() ?? "";
             await _settingsGate.WaitAsync();
+            var startupApplied = false;
             try
             {
+                await _settingsStore.ValidateWriteAsync();
+                if (_startupRegistration.IsSupported)
+                {
+                    _startupRegistration.Apply(settings.StartWithSystem);
+                    startupApplied = true;
+                }
                 await _secretStore.SaveApiKeyAsync(key);
                 await _settingsStore.SaveAsync(settings);
                 _settings = settings;
                 _savedApiKey = key;
+                _credentialsAvailable = true;
+            }
+            catch
+            {
+                if (startupApplied)
+                {
+                    try { _startupRegistration.Apply(_settings.StartWithSystem); }
+                    catch (Exception exception) { System.Diagnostics.Trace.TraceError("Startup rollback failed: {0}", exception.GetType().Name); }
+                }
+                throw;
             }
             finally { _settingsGate.Release(); }
-            if (OperatingSystem.IsWindows() && _windowsRuntime is not null) WindowsStartupRegistration.Apply(_settings.StartWithSystem);
             ApplyRuntimeSettings();
+            if (_selectionRuntime is IPlatformPermissionService && _permissionService is not null)
+            {
+                await RefreshPlatformPermissionsAsync();
+                if (_settings.IsEnabled && (_permissionStatus?.Service != NativeServiceState.Available || NeedsSelectionPermissions))
+                {
+                    SettingsNavigation.SelectedIndex = 0;
+                    return;
+                }
+            }
             Hide();
+        }
+        catch (SettingsStoreException exception)
+        {
+            _settingsFailure = exception.Kind;
+            ApplyUiLanguage(_uiLanguage);
         }
         catch (Exception exception) { await ShowMessageAsync(exception.Message); }
     }
@@ -203,7 +292,9 @@ public sealed partial class MainWindow : Window
 
     private void ApplyRuntimeSettings()
     {
-        _windowsRuntime?.Configure(_settings.IsEnabled, _settings.UseClipboardFallback, _settings.SelectionDelayMilliseconds,
+        ReferenceMotion.SetReduceMotion(_settings.ReduceMotion);
+        RefreshMotionResources();
+        _selectionRuntime?.Configure(_settings.IsEnabled, _settings.UseClipboardFallback, _settings.SelectionDelayMilliseconds,
             _settings.UseWpsPdfCompatibility, _settings.UseSelectionContext);
         ReferenceTheme.Apply(Application.Current!.Resources, _settings.ToOriginal());
         foreach (var popup in _popups) popup.ApplySettings(_settings.ToOriginal(_savedApiKey));
@@ -220,15 +311,17 @@ public sealed partial class MainWindow : Window
         _ = PersistSettingsWithStatusAsync();
     }
 
-    private async Task PersistSettingsWithStatusAsync()
+    private async Task<bool> PersistSettingsWithStatusAsync()
     {
+        if (_settingsFailure is not null) return false;
         try
         {
             await _settingsGate.WaitAsync();
             try { await _settingsStore.SaveAsync(_settings); }
             finally { _settingsGate.Release(); }
+            return true;
         }
-        catch { SetStatus(ConnectionStatusText, Localize("Could not save settings.", "暂时无法保存设置。"), true); }
+        catch { SetStatus(ConnectionStatusText, Localize("Could not save settings.", "暂时无法保存设置。"), true); return false; }
     }
 
     private void SettingsNavigationChanged(object? sender, SelectionChangedEventArgs e)
@@ -259,7 +352,7 @@ public sealed partial class MainWindow : Window
         var navKeys = new[] { "NavigationGeneral", "NavigationAiHistory", "NavigationTranslationAppearance", "NavigationModel" };
         for (var i = 0; i < navKeys.Length; i++) ((ListBoxItem)SettingsNavigation.Items[i]!).Content = L(navKeys[i]);
         LocalizeCombo(SourceLanguageComboBox, [("自动检测", "Auto detect", "自动检测"), ("英语", "English", "英语"), ("简体中文", "Simplified Chinese", "简体中文")]);
-        LocalizeCombo(TargetLanguageComboBox, [("自动判断", "Choose automatically", "自动判断"), ("简体中文", "Simplified Chinese", "简体中文"), ("英语", "English", "英语"), ("日语", "Japanese", "日语")]);
+        LocalizeCombo(TargetLanguageComboBox, TargetLanguageOptions.Labels);
         LocalizeCombo(TranslationModeComboBox, [("fast", "Fast", "快速"), ("balanced", "Balanced", "均衡"), ("precise", "Precise", "精确")]);
         LocalizeCombo(TranslationToneComboBox, [("natural", "Natural", "自然"), ("formal", "Formal", "正式"), ("concise", "Concise", "简洁"), ("academic", "Academic", "学术"), ("technical", "Technical", "技术")]);
         LocalizeCombo(AiSummaryRangeComboBox, [("today", "Today", "今天"), ("last-7-days", "Last 7 days", "最近 7 天"), ("all", "All", "全部")]);
@@ -268,9 +361,39 @@ public sealed partial class MainWindow : Window
             ("bubble-v2", "Bubble 2.0", "气泡 2.0"), ("bubble-v3", "Bubble 3.0 · Glass", "气泡 3.0 · 液态玻璃"),
             ("bubble-v3-color", "Bubble 3.0 · Color Glass", "气泡 3.0 · 彩色玻璃")]);
         LocalizeCombo(ProviderComboBox, [("deepseek", "DeepSeek API", "DeepSeek API"), ("mock", "Mock · offline test", "Mock · 离线测试")]);
+        LocalizeFontOptions(EnglishTranslationFontComboBox);
+        LocalizeFontOptions(ChineseTranslationFontComboBox);
+        Avalonia.Automation.AutomationProperties.SetName(ReduceMotionSwitch, L("ReduceMotion"));
         ToolTip.SetTip(SelectionDelayTextBox, L("SelectionDelayTooltip"));
         ToolTip.SetTip(MaximumSelectionTextBox, L("MaximumSelectionTooltip"));
         ToolTip.SetTip(CustomAccentColorTextBox, L("CustomColorTooltip"));
+        SettingsStatusText.IsVisible = _settingsFailure is not null;
+        SettingsStatusText.Text = _settingsFailure == SettingsFailureKind.NewerVersion
+            ? Localize("These settings require a newer Yita version. Editing is disabled; the file has been preserved.", "设置来自更高版本的 Yita，已禁止保存并保留原文件，请更新软件。")
+            : Localize("Settings could not be read. Saving is disabled; the file has been preserved.", "无法读取设置，已禁止保存并保留原文件。请检查或恢复设置文件。");
+        SaveSettingsButton.IsEnabled = _settingsFailure is null;
+        UpdateInputAvailability();
+        UpdatePermissionControls();
+        UpdateMacInstallationStatus(OperatingSystem.IsMacOS()
+            ? Yita.Native.Mac.MacApplicationBundle.GetLocation(Environment.ProcessPath,
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile))
+            : Yita.Native.Mac.MacApplicationLocation.Unpackaged);
+        UpdateSelectionStatus();
+        if (OperatingSystem.IsMacOS())
+            TranslationServiceDescriptionText.Text = Localize("Your API key is stored in macOS Keychain on this device.", "API Key 保存在本机 macOS Keychain 中。");
+        else if (!OperatingSystem.IsWindows())
+            TranslationServiceDescriptionText.Text = Localize("Your API key is kept for this session only on this platform.", "此平台仅在当前运行期间保留 API Key。");
+        if (!OperatingSystem.IsWindows())
+        {
+            StartWithSystemTitleText.Text = Localize("Start at login", "登录时启动");
+            Avalonia.Automation.AutomationProperties.SetName(StartWithWindowsCheckBox, StartWithSystemTitleText.Text);
+        }
+        if (!_startupRegistration.IsSupported)
+            ToolTip.SetTip(StartWithWindowsCheckBox, OperatingSystem.IsMacOS()
+                ? Localize("Login startup requires an installed Yita.app; it is disabled in source previews.", "登录启动需要已安装的 Yita.app，源码预览中不可用。")
+                : Localize("Login startup is not available on this platform yet.", "此平台尚未支持登录时启动。"));
+        else if (OperatingSystem.IsMacOS())
+            ToolTip.SetTip(StartWithWindowsCheckBox, Localize("Applies at the next login. macOS may ask you to allow Yita in Login Items.", "下次登录时生效；macOS 可能需要在登录项中允许 Yita。"));
         UpdateMemoryStatus();
         UpdateThemePreview();
         SynchronizeWindowLanguage();
@@ -299,6 +422,32 @@ public sealed partial class MainWindow : Window
     }
 
     private void ProviderComboBox_SelectionChanged(object? sender, SelectionChangedEventArgs e) { if (_ready) UpdateProviderFields(); }
+    private void LocalizeFontOptions(ComboBox combo)
+    {
+        if (OperatingSystem.IsWindows()) return;
+        LocalizeCombo(combo, combo.Items.OfType<ComboBoxItem>().Select(item =>
+        {
+            var id = item.Tag!.ToString()!;
+            var name = ReferenceTypography.CreateFont(id).Name;
+            if (id == "Source Sans Pro") name = id;
+            return (id, name, name);
+        }).ToArray());
+    }
+
+    private void ReduceMotionChanged(object? sender, RoutedEventArgs e)
+    {
+        if (!_ready) return;
+        ReferenceMotion.SetReduceMotion(ReduceMotionSwitch.IsChecked == true);
+        RefreshMotionResources();
+    }
+
+    internal void RefreshMotionResources()
+    {
+        if (Application.Current is { } app) ReferenceTheme.ApplyMotion(app.Resources);
+        ReferenceTheme.ApplyMotion(Resources);
+        foreach (var popup in _popups) ReferenceTheme.ApplyMotion(popup.Resources);
+        foreach (var conversation in _conversations) ReferenceTheme.ApplyMotion(conversation.Resources);
+    }
     private void ModelPickerArrowClick(object? sender, RoutedEventArgs e)
     {
         if (!ModelComboBox.IsEnabled || sender is not Button button) return;
@@ -429,8 +578,11 @@ public sealed partial class MainWindow : Window
     private void UpdateMemoryStatus()
     {
         var count = _memory?.Count ?? 0;
-        TranslationMemoryStatusText.Text = count == 0 ? L("TranslationMemoryEmpty") : string.Format(L("TranslationMemoryCount"), count);
-        ClearTranslationMemoryButton.IsEnabled = count > 0;
+        TranslationMemoryStatusText.Text = _memoryInitializationFailed || _memory?.LoadFailed == true
+            ? Localize("Encrypted memory could not be opened. Existing data has been preserved.", "无法打开加密翻译记忆，已保留原数据。")
+            : _memory is null ? Localize("Encrypted memory is unavailable.", "加密翻译记忆不可用。")
+            : count == 0 ? L("TranslationMemoryEmpty") : string.Format(L("TranslationMemoryCount"), count);
+        ClearTranslationMemoryButton.IsEnabled = _memory is not null && (count > 0 || _memory.LoadFailed);
     }
 
     private async void ClearTranslationMemoryButton_Click(object? sender, RoutedEventArgs e)
@@ -444,7 +596,7 @@ public sealed partial class MainWindow : Window
     {
         var dialog = new Window { Title = "Yita", Width = 420, SizeToContent = SizeToContent.Height,
             CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            FontFamily = new FontFamily("Microsoft YaHei"), FontSize = 14,
+            FontFamily = DesktopFontResolver.InterfaceFont, FontSize = 14,
             Background = ReferenceTheme.Brush("#FFFCF7") };
         var stack = new StackPanel { Margin = new Thickness(24), Spacing = 18 };
         stack.Children.Add(new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap });

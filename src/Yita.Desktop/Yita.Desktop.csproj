@@ -34,7 +34,7 @@
   -->
   <Target Name="BuildAndCopyWindowsUiAutomationWorker"
           BeforeTargets="Build"
-          Condition="'$(OS)' == 'Windows_NT'">
+          Condition="'$(OS)' == 'Windows_NT' and '$(RuntimeIdentifier)' == ''">
     <MSBuild Projects="..\Yita.Native.Windows.UIA.Worker\Yita.Native.Windows.UIA.Worker.csproj"
              Targets="Restore;Build"
              Properties="Configuration=$(Configuration)" />
@@ -44,5 +44,23 @@
     <Copy SourceFiles="@(WindowsUiAutomationWorkerFiles)"
           DestinationFiles="@(WindowsUiAutomationWorkerFiles->'$(TargetDir)%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />
+  </Target>
+  <Target Name="BuildMacNativeHelper"
+          AfterTargets="Build"
+          Condition="$([MSBuild]::IsOSPlatform('OSX'))"
+          Inputs="../Yita.Native.Mac.Helper/main.swift;../Yita.Native.Mac.Helper/SelectionReader.swift;../Yita.Native.Mac.Helper/SelectionSelfTests.swift;../Yita.Native.Mac.Helper/ClipboardSelectionReader.swift;../Yita.Native.Mac.Helper/ClipboardSelfTests.swift;../Yita.Native.Mac.Helper/HelperRequestControl.swift;../Yita.Native.Mac.Helper/NativeInput.swift;../Yita.Native.Mac.Helper/InputSelfTests.swift;../Yita.Native.Mac.Helper/Info.plist;../../scripts/Build-Mac-Helper.sh"
+          Outputs="$(TargetDir)Yita.Native.Mac.Helper.app/Contents/MacOS/Yita.Native.Mac.Helper">
+    <Exec Command="bash &quot;$(MSBuildThisFileDirectory)../../scripts/Build-Mac-Helper.sh&quot; &quot;$(TargetDir)&quot;" />
+  </Target>
+  <!-- Keep managed assemblies in Resources so macOS signs them as bundle resources. -->
+  <Target Name="CreateMacBundleAppHost" AfterTargets="Publish"
+          Condition="$([MSBuild]::IsOSPlatform('OSX')) and '$(MacBundleAppHostPath)' != ''">
+    <Error Condition="'$(RuntimeIdentifier)' != 'osx-arm64' or '$(SelfContained)' != 'true' or '$(PublishSingleFile)' == 'true'"
+           Text="Mac bundle packaging requires self-contained, non-single-file osx-arm64 output." />
+    <CreateAppHost AppHostSourcePath="$(AppHostSourcePath)"
+                   AppHostDestinationPath="$(MacBundleAppHostPath)"
+                   AppBinaryName="../Resources/Runtime/Yita.Desktop.dll"
+                   IntermediateAssembly="@(IntermediateAssembly->'%(FullPath)')"
+                   EnableMacOSCodeSign="true" />
   </Target>
 </Project>
