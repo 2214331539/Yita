@@ -135,8 +135,15 @@ enum ClipboardReadError: Error {
             }
         }
         let hit = request.trigger == .mouseGesture ? try ax.element(at: request.pointer) : nil
-        _ = try inspectSelectionPaths(ax, origins: [focused, hit].compactMap({ $0 }), check: checkSource)
-        guard try ax.allowsCopy(focused) else { throw ClipboardReadError.unsafeTarget }
+        // The focused AX element is often only a container (AXGroup/AXWindow) in
+        // editors, PDF readers and office apps. The selectable text may instead
+        // be exposed by the element hit at the release point or one of its
+        // ancestors. Inspect every candidate for protected ancestors first,
+        // then allow the fallback when any safe candidate supports copying.
+        let candidates = try inspectSelectionPaths(ax, origins: [focused, hit].compactMap({ $0 }), check: checkSource)
+        guard try candidates.contains(where: { try ax.allowsCopy($0) }) else {
+            throw ClipboardReadError.unsafeTarget
+        }
         let activity = clipboard.activity()
         let snapshot = try clipboard.snapshot()
         guard snapshot.isRestorable else { throw ClipboardReadError.unsafeSnapshot }

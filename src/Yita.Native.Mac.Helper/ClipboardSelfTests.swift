@@ -98,14 +98,15 @@ import Foundation
 private struct ClipboardAssertion: Error { let message: String }
 
 @MainActor func runClipboardSelfTests() async -> Int32 {
-    func request(pid: Int32? = 42) -> NativeSelectionRequest {
-        NativeSelectionRequest(trigger: .translateShortcut, pointer: SelectionPoint(x: -700, y: 150),
+    func request(pid: Int32? = 42, trigger: SelectionTrigger = .translateShortcut) -> NativeSelectionRequest {
+        NativeSelectionRequest(trigger: trigger, pointer: SelectionPoint(x: -700, y: 150),
             foregroundApplication: nil, gestureBounds: nil, includeContext: true, foregroundProcessId: pid)
     }
     func read(_ ax: FixtureAXAccess, _ clipboard: FixtureClipboardAccess,
+              trigger: SelectionTrigger = .translateShortcut,
               control: HelperRequestControl = HelperRequestControl()) async -> NativeSelection {
         await ClipboardSelectionReader(ax: ax, clipboard: clipboard, now: { clipboard.clock },
-            pause: { clipboard.advance(); await Task.yield() }, isCancelled: { control.isCancelled }).read(request())
+            pause: { clipboard.advance(); await Task.yield() }, isCancelled: { control.isCancelled }).read(request(trigger: trigger))
     }
     func expect(_ condition: Bool, _ message: String) throws {
         if !condition { throw ClipboardAssertion(message: message) }
@@ -163,6 +164,14 @@ private struct ClipboardAssertion: Error { let message: String }
             try expect(await read(ax, clipboard).failure == "protectedContent", "terminal")
             ax.target = SelectionTarget(processId: 42, bundleIdentifier: "test.editor"); ax.elements[1]?.copyEligible = false
             try expect(await read(ax, clipboard).failure == "protectedContent" && clipboard.posts == 0, "unsafe focus")
+        }
+        try await test("Hit-tested selectable text enables fallback when focus is a container") {
+            let ax = FixtureAXAccess(); let clipboard = FixtureClipboardAccess()
+            ax.elements[1]?.copyEligible = false
+            ax.hit = 2
+            ax.elements[2] = FixtureElement()
+            let result = await read(ax, clipboard, trigger: .mouseGesture)
+            try expect(result.text == "copied selection" && clipboard.posts == 1, "hit candidate")
         }
         try await test("Protected ancestors stop before any clipboard write") {
             let ax = FixtureAXAccess(); let clipboard = FixtureClipboardAccess()

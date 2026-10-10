@@ -314,6 +314,13 @@ final class SystemAXSelectionAccess: AXSelectionAccess {
     func allowsCopy(_ element: AXUIElement) throws -> Bool {
         let role = try attribute(element, kAXRoleAttribute as CFString) as? String
         if ["AXTextField", "AXTextArea", "AXStaticText", "AXWebArea", "AXDocument", "AXPDFView"].contains(role ?? "") { return true }
+        // Many native editors and document viewers expose the focused text as
+        // a child of a generic container. The clipboard reader has already
+        // walked the focused/hit-test paths and rejected protected ancestors,
+        // so these structural roles are safe compatibility candidates here.
+        if ["AXGroup", "AXWindow", "AXScrollArea", "AXUnknown", "AXOutline", "AXList",
+            "AXTable", "AXRow", "AXCell", "AXColumn", "AXTextView", "AXParagraph",
+            "AXHeading", "AXLink", "AXCode"].contains(role ?? "") { return true }
         let bundle = frontmostTarget()?.bundleIdentifier ?? ""
         return ["com.apple.Preview", "com.adobe.Reader", "com.adobe.Acrobat.Pro", "net.sourceforge.skim-app.skim"].contains(bundle)
             && ["AXScrollArea", "AXGroup", "AXUnknown", "AXWindow"].contains(role ?? "")
