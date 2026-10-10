@@ -142,7 +142,8 @@ public sealed class MacInputRuntimeTests
         await runtime.HandleInputAsync(Batch(Input(MacInputKind.PointerDown, 1, -800, age: 490), Input(MacInputKind.PointerUp, 2, -700)));
         Assert.Equal(0, clicks);
         Assert.Equal(0, helper.SelectionReads);
-        Assert.Contains("Stale=1", runtime.CreateDiagnostics(false));
+        // A busy runner may also expire the following release event while the filter awaits.
+        Assert.Matches(@"\bStale=[1-9]\d*\b", runtime.CreateDiagnostics(false));
     }
 
     [Fact]

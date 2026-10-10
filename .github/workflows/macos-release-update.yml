@@ -3,7 +3,7 @@ name: Update existing Mac release installer
 on:
   push:
     branches: ['codex/mac-selection-reliability']
-    paths: ['.github/workflows/macos-release-update.yml']
+    paths: ['.github/workflows/macos-release-update.yml', 'tests/Yita.Native.Mac.Tests/**']
   workflow_dispatch:
 
 permissions:
