@@ -1,6 +1,6 @@
 # Yita 跨平台产品开发路线图
 
-更新日期：2026-10-04。状态：`codex/platform-host-services` 已完成阶段 B 宿主/存储与阶段 C 的 helper、权限、AX/Cmd+C、全局输入、Desktop 触发、菜单栏、登录项和睡眠恢复代码，尚未合入 `main`。Mac Keychain、外部取词、真实登录和窗口行为仍待真机验证。维护者最新授权将同一最新版的 Windows Avalonia Setup 与 Apple Silicon Mac 包共同发布到 GitHub Release，使用公开预览标记，不混入旧 WPF 包。朋友此前验收的是旧 WPF 安装版，不作为 Avalonia Setup 的验收证据。当前代码事实见 [技术架构](ARCHITECTURE.md)，已完成的 Windows 验收见 [验收记录](WINDOWS_AVALONIA_ACCEPTANCE.md)。
+更新日期：2026-10-10。状态：平台宿主、Mac 原生适配、权限、菜单栏、登录项、睡眠恢复与浮窗目标语言快捷切换已合入 `main`，进入 `v0.9.0-preview.3` 双端发布。Mac Keychain、外部取词、真实登录和窗口行为仍待真机验证。维护者授权新版发布成功后清理旧 Release 记录与附件，保留源码历史、标签及 WPF 分支。朋友此前验收的是旧 WPF 安装版，不作为 Avalonia Setup 的验收证据。当前代码事实见 [技术架构](ARCHITECTURE.md)，已完成的 Windows 验收见 [验收记录](WINDOWS_AVALONIA_ACCEPTANCE.md)。
 
 ## 产品目标与边界
 
@@ -19,7 +19,7 @@
 | 能力 | 当前证据 | 尚缺工作 |
 | --- | --- | --- |
 | Windows 取词与阅读 | UIA 隔离、原生控件、复制回退、浮窗与托盘已接入；本机 WPS PDF 等已验收；朋友验收了旧 WPF 安装版 | 新 Avalonia 版的多电脑、更多目标软件、安装后兼容性与长期运行 |
-| 平台宿主接入 | 功能分支已通过共享接口连接窗口、原生事件、托盘与启动项；单实例/唤醒通过双端 CI；Mac 菜单栏、受约束的 `.app` 登录项与会话恢复已有代码；Apple Silicon 内部试用包已生成 | 合入主线、Mac 桌面/真实登录实测和正式签名分发 |
+| 平台宿主接入 | 已合入主线，通过共享接口连接窗口、原生事件、托盘与启动项；单实例/唤醒通过双端 CI；Mac 菜单栏、受约束的 `.app` 登录项与会话恢复已有代码；Apple Silicon 预览包已生成 | Mac 桌面/真实登录实测和正式签名分发 |
 | 共享翻译与功能 | Core 复用原版提供器、SSE、取消、缓存、解释/问答和记录；Avalonia UI 已还原 | 保持回归，补齐跨平台宿主和存储依赖 |
 | Windows 分发 | Avalonia 自包含 Setup 已发布 `v0.9.0-preview.2`；本机与 Windows runner 的安装、文件校验、运行时启动、重装及卸载通过；旧 WPF Release 保留 | 更多电脑的升级、实际取词及长期使用验收 |
 | macOS UI 与存储 | Mac CI 编译和自动化通过；原生 Keychain 与 AES-GCM 修正记录、菜单栏、Spaces 属性和睡眠恢复已有代码与可控测试 | Keychain 真机授权/锁定/签名验证、真实桌面生命周期、取词、权限和菜单栏验收 |

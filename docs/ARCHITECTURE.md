@@ -2,9 +2,9 @@
 
 本文描述 `main` 当前代码的实际组织。主应用使用 C#、.NET 8 和 Avalonia 11.2.6；Windows 已实现划词翻译，macOS 原生取词仍待完成。旧 WPF 产品的完整快照保留在 `codex/csharp-wpf-legacy`。
 
-本文的平台宿主与存储说明对应 `codex/platform-host-services` 功能分支，尚未合入 `main`。该分支新增单实例、设置 schema、Mac 加密存储与原生输入/取词到 Desktop 的代码链路；Mac 真机授权、应用兼容性和窗口生命周期仍待验收，不代表产品已可公开分发。
+本文的平台宿主与存储说明对应当前 `main`；`codex/platform-host-services` 的单实例、设置 schema、Mac 加密存储与原生输入/取词链路已于 2026-10-10 合入主线。双端安装包以公开预览分发；Mac 真机授权、应用兼容性和窗口生命周期仍待验收。
 
-该功能分支现已提供 Apple Silicon 内部试用打包入口 `scripts/Build-Mac-Preview.sh`。主 apphost 位于 `.app/Contents/MacOS`，SDK 写入相对于主程序的托管入口；共享业务与自带运行时位于 `Contents/Resources/Runtime`，helper 位于 `Contents/Helpers`。包使用 ad-hoc 签名，输出 DMG/ZIP、构建清单和 SHA256；不是 Developer ID 公证的正式版本。安装与真实验收见 [Mac 试用说明](MAC_PREVIEW_TESTING.md)。
+主线提供 Apple Silicon 打包入口 `scripts/Build-Mac-Preview.sh`。主 apphost 位于 `.app/Contents/MacOS`，SDK 写入相对于主程序的托管入口；共享业务与自带运行时位于 `Contents/Resources/Runtime`，helper 位于 `Contents/Helpers`。包使用 ad-hoc 签名，内部输出 DMG/ZIP、构建清单和 SHA256，公开 Release 只上传 DMG 和 Windows Setup；尚未完成 Developer ID 签名与公证。安装与真实验收见 [Mac 试用说明](MAC_PREVIEW_TESTING.md)。
 
 ## 模块边界
 

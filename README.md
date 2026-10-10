@@ -19,16 +19,16 @@ Yita 是一个开源桌面划词翻译工具。在外部应用中用鼠标拖选
 
 **当前跨平台预览采用 C# + .NET 8 + Avalonia 架构。** Windows 取词、阅读浮窗、设置与 AI 辅助已实现，并完成本地功能验收；Mac 原生 AX/Cmd+C、权限、全局输入、菜单栏、Keychain 与桌面生命周期已接入，真实设备兼容性仍待验收。
 
-> **源码与下载版本**：`v0.9.0-preview.2` 的 Windows 和 Apple Silicon Mac 包来自 `codex/platform-host-services` 同一源码提交，均为当前 Avalonia 应用；该功能分支尚未合入 `main`。历史 `v0.8.4` 是旧 WPF 版本，保留不变。更新源码或创建 Release 不会自动更新已安装的程序。
+> **源码与下载版本**：`v0.9.0-preview.3` 的 Windows 和 Apple Silicon Mac 包来自已合入 `main` 的同一源码提交，均为当前 Avalonia 应用，包含浮窗目标语言快捷切换。旧 Release 按维护者要求清理，历史标签、提交和 WPF 源码分支保留。更新源码或创建 Release 不会自动更新已安装的程序。
 
 ## 下载
 
 | 系统 | 安装包 | 要求 |
 | --- | --- | --- |
-| Windows | [Yita-Setup.exe](https://github.com/2214331539/Yita/releases/download/v0.9.0-preview.2/Yita-Setup.exe) | Windows 10 1809+ / Windows 11 x64 |
-| macOS | [Yita.dmg](https://github.com/2214331539/Yita/releases/download/v0.9.0-preview.2/Yita.dmg) | M 系列芯片，包元数据最低 macOS 12.0 |
+| Windows | [Yita-Setup.exe](https://github.com/2214331539/Yita/releases/download/v0.9.0-preview.3/Yita-Setup.exe) | Windows 10 1809+ / Windows 11 x64 |
+| macOS | [Yita.dmg](https://github.com/2214331539/Yita/releases/download/v0.9.0-preview.3/Yita.dmg) | M 系列芯片，包元数据最低 macOS 12.0 |
 
-[完整 Release](https://github.com/2214331539/Yita/releases/tag/v0.9.0-preview.2)。上传附件仅有两个安装包，两端都自带运行时，无需预装 .NET。SHA256 校验、ZIP、构建 JSON 和测试文件保留在 Actions 产物中。Windows 安装包尚无商业代码签名，Mac 使用 ad-hoc 签名且未公证；首次运行、权限和试用清单见 [Windows 说明](docs/WINDOWS_PREVIEW_TESTING.md) / [Mac 说明](docs/MAC_PREVIEW_TESTING.md)。本版标记为 Pre-release，构建检查不替代真机兼容性验收。
+[完整 Release](https://github.com/2214331539/Yita/releases/tag/v0.9.0-preview.3)。上传附件仅有两个安装包，两端都自带运行时，无需预装 .NET。SHA256 校验、ZIP、构建 JSON 和测试文件保留在 Actions 产物中。Windows 安装包尚无商业代码签名，Mac 使用 ad-hoc 签名且未公证；首次运行、权限和试用清单见 [Windows 说明](docs/WINDOWS_PREVIEW_TESTING.md) / [Mac 说明](docs/MAC_PREVIEW_TESTING.md)。本版标记为 Pre-release，构建检查不替代真机兼容性验收。
 
 ## 界面预览
 
@@ -69,7 +69,7 @@ Yita 是一个开源桌面划词翻译工具。在外部应用中用鼠标拖选
 需要 Git 和 [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)。`global.json` 使用 `8.0.425` 作为构建基线，允许 .NET 8 内更新的稳定 SDK。
 
 ```powershell
-git clone --branch v0.9.0-preview.2 https://github.com/2214331539/Yita.git
+git clone --branch v0.9.0-preview.3 https://github.com/2214331539/Yita.git
 cd Yita
 dotnet restore Yita.CrossPlatform.sln
 dotnet build Yita.CrossPlatform.sln -c Release --no-restore
@@ -106,7 +106,7 @@ dotnet run --project src/Yita.Desktop/Yita.Desktop.csproj -c Release --no-build
 
 `Ctrl+Shift+T` 翻译当前剪贴板，不会替用户先复制。自动划词使用独立的取词链路，通用剪贴板回退与 WPS PDF 兼容取词当前默认启用，可在“常规”中关闭并保存。回退只向仍处于前台的原目标发送复制，尽可能恢复原剪贴板；不会自动向终端发送 Ctrl+C。
 
-浮窗目标语言快捷切换已加入当前开发分支，提供与设置页相同的自动判断、简体中文、英语和日语选项；已经固定的其他译文保持各自的语言。此功能尚未包含在已发布的 `v0.9.0-preview.2` 安装包中，可先从当前源码构建体验。
+浮窗目标语言快捷切换提供与设置页相同的自动判断、简体中文、英语和日语选项；已经固定的其他译文保持各自的语言。选中后立即重新翻译当前原文，并保存为后续划词的默认目标语言，无需打开设置页。
 
 ## 技术架构
 
@@ -189,9 +189,9 @@ scripts/ · packaging/               Avalonia 双端及保留的 WPF 打包流�
 | `main` | 当前 C#/.NET/Avalonia 架构的主开发分支 |
 | `codex/csharp-wpf-legacy` | 切换前 GitHub main 的完整 Yita WPF 快照，保留旧源码、README 与打包流程 |
 | `codex/csharp-wpf-upstream-baseline` | 切换前本地 main 的上游 WPF 基线，单独保留其历史 |
-| `codex/platform-host-services` | 共享宿主、单实例、设置版本迁移和 Mac 安全存储开发，尚未合入 main |
+| `codex/platform-host-services` | 共享宿主、Mac 原生适配与浮窗语言切换的开发历史，已合入 main |
 
-旧 WPF 与新 Avalonia 都使用 C#，旧分支名中的 `csharp-wpf` 用来区分界面与原生组织方式。已有版本标签与安装包保留；新版上传附件仅保留安装包。
+旧 WPF 与新 Avalonia 都使用 C#，旧分支名中的 `csharp-wpf` 用来区分界面与原生组织方式。版本标签、提交和旧源码保留；公开 Release 只保留本次新版，上传附件仅有双端安装包。
 
 早期迁移和 Windows 还原的提交均已包含在 `main` 中。历史分支保持参考用途；后续功能从最新 `main` 创建独立分支，验收后通过 Pull Request 合入。
 
@@ -211,7 +211,7 @@ dotnet run --project tools/Yita.WindowsSmoke/Yita.WindowsSmoke.csproj -c Release
 
 原生 smoke 需要可交互桌面，并且应先退出正在运行的 Yita，释放全局快捷键。它使用独立测试编辑器，保存并恢复剪贴板，不请求在线服务、不写产品设置。修改源码后重新构建，再退出并启动新进程；正在运行的 EXE 不会自动热更新。
 
-平台宿主分支还提供不依赖 GUI 权限的跨进程单实例与唤醒检查，使用临时目录，不修改产品设置或剪贴板：
+当前主线还提供不依赖 GUI 权限的跨进程单实例与唤醒检查，使用临时目录，不修改产品设置或剪贴板：
 
 ```powershell
 dotnet run --project tools/Yita.PlatformSmoke/Yita.PlatformSmoke.csproj -c Release
@@ -221,7 +221,7 @@ dotnet run --project tools/Yita.PlatformSmoke/Yita.PlatformSmoke.csproj -c Relea
 
 GitHub Actions 的 `Cross-platform architecture` 工作流在 Windows/macOS runner 上构建当前解决方案并运行测试；`Legacy WPF regression` 在 Windows 上检查保留的 WPF 解决方案。macOS 编译与原生 fixture 检查通过不能替代真实授权和外部划词验收。
 
-`codex/platform-host-services` 功能分支已将 Mac 的 Swift 鼠标监听、Carbon `Cmd+Shift+T`、AX 与显式 Cmd+C 回退连接到 Desktop。CI 使用实际 Swift/C# 管道验证合成拖选与取消，不请求桌面权限或读取真实选区/剪贴板。代码接入不代表 Mac 真机已验收；接口与输入约定见 [Mac helper 协议](docs/MAC_HELPER_PROTOCOL.md) 和 [Mac 原生输入](docs/MAC_NATIVE_INPUT.md)。
+当前主线已将 Mac 的 Swift 鼠标监听、Carbon `Cmd+Shift+T`、AX 与显式 Cmd+C 回退连接到 Desktop。CI 使用实际 Swift/C# 管道验证合成拖选与取消，不请求桌面权限或读取真实选区/剪贴板。代码接入不代表 Mac 真机已验收；接口与输入约定见 [Mac helper 协议](docs/MAC_HELPER_PROTOCOL.md) 和 [Mac 原生输入](docs/MAC_NATIVE_INPUT.md)。
 
 下一阶段的交付顺序、平台边界和发布验收标准见 [跨平台产品开发路线图](docs/CROSS_PLATFORM_ROADMAP.md)。已有结果见 [Windows 验收说明](docs/WINDOWS_AVALONIA_ACCEPTANCE.md)；[还原开发计划](docs/WINDOWS_AVALONIA_PARITY_PLAN.md) 和 [首次迁移计划](docs/CROSS_PLATFORM_MIGRATION_PLAN.md) 保留为历史记录。
 
@@ -245,7 +245,7 @@ GitHub Actions 的 `Cross-platform architecture` 工作流在 Windows/macOS runn
 
 首次启动可导入旧 WPF 阅读偏好，保存到新文件；不沿用旧版开机启动或 AI 记录目录。旧 WPF 使用 `settings.json` 和 `Yita/DeepSeekApiKey`，当前程序使用独立设置与凭据标识。
 
-平台宿主功能分支新增设置格式版本和迁移备份；损坏、不可读或由更高版本写入的配置会禁止覆盖。Mac 凭据改用原生 Keychain API，主动保存的修正使用 Keychain 密钥保护的 AES-GCM；这些代码仍需真实 Mac 授权与运行验收，没有明文持久化回退。具体迁移、密钥与文件规则见 [架构说明](docs/ARCHITECTURE.md)。
+当前主线提供设置格式版本和迁移备份；损坏、不可读或由更高版本写入的配置会禁止覆盖。Mac 凭据使用原生 Keychain API，主动保存的修正使用 Keychain 密钥保护的 AES-GCM；这些代码仍需真实 Mac 授权与运行验收，没有明文持久化回退。具体迁移、密钥与文件规则见 [架构说明](docs/ARCHITECTURE.md)。
 
 Yita 是本地客户端，默认在线翻译不是离线模型。开启个人术语或修正示例时，请求可能附带相关内容。分享日志、记录或截图前请脱敏，不要提交 API Key 或私人文档。
 
@@ -264,7 +264,7 @@ Yita 是本地客户端，默认在线翻译不是离线模型。开启个人术
 
 通过 [Issues](https://github.com/2214331539/Yita/issues) 报告问题或提出建议。Pull Request 默认提交到 `main`，请运行当前解决方案的构建与测试；取词、剪贴板和请求生命周期修改应包含针对实际风险的回归验证，UI 修改应检查中英文、长文、缩放与加载/错误状态。
 
-新增平台能力应实现原生适配边界，保持 Core 不依赖平台 UI。`codex/platform-host-services` 已接入 Mac 输入、AX/Cmd+C 和权限入口；后续工作包括菜单栏/登录启动、窗口生命周期、真实设备验收与正式分发。
+新增平台能力应实现原生适配边界，保持 Core 不依赖平台 UI。Mac 输入、AX/Cmd+C、权限、菜单栏、登录启动和窗口生命周期已合入主线；后续工作包括真实设备验收、软件兼容性、升级体验与正式签名分发。
 
 ## 许可证与来源
 
