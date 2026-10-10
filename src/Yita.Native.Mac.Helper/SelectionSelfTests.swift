@@ -22,7 +22,12 @@ final class FixtureAXAccess: AXSelectionAccess {
     var textReads = 0
     var clock: TimeInterval = 0
     var readError: SelectionReadError?
+    var rangeError: SelectionReadError?
+    var boundsError: SelectionReadError?
+    var countError: SelectionReadError?
+    var parameterError: SelectionReadError?
     var afterText: (() -> Void)?
+    var afterBounds: (() -> Void)?
 
     func isTrusted() -> Bool { trusted }
     func frontmostTarget() -> SelectionTarget? { target }
@@ -39,16 +44,27 @@ final class FixtureAXAccess: AXSelectionAccess {
         afterText?()
         return elements[element]?.text
     }
-    func selectedRange(_ element: Int) throws -> CFRange? { elements[element]?.range }
+    func selectedRange(_ element: Int) throws -> CFRange? {
+        if let error = rangeError { throw error }
+        return elements[element]?.range
+    }
     func text(_ element: Int, range: CFRange) throws -> String? {
         rangeQueries.append(range)
+        if let error = parameterError { throw error }
         let value = document as NSString
         guard range.location >= 0, range.length >= 0, range.location <= value.length,
               range.length <= value.length - range.location else { return nil }
         return value.substring(with: NSRange(location: range.location, length: range.length))
     }
-    func bounds(_ element: Int, range: CFRange) throws -> SelectionRectangle? { rectangle }
-    func characterCount(_ element: Int) throws -> Int? { (document as NSString).length }
+    func bounds(_ element: Int, range: CFRange) throws -> SelectionRectangle? {
+        afterBounds?()
+        if let error = boundsError { throw error }
+        return rectangle
+    }
+    func characterCount(_ element: Int) throws -> Int? {
+        if let error = countError { throw error }
+        return (document as NSString).length
+    }
     func allowsCopy(_ element: Int) throws -> Bool { elements[element]?.copyEligible == true }
 }
 
@@ -110,6 +126,76 @@ func runSelectionSelfTests() -> Int32 {
             access.rectangle = nil
             let selection = read(access, request())
             try expect(selection.text == "hello" && selection.bounds == nil, "optional bounds")
+        }
+        try test("Optional selected-range failures preserve already acquired text") {
+            for error in [SelectionReadError.timeout, .unsupported, .unavailable] {
+                let access = FixtureAXAccess()
+                access.rangeError = error
+                let selection = read(access, request(context: true))
+                try expect(selection.text == "hello" && selection.failure == "none"
+                    && selection.bounds == nil && selection.context == nil, "optional range")
+            }
+        }
+        try test("AX bounds failures preserve text for pointer-based popup placement") {
+            for error in [SelectionReadError.timeout, .unsupported, .unavailable] {
+                let access = FixtureAXAccess()
+                access.boundsError = error
+                let selection = read(access, request())
+                try expect(selection.text == "hello" && selection.failure == "none" && selection.bounds == nil, "optional bounds")
+            }
+        }
+        try test("Optional context failures preserve selected text and usable bounds") {
+            for error in [SelectionReadError.timeout, .unsupported, .unavailable] {
+                for failCount in [false, true] {
+                    let access = FixtureAXAccess()
+                    if failCount { access.countError = error } else { access.parameterError = error }
+                    let selection = read(access, request(context: true))
+                    try expect(selection.text == "hello" && selection.failure == "none"
+                        && selection.bounds != nil && selection.context == nil, "optional context")
+                }
+            }
+        }
+        try test("Exhausting the budget on optional geometry skips context without discarding text") {
+            let access = FixtureAXAccess()
+            access.afterBounds = { access.clock = 2 }
+            access.boundsError = .timeout
+            let selection = read(access, request(context: true))
+            try expect(selection.text == "hello" && selection.failure == "none"
+                && selection.bounds == nil && selection.context == nil && access.rangeQueries.isEmpty, "metadata budget")
+        }
+        try test("Range and parameter failures remain fatal when needed to acquire selected text") {
+            for failRange in [false, true] {
+                let access = FixtureAXAccess()
+                access.elements[1]?.text = nil
+                if failRange { access.rangeError = .timeout } else { access.parameterError = .timeout }
+                let selection = read(access, request())
+                try expect(selection.failure == "timeout" && selection.text == nil, "required text read")
+            }
+        }
+        try test("Critical failures in supplemental AX queries still discard all text") {
+            for error in [SelectionReadError.permissionDenied, .targetChanged, .protectedContent, .cancelled] {
+                for failRange in [false, true] {
+                    let access = FixtureAXAccess()
+                    if failRange { access.rangeError = error } else { access.boundsError = error }
+                    let selection = read(access, request())
+                    try expect(selection.failure == error.failure && selection.text == nil, "critical metadata failure")
+                }
+            }
+        }
+        try test("Supplemental timeouts cannot hide permission revocation source changes or cancellation") {
+            for scenario in ["permission", "source", "cancel"] {
+                let access = FixtureAXAccess()
+                var cancelled = false
+                access.boundsError = .timeout
+                access.afterBounds = {
+                    if scenario == "permission" { access.trusted = false }
+                    else if scenario == "source" { access.target = SelectionTarget(processId: 43, bundleIdentifier: "test.other") }
+                    else { cancelled = true }
+                }
+                let selection = AXSelectionReader(access: access, now: { access.clock }, isCancelled: { cancelled }).read(request())
+                try expect(selection.failure == (scenario == "permission" ? "permissionDenied" : "cancelled")
+                    && selection.text == nil && selection.bounds == nil && selection.context == nil, "stale supplemental result")
+            }
         }
         try test("Malformed bounds are discarded") {
             for rect in [SelectionRectangle(x: .infinity, y: 0, width: 10, height: 10),

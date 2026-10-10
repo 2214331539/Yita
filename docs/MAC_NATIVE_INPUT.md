@@ -1,6 +1,6 @@
 # Mac 原生输入与 Desktop 接入
 
-本实现位于 `codex/platform-host-services`，尚未合入 `main`。Swift helper 的全局输入、C# `MacSelectionRuntime` 和 Avalonia 阅读浮窗已接入代码链路；Apple Silicon 公开预览 DMG 已提供，真实 Mac 授权、外部划词、Retina、Spaces 与全屏行为继续按验收记录确认。此文档不表示真机验收已完成。
+Swift helper 的全局输入、C# `MacSelectionRuntime` 和 Avalonia 阅读浮窗已接入代码链路并合入 `main`；Apple Silicon 公开预览 DMG 已提供，真实 Mac 授权、外部划词、Retina、Spaces 与全屏行为继续按验收记录确认。此文档不表示真机验收已完成。
 
 ## 输入到翻译
 
@@ -41,6 +41,8 @@
 CGEvent 和 AX 边界均使用 Quartz 全局点、左上角原点。当前 Avalonia.Native 11.2.6 的屏幕范围和窗口位置也使用这些全局点，其 `Screen.Scaling` 为 1；Retina 的 `RenderScaling` 用于渲染，不应再次乘到浮窗位置或窗口命中范围上。
 
 因此当前宿主直接传递 Quartz 点，保留外接屏的负坐标，并复用共享工作区约束和相对偏移。没有 AX 边界时使用本次拖选区域/指针，不伪造选区边界。升级 Avalonia 后须重新检查此约定。依据：[Screens.mm](https://github.com/AvaloniaUI/Avalonia/blob/11.2.6/native/Avalonia.Native/src/OSX/Screens.mm)、[WindowBaseImpl.mm](https://github.com/AvaloniaUI/Avalonia/blob/11.2.6/native/Avalonia.Native/src/OSX/WindowBaseImpl.mm)。
+
+选中文字必须在 AX 总预算内取得。已经取得正文后，范围、边界和可选上下文查询的 `timeout/unsupported/unavailable` 不再使正文失效；预算用尽后跳过剩余元数据。返回前仍核验权限、前台来源及输入取消，关键安全错误继续拒绝全部正文。未取得正文时用于读取文本的范围和参数化查询仍属于必需操作。
 
 ## 非交互验证与后续验收
 
