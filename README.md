@@ -12,6 +12,9 @@
   <img src="https://img.shields.io/badge/macOS-Apple_Silicon_preview-696158" alt="Apple Silicon preview">
 </p>
 <p align="center">
+  <a href="https://2214331539.github.io/YitaWeb/">Yita 官网 · 免费开源桌面翻译工具</a> · <a href="https://2214331539.github.io/YitaWeb/windows.html">Windows 下载与指南</a> · <a href="https://2214331539.github.io/YitaWeb/mac.html">Mac 下载与指南</a> · <a href="https://2214331539.github.io/YitaWeb/faq.html">免费使用与常见问题</a>
+</p>
+<p align="center">
   <a href="#快速开始">快速开始</a> · <a href="#核心功能">核心功能</a> · <a href="#技术架构">技术架构</a> · <a href="#开发与测试">开发与测试</a> · <a href="#配置与隐私">配置与隐私</a> · <a href="#贡献">贡献</a>
 </p>
 
