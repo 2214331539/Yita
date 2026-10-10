@@ -1,6 +1,6 @@
 # Yita 跨平台产品开发路线图
 
-更新日期：2026-10-10。状态：平台宿主、Mac 原生适配、权限、菜单栏、登录项、睡眠恢复与浮窗目标语言快捷切换已合入 `main`，进入 `v0.9.0-preview.3` 双端发布。Mac Keychain、外部取词、真实登录和窗口行为仍待真机验证。维护者授权新版发布成功后清理旧 Release 记录与附件，保留源码历史、标签及 WPF 分支。朋友此前验收的是旧 WPF 安装版，不作为 Avalonia Setup 的验收证据。当前代码事实见 [技术架构](ARCHITECTURE.md)，已完成的 Windows 验收见 [验收记录](WINDOWS_AVALONIA_ACCEPTANCE.md)。
+更新日期：2026-10-10。状态：平台宿主、Mac 原生适配、权限、菜单栏、登录项、睡眠恢复与浮窗目标语言快捷切换已合入 `main`，`v0.9.0-preview.3` 双端发布成功。Mac Keychain、外部取词、真实登录和窗口行为仍待真机验证。维护者授权的旧 Release 记录与附件已清理，源码历史、标签及 WPF 分支保留。朋友此前验收的是旧 WPF 安装版，不作为 Avalonia Setup 的验收证据。当前代码事实见 [技术架构](ARCHITECTURE.md)，已完成的 Windows 验收见 [验收记录](WINDOWS_AVALONIA_ACCEPTANCE.md)。
 
 ## 产品目标与边界
 
@@ -21,7 +21,7 @@
 | Windows 取词与阅读 | UIA 隔离、原生控件、复制回退、浮窗与托盘已接入；本机 WPS PDF 等已验收；朋友验收了旧 WPF 安装版 | 新 Avalonia 版的多电脑、更多目标软件、安装后兼容性与长期运行 |
 | 平台宿主接入 | 已合入主线，通过共享接口连接窗口、原生事件、托盘与启动项；单实例/唤醒通过双端 CI；Mac 菜单栏、受约束的 `.app` 登录项与会话恢复已有代码；Apple Silicon 预览包已生成 | Mac 桌面/真实登录实测和正式签名分发 |
 | 共享翻译与功能 | Core 复用原版提供器、SSE、取消、缓存、解释/问答和记录；Avalonia UI 已还原 | 保持回归，补齐跨平台宿主和存储依赖 |
-| Windows 分发 | Avalonia 自包含 Setup 已发布 `v0.9.0-preview.2`；本机与 Windows runner 的安装、文件校验、运行时启动、重装及卸载通过；旧 WPF Release 保留 | 更多电脑的升级、实际取词及长期使用验收 |
+| Windows 分发 | Avalonia 自包含 Setup 已发布 `v0.9.0-preview.3`；本机与 Windows runner 的安装、文件校验、运行时启动、重装及卸载通过；旧 WPF 源码分支保留 | 更多电脑的升级、实际取词及长期使用验收 |
 | macOS UI 与存储 | Mac CI 编译和自动化通过；原生 Keychain 与 AES-GCM 修正记录、菜单栏、Spaces 属性和睡眠恢复已有代码与可控测试 | Keychain 真机授权/锁定/签名验证、真实桌面生命周期、取词、权限和菜单栏验收 |
 | macOS 划词 | `MacSelectionRuntime` 已将鼠标/快捷键、权限、AX/边界和显式 Cmd+C 接入 Desktop；通过合成输入及实际 Swift 管道检查 | 真实授权、外部 AX/复制、Retina/多屏与窗口验收 |
 | 更新 | GitHub 已有双端 Avalonia 预览 Release、版本/来源/校验约束与构建流水线 | 应用内版本检查、双端升级与回退 |
@@ -320,6 +320,14 @@ NSPasteboard 不能原子比较序列并写入，也没有可验证的复制所�
 - Release API 确认只有两项上传资产：`Yita-Setup.exe`（84,506,961 字节）与 `Yita.dmg`（48,522,738 字节），没有额外 ZIP、清单或校验文件。GitHub 自动显示两份 Source code 归档；内部产物仍保留 SHA256，并在公开上传前验证同一版本、提交、RID 和干净源码。
 - 两份公开下载均返回 HTTP 200，本地整理到 `artifacts/published/v0.9.0-preview.2/`，目录只含两个安装包。SHA256 与 Release digest 一致：Windows `c495fb4789add2826417831dd19f730d209f6e10d90e8aa5c57a025b87670efb`，Mac `f584fa872c04f6e2c8b1412c003d4cd132dae45d396dbffa29808e1a85cfe559`。
 - 发布暂存验证覆盖准确的两文件输出、改名后内容不变，以及内部文件遭修改、提交不一致和工作区非干净时拒绝发布。此次安装包命名整理不代表 Mac 真机划词或正式签名/公证已验收；后续文档记录不会重写已发布标签。
+
+### 主线合并与新版公开发布（2026-10-10）
+
+- 浮窗目标语言快捷切换提交为 `b3da9d9`；平台宿主分支通过合并提交 `a60d5ac43d49762d7b01d5334abe48e7670a5171` 合入 `main`，并推送至远程。新版标签 `v0.9.0-preview.3` 固定在此合并提交，两端包从相同干净源码生成；后续发布记录不重写标签。
+- [主线架构 CI #38046721391](https://github.com/2214331539/Yita/actions/runs/38046721391) 与 [旧 WPF 回归 #38046721374](https://github.com/2214331539/Yita/actions/runs/38046721374) 成功；旧版 455 项测试通过。[标签发布 #38046720736](https://github.com/2214331539/Yita/actions/runs/38046720736) 双端各通过 505 项测试，构建 0 警告/0 错误，Windows 安装/重装/卸载及 Mac 原始应用、挂载 DMG、解压 ZIP 的 19 个 ARM64 原生文件/签名/运行时/helper 检查通过。
+- [Release v0.9.0-preview.3](https://github.com/2214331539/Yita/releases/tag/v0.9.0-preview.3) 已公开，ID `408887514`，保留 Pre-release 标记。上传资产仅有 `Yita-Setup.exe`（84,509,289 字节，SHA256 `a379088edbf982c0b6f518faf7ced7ef71e38fe7aa06c58fa1e3a32517d40482`）和 `Yita.dmg`（47,743,485 字节，SHA256 `7838fde345b94cd1aed0253c083c424cae5a72e6a890176126f04330578d6c6b`）。ZIP、校验文件及构建清单仅留在内部 Actions 产物。
+- 确认新版两条下载链接成功后，按维护者授权删除旧 Release `v0.9.0-preview.2`、`v0.9.0-preview.1` 和 `v0.8.4` 及其附件。Release API 确认只剩新版，旧 Git 标签与提交均仍在远程；旧下载链接已失效。清理前元数据存于本机 `.work/release-history-before-preview.3.json`，Actions `retired-release-metadata` artifact（ID `11666944768`）保留至 2027-01-08。
+- 一次性清理已验证新附件多余、下载不可用、旧记录身份不符时拒绝删除；执行成功后从主线移除清理步骤。后续标签继续触发双端打包，不自动删除其他 Release。Mac 真实权限和软件兼容性继续按真机清单验收。
 
 ### 继续开发顺序
 
