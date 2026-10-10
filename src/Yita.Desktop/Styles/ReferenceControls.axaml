@@ -132,6 +132,49 @@
     </Setter>
   </Style>
   <Style Selector="Button.text-action"><Setter Property="Width" Value="NaN" /><Setter Property="Height" Value="28" /><Setter Property="MinWidth" Value="58" /><Setter Property="Margin" Value="0" /><Setter Property="Padding" Value="7,3" /><Setter Property="FontSize" Value="13" /><Setter Property="FontWeight" Value="SemiBold" /></Style>
+  <Style Selector="ComboBox.popup-language">
+    <Setter Property="Width" Value="108" /><Setter Property="MinHeight" Value="28" /><Setter Property="Height" Value="28" />
+    <Setter Property="FontFamily" Value="{DynamicResource InterfaceFont}" /><Setter Property="FontSize" Value="13" /><Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource PopupTextBrush}" /><Setter Property="Background" Value="{DynamicResource PopupBackgroundBrush}" />
+    <Setter Property="Padding" Value="10,3,6,3" /><Setter Property="Cursor" Value="Hand" /><Setter Property="MaxDropDownHeight" Value="200" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border x:Name="LanguageChrome" Background="{TemplateBinding Background}" CornerRadius="{DynamicResource PopupButtonCornerRadius}">
+          <Grid ColumnDefinitions="*,24">
+            <ContentPresenter Margin="{TemplateBinding Padding}" VerticalAlignment="Center" Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" />
+            <Path Grid.Column="1" Width="9" Height="5" VerticalAlignment="Center" HorizontalAlignment="Center"
+                  Data="M0,0 L4.5,4.5 L9,0" Stroke="{DynamicResource PopupMutedBrush}" StrokeThickness="1.5" StrokeLineCap="Round" />
+            <Popup x:Name="PART_Popup" IsOpen="{TemplateBinding IsDropDownOpen, Mode=TwoWay}" PlacementTarget="LanguageChrome"
+                   MinWidth="160" MaxHeight="{TemplateBinding MaxDropDownHeight}" Placement="BottomEdgeAlignedLeft"
+                   VerticalOffset="6" IsLightDismissEnabled="True" InheritsTransform="True" WindowManagerAddShadowHint="False">
+              <Border Padding="5" Background="{DynamicResource ExplanationSurfaceBrush}" BorderBrush="{DynamicResource PopupButtonBorderBrush}"
+                      BorderThickness="1" CornerRadius="{DynamicResource PopupActionBarCornerRadius}">
+                <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                  <ItemsPresenter x:Name="PART_ItemsPresenter" ItemsPanel="{TemplateBinding ItemsPanel}" />
+                </ScrollViewer>
+              </Border>
+            </Popup>
+          </Grid>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="ComboBox.popup-language:pointerover /template/ Border#LanguageChrome, ComboBox.popup-language:dropdownopen /template/ Border#LanguageChrome">
+    <Setter Property="Background" Value="{DynamicResource PopupButtonHoverBrush}" />
+  </Style>
+  <Style Selector="ComboBox.popup-language:focus-visible /template/ Border#LanguageChrome">
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" /><Setter Property="BorderThickness" Value="1" />
+  </Style>
+  <Style Selector="ComboBox.popup-language ComboBoxItem">
+    <Setter Property="FontFamily" Value="{DynamicResource InterfaceFont}" /><Setter Property="FontSize" Value="13" /><Setter Property="FontWeight" Value="Normal" />
+    <Setter Property="Foreground" Value="{DynamicResource PopupTextBrush}" /><Setter Property="Padding" Value="10,7" /><Setter Property="CornerRadius" Value="{DynamicResource PopupButtonCornerRadius}" />
+  </Style>
+  <Style Selector="ComboBox.popup-language ComboBoxItem:pointerover /template/ ContentPresenter, ComboBox.popup-language ComboBoxItem:pressed /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PopupButtonHoverBrush}" /><Setter Property="Foreground" Value="{DynamicResource PopupTextBrush}" />
+  </Style>
+  <Style Selector="ComboBox.popup-language ComboBoxItem:selected /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PopupButtonHoverBrush}" /><Setter Property="Foreground" Value="{DynamicResource PopupTextBrush}" />
+  </Style>
   <Style Selector="Button.qa-action"><Setter Property="Width" Value="NaN" /><Setter Property="Height" Value="28" /><Setter Property="MinWidth" Value="34" /><Setter Property="Padding" Value="8,3" /><Setter Property="FontSize" Value="11.5" /><Setter Property="FontWeight" Value="SemiBold" /></Style>
   <Style Selector="Button.size-preset"><Setter Property="Width" Value="25" /><Setter Property="Height" Value="28" /><Setter Property="Margin" Value="0.5,0" /><Setter Property="Padding" Value="0" /></Style>
   <Style Selector="Slider.direct-font-size">

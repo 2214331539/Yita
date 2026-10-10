@@ -97,9 +97,6 @@ public sealed partial class MainWindow
     internal async Task ShowSelectionTranslationAsync(SelectionRequest request, SelectionResult result, TimeSpan? readDuration = null)
     {
         TranslationPopupWindow? popup = null;
-        LatestRequestController.RequestLease? pending = null;
-        TranslationPerformanceOperation? performance = null;
-        var outcome = TranslationOutcome.Cancelled;
         try
         {
             if (_shuttingDown || !_desktopSessionActive) return;
@@ -113,24 +110,46 @@ public sealed partial class MainWindow
             if (diagnostic.Issue == SelectionIssue.Cancelled) return;
             if (_popup is null || _popup.IsPinned) _popup = CreatePopup();
             popup = _popup;
-            pending = popup.TranslationRequests.Begin();
             var settings = _settings.ToOriginal(_savedApiKey) with { UiLanguage = _uiLanguage };
-            performance = _performance.Begin(request.Trigger == SelectionTrigger.MouseGesture ? TranslationTrigger.Selection : TranslationTrigger.Clipboard, settings.ProviderId);
             popup.ApplySettings(settings);
             popup.PlaceNear(request, result, SavedPopupOffset());
-            popup.BeginTranslation(result.Text ?? "");
-            if (!popup.IsVisible) popup.Show();
             if (!result.Succeeded)
             {
+                popup.TranslationRequests.Cancel();
+                _sessions.Remove(popup);
+                popup.BeginTranslation("");
+                if (!popup.IsVisible) popup.Show();
                 popup.SetSelectionError(diagnostic.Issue);
-                outcome = TranslationOutcome.NoSelection;
+                _performance.Begin(request.Trigger == SelectionTrigger.MouseGesture ? TranslationTrigger.Selection : TranslationTrigger.Clipboard,
+                    settings.ProviderId).Complete(TranslationOutcome.NoSelection);
                 return;
             }
-            var source = Yita.Selection.TextNormalizer.Normalize(result.Text!);
+            await TranslatePopupAsync(popup, result.Text!, result.Context, settings,
+                request.Trigger == SelectionTrigger.MouseGesture ? TranslationTrigger.Selection : TranslationTrigger.Clipboard);
+        }
+        catch (Exception exception)
+        {
+            if (!_shuttingDown && popup is { IsVisible: true }) popup.SetError(exception.Message);
+        }
+    }
+
+    private async Task TranslatePopupAsync(TranslationPopupWindow popup, string text, string? context,
+        AppSettings settings, TranslationTrigger trigger, bool preserveSize = false)
+    {
+        using var pending = popup.TranslationRequests.Begin();
+        var performance = _performance.Begin(trigger, settings.ProviderId);
+        var outcome = TranslationOutcome.Cancelled;
+        try
+        {
+            _sessions.Remove(popup);
+            popup.SetTargetLanguage(settings.TargetLanguageMode, settings.TargetLanguage);
+            popup.BeginTranslation(text, preserveSize);
+            if (!popup.IsVisible) popup.Show();
+            var source = Yita.Selection.TextNormalizer.Normalize(text);
             if (source.Length > settings.MaximumSelectionCharacters)
                 throw new ArgumentException(Localize("The selection exceeds the character limit.", "所选文本超过字符上限，请缩小选区。"));
-            var translation = _translationRuntime.Prepare(source, result.Context, settings);
-            var session = new PopupSession(settings, translation,
+            var translation = _translationRuntime.Prepare(source, context, settings);
+            var session = new PopupSession(settings, translation, text,
                 new AiHistoryContext(Guid.NewGuid(), DateTimeOffset.UtcNow, source, "", translation.SourceLanguage, translation.TargetLanguage));
             _sessions[popup] = session;
             await foreach (var output in _translationRuntime.TranslateAsync(translation, settings, pending.Token, performance))
@@ -145,16 +164,51 @@ public sealed partial class MainWindow
         catch (Exception exception)
         {
             outcome = TranslationOutcome.Failed;
-            if (!_shuttingDown && pending is not { IsCurrent: false } && popup is { IsVisible: true })
+            if (!_shuttingDown && pending.IsCurrent && popup.IsVisible)
                 popup.SetError(exception.Message);
         }
-        finally { performance?.Complete(outcome); pending?.Dispose(); }
+        finally { performance.Complete(outcome); }
+    }
+
+    internal async Task ChangePopupTargetLanguageAsync(TranslationPopupWindow popup, string choice)
+    {
+        if (_shuttingDown || !_desktopSessionActive || !_popups.Contains(popup) || !popup.IsVisible
+            || !TargetLanguageOptions.Labels.Any(option => option.Value == choice)) return;
+        try
+        {
+            if (_settingsFailure is not null)
+            {
+                if (_sessions.TryGetValue(popup, out var unchanged))
+                    popup.SetTargetLanguage(unchanged.Settings.TargetLanguageMode, unchanged.Settings.TargetLanguage);
+                else popup.SetTargetLanguage(_settings.TargetLanguageMode, _settings.TargetLanguage);
+                popup.ShowNotice(Localize("Settings are read-only; the default language cannot be changed.", "设置只读，无法更改默认目标语言。"));
+                return;
+            }
+            var mode = choice == TargetLanguageOptions.Automatic ? "auto" : "fixed";
+            var language = mode == "auto" ? "简体中文" : choice;
+            _settings = _settings with { TargetLanguageMode = mode, TargetLanguage = language };
+            SetCombo(TargetLanguageComboBox, choice);
+            var saved = PersistSettingsWithStatusAsync();
+            if (_sessions.TryGetValue(popup, out var session))
+            {
+                var settings = session.Settings with { TargetLanguageMode = mode, TargetLanguage = language, UiLanguage = _uiLanguage };
+                await TranslatePopupAsync(popup, session.SourceText, session.Request.Context, settings,
+                    TranslationTrigger.Retranslation, preserveSize: true);
+            }
+            if (!await saved && popup.IsVisible && popup.TargetLanguageChoice == choice)
+                popup.ShowNotice(Localize("Language changed for now; could not save the default.", "已切换语言，但默认设置保存失败。"));
+        }
+        catch (Exception exception)
+        {
+            if (!_shuttingDown && popup.IsVisible) popup.ShowNotice(exception.Message);
+        }
     }
 
     private TranslationPopupWindow CreatePopup()
     {
         var popup = new TranslationPopupWindow();
         _popups.Add(popup);
+        popup.TargetLanguageChanged += async (_, choice) => await ChangePopupTargetLanguageAsync(popup, choice);
         popup.Moved += (_, args) =>
         {
             _settings = _settings with { PopupOffsetX = args.Offset.X, PopupOffsetY = args.Offset.Y };
@@ -330,10 +384,11 @@ public sealed partial class MainWindow
         _savedApiKey = "";
     }
 
-    private sealed class PopupSession(AppSettings settings, TranslationRequest request, AiHistoryContext context)
+    private sealed class PopupSession(AppSettings settings, TranslationRequest request, string sourceText, AiHistoryContext context)
     {
         internal AppSettings Settings { get; set; } = settings;
         internal TranslationRequest Request { get; } = request;
+        internal string SourceText { get; } = sourceText;
         internal AiHistoryContext Context { get; } = context;
         internal string Translation { get; set; } = "";
         internal string Explanation { get; set; } = "";

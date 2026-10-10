@@ -35,10 +35,14 @@ public sealed partial class TranslationPopupWindow : Window
     private int _explanationVersion;
     private int _recordedExplanationVersion;
     private bool _savingExplanation;
+    private bool _updatingTargetLanguage;
+    internal string TargetLanguageChoice { get; private set; } = TargetLanguageOptions.Automatic;
 
     public TranslationPopupWindow()
     {
         InitializeComponent();
+        PopupTargetLanguageComboBox.ItemsSource = TargetLanguageOptions.CreateItems();
+        SetTargetLanguage(_settings.TargetLanguageMode, _settings.TargetLanguage);
         DesktopFloatingWindowBehavior.Apply(this);
         ReferenceTheme.Apply(Resources, _settings);
         SizeChanged += (_, _) => ConstrainToScreen();
@@ -57,10 +61,12 @@ public sealed partial class TranslationPopupWindow : Window
     internal event EventHandler<QuestionAction>? QuestionRequested;
     internal event EventHandler<string>? CorrectionSaved;
     internal event EventHandler? RecordExplanationRequested;
+    internal event EventHandler<string>? TargetLanguageChanged;
 
     internal void ApplySettings(AppSettings settings)
     {
         _settings = settings;
+        if (_sourceText.Length == 0) SetTargetLanguage(settings.TargetLanguageMode, settings.TargetLanguage);
         ReferenceTheme.Apply(Resources, settings);
         ApplyUiLanguage(settings.UiLanguage);
         TranslationText.FontSize = ExplanationText.FontSize = settings.DefaultTranslationFontSize;
@@ -77,6 +83,10 @@ public sealed partial class TranslationPopupWindow : Window
     {
         _settings = _settings with { UiLanguage = UiLanguageCatalog.Normalize(language) };
         var chinese = _settings.UiLanguage == "zh-CN";
+        RefreshTargetLanguageLabels();
+        var targetTip = chinese ? "目标语言 · 切换后立即重译并保存为默认" : "Target language · Retranslate and save as default";
+        ToolTip.SetTip(PopupTargetLanguageComboBox, targetTip);
+        Avalonia.Automation.AutomationProperties.SetName(PopupTargetLanguageComboBox, chinese ? "目标语言" : "Target language");
         if (_selectionIssue is { } issue)
         {
             _translatedText = SelectionFailureText.Message(issue, chinese);
@@ -119,7 +129,36 @@ public sealed partial class TranslationPopupWindow : Window
                 ? (chinese ? "已保存" : "Saved") : (chinese ? "记录" : "Record");
     }
 
-    public void BeginTranslation(string source)
+    internal void SetTargetLanguage(string mode, string language)
+    {
+        TargetLanguageChoice = TargetLanguageOptions.Choice(mode, language);
+        RefreshTargetLanguageLabels();
+    }
+
+    private void RefreshTargetLanguageLabels()
+    {
+        _updatingTargetLanguage = true;
+        try
+        {
+            foreach (var item in PopupTargetLanguageComboBox.Items.OfType<ComboBoxItem>())
+                item.Content = TargetLanguageOptions.Label(item.Tag!.ToString()!, _settings.UiLanguage == "zh-CN", compact: true);
+            // ComboBox snapshots the selected item's content; reselect without dispatching a request.
+            PopupTargetLanguageComboBox.SelectedIndex = -1;
+            PopupTargetLanguageComboBox.SelectedItem = PopupTargetLanguageComboBox.Items.OfType<ComboBoxItem>()
+                .First(item => item.Tag?.ToString() == TargetLanguageChoice);
+        }
+        finally { _updatingTargetLanguage = false; }
+    }
+
+    private void TargetLanguageSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_updatingTargetLanguage || PopupTargetLanguageComboBox.SelectedItem is not ComboBoxItem { Tag: string choice }
+            || choice == TargetLanguageChoice) return;
+        TargetLanguageChoice = choice;
+        TargetLanguageChanged?.Invoke(this, choice);
+    }
+
+    public void BeginTranslation(string source, bool preserveSize = false)
     {
         _selectionIssue = null;
         _translationComplete = false;
@@ -127,7 +166,7 @@ public sealed partial class TranslationPopupWindow : Window
         _translatedText = _settings.UiLanguage == "zh-CN" ? "正在翻译…" : "Translating…";
         _hasError = false;
         _showOriginal = false;
-        _userSized = false;
+        if (!preserveSize) _userSized = false;
         ExplanationRequests.Cancel();
         _explanationVersion++;
         _savingExplanation = false;
@@ -216,7 +255,8 @@ public sealed partial class TranslationPopupWindow : Window
         var calculated = PopupAutoSizeCalculator.Calculate(ReferenceTypography.GetText(content), content.FontSize, MaxWidth, MaxHeight,
             additionalHorizontalPadding: glass ? 24 : 0, additionalVerticalPadding: glass ? 24 : 0);
         var inset = PopupSurface.Margin;
-        Width = Math.Clamp(calculated.Width + inset.Left + inset.Right, MinWidth, MaxWidth);
+        ActionBarSurface.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        Width = Math.Clamp(Math.Max(calculated.Width + inset.Left + inset.Right, ActionBarSurface.DesiredSize.Width), MinWidth, MaxWidth);
         content.Measure(new Size(Math.Max(100, Width - 44 - inset.Left - inset.Right - (glass ? 24 : 0)), double.PositiveInfinity));
         Height = Math.Clamp(Math.Max(calculated.Height, content.DesiredSize.Height + 174 + (glass ? 24 : 0)) + inset.Top + inset.Bottom, MinHeight, MaxHeight);
         ConstrainToScreen();

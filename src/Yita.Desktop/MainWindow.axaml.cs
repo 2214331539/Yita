@@ -73,6 +73,7 @@ public sealed partial class MainWindow : Window
         _usePlatformMemory = settingsStore is null;
         _translationRuntime = new ReferenceTranslationRuntime(_providerFactory, _memory);
         InitializeComponent();
+        TargetLanguageComboBox.ItemsSource = TargetLanguageOptions.CreateItems();
         _ready = true;
         ModelComboBox.ItemsSource = new[] { "deepseek-v4-flash", "deepseek-v4-pro", "deepseek-chat", "deepseek-reasoner" };
         AiHistoryEnabledCheckBox.IsCheckedChanged += (_, _) => UpdateAiHistoryControls();
@@ -310,16 +311,17 @@ public sealed partial class MainWindow : Window
         _ = PersistSettingsWithStatusAsync();
     }
 
-    private async Task PersistSettingsWithStatusAsync()
+    private async Task<bool> PersistSettingsWithStatusAsync()
     {
-        if (_settingsFailure is not null) return;
+        if (_settingsFailure is not null) return false;
         try
         {
             await _settingsGate.WaitAsync();
             try { await _settingsStore.SaveAsync(_settings); }
             finally { _settingsGate.Release(); }
+            return true;
         }
-        catch { SetStatus(ConnectionStatusText, Localize("Could not save settings.", "暂时无法保存设置。"), true); }
+        catch { SetStatus(ConnectionStatusText, Localize("Could not save settings.", "暂时无法保存设置。"), true); return false; }
     }
 
     private void SettingsNavigationChanged(object? sender, SelectionChangedEventArgs e)
@@ -350,7 +352,7 @@ public sealed partial class MainWindow : Window
         var navKeys = new[] { "NavigationGeneral", "NavigationAiHistory", "NavigationTranslationAppearance", "NavigationModel" };
         for (var i = 0; i < navKeys.Length; i++) ((ListBoxItem)SettingsNavigation.Items[i]!).Content = L(navKeys[i]);
         LocalizeCombo(SourceLanguageComboBox, [("自动检测", "Auto detect", "自动检测"), ("英语", "English", "英语"), ("简体中文", "Simplified Chinese", "简体中文")]);
-        LocalizeCombo(TargetLanguageComboBox, [("自动判断", "Choose automatically", "自动判断"), ("简体中文", "Simplified Chinese", "简体中文"), ("英语", "English", "英语"), ("日语", "Japanese", "日语")]);
+        LocalizeCombo(TargetLanguageComboBox, TargetLanguageOptions.Labels);
         LocalizeCombo(TranslationModeComboBox, [("fast", "Fast", "快速"), ("balanced", "Balanced", "均衡"), ("precise", "Precise", "精确")]);
         LocalizeCombo(TranslationToneComboBox, [("natural", "Natural", "自然"), ("formal", "Formal", "正式"), ("concise", "Concise", "简洁"), ("academic", "Academic", "学术"), ("technical", "Technical", "技术")]);
         LocalizeCombo(AiSummaryRangeComboBox, [("today", "Today", "今天"), ("last-7-days", "Last 7 days", "最近 7 天"), ("all", "All", "全部")]);

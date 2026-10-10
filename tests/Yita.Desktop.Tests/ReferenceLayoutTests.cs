@@ -253,6 +253,58 @@ public sealed class ReferenceLayoutTests
     }
 
     [AvaloniaFact]
+    public void PopupLanguageSelectorFitsTheToolbarAndUsesTheReadingTheme()
+    {
+        var motion = ReferenceMotion.Enabled;
+        ReferenceMotion.Enabled = false;
+        try
+        {
+            foreach (var language in new[] { "zh-CN", "en" })
+            foreach (var theme in new[] { "yita", "ocean" })
+            {
+                var popup = new TranslationPopupWindow();
+                try
+                {
+                    popup.ApplySettings((YitaSettings.Default with { UiLanguage = language, ColorTheme = theme }).ToOriginal());
+                    popup.Show();
+                    popup.BeginTranslation("这个 feature 可以帮我 review 中英文混合的句子。");
+                    popup.SetText(language == "zh-CN" ? "这个功能可以帮助我检查中英文混合的句子。" : "This feature helps me review sentences mixing Chinese and English.");
+                    popup.CompleteTranslation(); popup.UpdateLayout(); Dispatcher.UIThread.RunJobs();
+                    var combo = popup.FindControl<ComboBox>("PopupTargetLanguageComboBox")!;
+                    var original = popup.FindControl<Button>("OriginalButton")!;
+                    var close = popup.FindControl<Button>("CloseButton")!;
+                    var comboPoint = combo.TranslatePoint(default, popup)!.Value;
+                    var originalPoint = original.TranslatePoint(default, popup)!.Value;
+                    var closePoint = close.TranslatePoint(default, popup)!.Value;
+                    Assert.True(comboPoint.X >= 0);
+                    Assert.True(comboPoint.X + combo.Bounds.Width <= originalPoint.X);
+                    Assert.True(closePoint.X + close.Bounds.Width <= popup.Width);
+                    Assert.Equal(popup.Resources["PopupTextBrush"], combo.Foreground);
+                    var scroll = popup.FindControl<ScrollViewer>("ReadingScroll")!;
+                    Assert.True(popup.FindControl<SelectableTextBlock>("TranslationText")!.Bounds.Height <= scroll.Viewport.Height);
+                    Capture(popup, $"avalonia-target-language-{language}-{theme}");
+                    combo.IsDropDownOpen = true;
+                    popup.UpdateLayout(); Dispatcher.UIThread.RunJobs();
+                    var dropdown = combo.GetVisualDescendants().OfType<Avalonia.Controls.Primitives.Popup>().Single();
+                    Assert.True(dropdown.IsOpen);
+                    Assert.NotNull(dropdown.Child);
+                    Assert.True(dropdown.Child.Bounds.Height >= 4 * 30);
+                    if (Environment.GetEnvironmentVariable("YITA_PARITY_CAPTURE_DIRECTORY") is { Length: > 0 } directory)
+                    {
+                        using var bitmap = new RenderTargetBitmap(new PixelSize((int)Math.Ceiling(dropdown.Child.Bounds.Width), (int)Math.Ceiling(dropdown.Child.Bounds.Height)));
+                        bitmap.Render(dropdown.Child);
+                        bitmap.Save(Path.Combine(directory, $"avalonia-target-language-menu-{language}-{theme}.png"));
+                    }
+                    combo.IsDropDownOpen = false;
+                    Assert.True(popup.IsVisible);
+                }
+                finally { popup.Close(); }
+            }
+        }
+        finally { ReferenceMotion.Enabled = motion; }
+    }
+
+    [AvaloniaFact]
     public void PopupReadingSurfaceRendersWithoutClippingTheLastLine()
     {
         ReferenceMotion.Enabled = false;

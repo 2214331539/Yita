@@ -176,12 +176,7 @@
                   </StackPanel>
                   <StackPanel Grid.Column="2">
                     <TextBlock Tag="loc:TargetLanguage" Text="Target language" Classes="label" LineHeight="19" />
-                    <ComboBox x:Name="TargetLanguageComboBox">
-                      <ComboBoxItem Content="Choose automatically" Tag="自动判断" />
-                      <ComboBoxItem Content="Simplified Chinese" Tag="简体中文" />
-                      <ComboBoxItem Content="English" Tag="英语" />
-                      <ComboBoxItem Content="Japanese" Tag="日语" />
-                    </ComboBox>
+                    <ComboBox x:Name="TargetLanguageComboBox" />
                   </StackPanel>
                 </Grid>
                 <Border Height="1" Margin="0,17" Background="{DynamicResource AppCardBorderBrush}" />
