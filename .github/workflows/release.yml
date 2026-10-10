@@ -22,12 +22,15 @@ jobs:
         id: version
         shell: pwsh
         run: |
-          $version = (Get-Content packaging/release-version.json -Raw | ConvertFrom-Json).version
+          $release = Get-Content packaging/release-version.json -Raw | ConvertFrom-Json
+          $version = $release.version
           if ($version -notmatch '^\d+\.\d+\.\d+-preview\.[1-9]\d*$') { throw 'Invalid preview version.' }
           if ($env:GITHUB_REF -like 'refs/tags/*' -and $env:GITHUB_REF_NAME -ne "v$version") { throw 'Tag and package version must match.' }
           if (!(Test-Path "docs/releases/v$version.md")) { throw 'Release notes are missing.' }
           "version=$version" >> $env:GITHUB_OUTPUT
-          "build=$($version -replace '^.*\.', '')" >> $env:GITHUB_OUTPUT
+          $build = if ($null -ne $release.macBuildNumber) { [string]$release.macBuildNumber } else { $version -replace '^.*\.', '' }
+          if ($build -notmatch '^[1-9]\d*$') { throw 'Invalid Mac build number.' }
+          "build=$build" >> $env:GITHUB_OUTPUT
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
@@ -108,3 +111,30 @@ jobs:
           files: |
             artifacts/release/Yita-Setup.exe
             artifacts/release/Yita.dmg
+      - name: Verify published installer downloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+            --pattern 'Yita-Setup.exe' --pattern 'Yita.dmg' --dir artifacts/published
+          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json assets > artifacts/published-assets.json
+          python3 - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          names = {'Yita-Setup.exe', 'Yita.dmg'}
+          assets = json.loads(Path('artifacts/published-assets.json').read_text())['assets']
+          if len(assets) != len(names) or {asset['name'] for asset in assets} != names:
+              raise SystemExit('Release must contain exactly the two installers.')
+          def digest(path):
+              with path.open('rb') as stream:
+                  return hashlib.file_digest(stream, 'sha256').hexdigest()
+          for name in sorted(names):
+              original = Path('artifacts/release') / name
+              downloaded = Path('artifacts/published') / name
+              if original.stat().st_size != downloaded.stat().st_size or digest(original) != digest(downloaded):
+                  raise SystemExit(f'Published download does not match the verified installer: {name}')
+              print(f'{name}: {downloaded.stat().st_size} bytes; SHA256={digest(downloaded)}')
+          PY

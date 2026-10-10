@@ -56,6 +56,7 @@ manifest="$app/Contents/Resources/build-manifest.json"
 runtime="$(plutil -extract runtimeOptions.includedFrameworks.0.version raw -o - "$runtime_root/Yita.Desktop.runtimeconfig.json")"
 plutil -create xml1 "$manifest"
 plutil -insert version -string "$version" "$manifest"
+plutil -insert buildNumber -integer "$build_number" "$manifest"
 plutil -insert commit -string "$(git rev-parse HEAD)" "$manifest"
 worktree_dirty=false
 [[ -z "$(git status --porcelain)" ]] || worktree_dirty=true
