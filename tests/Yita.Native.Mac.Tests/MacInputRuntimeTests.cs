@@ -53,6 +53,51 @@ public sealed class MacInputRuntimeTests
     }
 
     [Fact]
+    public async Task DiagnosticsDistinguishPausedSelectionInputKindsAndReadFailuresWithoutExposingText()
+    {
+        using var helper = new TestHelper
+        {
+            Selection = SelectionResult.Failed(SelectionFailureKind.PermissionDenied, "ax-permission-denied"),
+        };
+        using var runtime = new MacSelectionRuntime(helper);
+        runtime.Configure(false, false, 125);
+        await runtime.HandleInputAsync(Batch(Input(MacInputKind.PointerDown, 1, -800), Input(MacInputKind.PointerUp, 2, -700),
+            Input(MacInputKind.Cancel, 3, 0), Input(MacInputKind.PointerDown, 4, -800, age: 501)));
+        var paused = runtime.CreateDiagnostics(false);
+        Assert.Contains("Enabled=False; ClipboardFallback=False; Delay=125ms", paused);
+        Assert.Contains("Down=2; Up=1; Cancel=1; Stale=1", paused);
+        Assert.Contains("Last selection diagnostic: not-read", paused);
+
+        runtime.Configure(true, true, 0);
+        var captured = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        runtime.SelectionCaptured += (_, _) => captured.TrySetResult();
+        await runtime.HandleInputAsync(Batch(Input(MacInputKind.PointerDown, 5, -800), Input(MacInputKind.PointerUp, 6, -700)));
+        await captured.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        var failed = runtime.CreateDiagnostics(false);
+        Assert.Contains("LastSelection=PermissionDenied", failed);
+        Assert.Contains("Last selection diagnostic: mac-helper-ax-permission-denied", failed);
+        Assert.DoesNotContain("test.editor", failed);
+        Assert.DoesNotContain("-800", failed);
+    }
+
+    [Fact]
+    public async Task DiagnosticsNeverIncludeUnrecognizedHelperDiagnosticContent()
+    {
+        using var helper = new TestHelper
+        {
+            Selection = SelectionResult.Failed(SelectionFailureKind.Unknown, "private-text-or-api-key"),
+        };
+        using var runtime = new MacSelectionRuntime(helper);
+        runtime.Configure(true, true, 0);
+        var captured = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        runtime.SelectionCaptured += (_, _) => captured.TrySetResult();
+        await runtime.HandleInputAsync(Batch(Input(MacInputKind.PointerDown, 1, -800), Input(MacInputKind.PointerUp, 2, -700)));
+        await captured.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.Contains("Last selection diagnostic: mac-helper-operation-failed", runtime.CreateDiagnostics(false));
+        Assert.DoesNotContain("private-text-or-api-key", runtime.CreateDiagnostics(false));
+    }
+
+    [Fact]
     public async Task PausingKeepsExternalDismissalAndManualClipboardWithoutSendingCopy()
     {
         using var helper = new TestHelper();
@@ -97,6 +142,7 @@ public sealed class MacInputRuntimeTests
         await runtime.HandleInputAsync(Batch(Input(MacInputKind.PointerDown, 1, -800, age: 490), Input(MacInputKind.PointerUp, 2, -700)));
         Assert.Equal(0, clicks);
         Assert.Equal(0, helper.SelectionReads);
+        Assert.Contains("Stale=1", runtime.CreateDiagnostics(false));
     }
 
     [Fact]
@@ -244,7 +290,7 @@ public sealed class MacInputRuntimeTests
         Capabilities = new() { Selection = true, GlobalInput = true, ClipboardFallback = true },
         Pointer = new(-500, 200),
         Input = Batch(),
-        Selection = new(command == "readClipboard" ? "manual" : "selection",
+        Selection = new(command == "readClipboard" ? "manual" : "fixture private selected text",
             command == "readClipboard" ? SelectionSource.ManualClipboard : SelectionSource.Accessibility),
     });
 
@@ -256,6 +302,7 @@ public sealed class MacInputRuntimeTests
         public bool Disposed { get; private set; }
         public CancellationToken SelectionToken { get; private set; }
         public TaskCompletionSource<MacHelperExchange>? DelayedSelection { get; init; }
+        public SelectionResult? Selection { get; init; }
         public bool LoseConfigurationOnFirstPoll { get; init; }
         private bool _lost;
         private int _configurations;
@@ -276,6 +323,8 @@ public sealed class MacInputRuntimeTests
             {
                 SelectionReads++; CopyAllowed = allowClipboardFallback; Sequence = input?.Sequence; SelectionToken = cancellationToken;
                 if (DelayedSelection is { } delayed) return delayed.Task;
+                if (Selection is { } result) return Task.FromResult(Success(command) with
+                { Response = Success(command).Response! with { Selection = result } });
             }
             return Task.FromResult(Success(command));
         }

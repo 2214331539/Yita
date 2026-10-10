@@ -160,11 +160,25 @@ final class AXSelectionReader<Access: AXSelectionAccess> {
             throw SelectionReadError.targetChanged
         }
         let deadline = now() + budget
-        func checkTarget() throws {
+        func checkSource() throws {
             guard !isCancelled() else { throw SelectionReadError.cancelled }
-            guard now() < deadline else { throw SelectionReadError.timeout }
             guard access.isTrusted() else { throw SelectionReadError.permissionDenied }
             guard access.frontmostTarget() == target else { throw SelectionReadError.targetChanged }
+        }
+        func checkTarget() throws {
+            try checkSource()
+            guard now() < deadline else { throw SelectionReadError.timeout }
+        }
+        // Range, bounds and context are optional once text has been acquired within the budget.
+        // A reader may expose selected text while rejecting these additional AX queries.
+        func supplemental<Value>(_ read: () throws -> Value?) throws -> Value? {
+            do { try checkTarget(); return try read() }
+            catch let error as SelectionReadError {
+                switch error {
+                case .timeout, .unsupported, .unavailable: return nil
+                default: throw error
+                }
+            }
         }
         try access.prepare(target: target, deadline: deadline)
         try checkTarget()
@@ -177,35 +191,41 @@ final class AXSelectionReader<Access: AXSelectionAccess> {
         for element in candidates {
             try checkTarget()
             let direct = try access.selectedText(element)
-            let range = try access.selectedRange(element)
+            try checkTarget()
+            let hasDirectText = direct?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+            let range: CFRange?
+            if hasDirectText { range = try supplemental { try access.selectedRange(element) } }
+            else { range = try access.selectedRange(element) }
             if direct != nil || range != nil { foundSelectionAttribute = true }
             var selected = direct
             let validRange = range.flatMap { valid($0) ? $0 : nil }
-            if selected?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false,
-               let range = validRange {
-                selected = try access.text(element, range: range)
+            if !hasDirectText {
+                if let range = validRange { selected = try access.text(element, range: range) }
+                try checkTarget()
             }
             guard let text = selected, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
             guard text.utf16.count <= maximumTextLength else { throw SelectionReadError.textLimit }
             var result = NativeSelection(text: text)
             if let range = validRange {
                 // AX bounds are Quartz global points, with a top-left origin.
-                let rectangle = try access.bounds(element, range: range)
+                let rectangle = try supplemental { try access.bounds(element, range: range) }
                 result.bounds = rectangle?.isValid == true ? rectangle : nil
                 if request.includeContext, range.length <= 1_400 {
-                    try checkTarget()
-                    let start = max(0, range.location - 300)
-                    let end = range.location + range.length
-                    let count = try access.characterCount(element)
-                    let contextEnd = count.map { max(end, min($0, end > Int.max - 300 ? end : end + 300)) } ?? end
-                    if contextEnd - start <= 2_000,
-                       let context = try access.text(element, range: CFRange(location: start, length: contextEnd - start)),
-                       context.utf16.count <= 2_000 {
-                        result.context = context
+                    result.context = try supplemental {
+                        let start = max(0, range.location - 300)
+                        let end = range.location + range.length
+                        let count = try access.characterCount(element)
+                        try checkTarget()
+                        let contextEnd = count.map { max(end, min($0, end > Int.max - 300 ? end : end + 300)) } ?? end
+                        guard contextEnd - start <= 2_000,
+                              let context = try access.text(element, range: CFRange(location: start, length: contextEnd - start)),
+                              context.utf16.count <= 2_000 else { return nil }
+                        return context
                     }
                 }
             }
-            try checkTarget()
+            // Supplemental timeouts must not discard good text, but stale/unauthorized text is still rejected.
+            try checkSource()
             return result
         }
         try checkTarget()

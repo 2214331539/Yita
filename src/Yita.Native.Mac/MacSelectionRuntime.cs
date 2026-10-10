@@ -33,7 +33,12 @@ public sealed class MacSelectionRuntime : ISelectionRuntime, IPlatformPermission
     private long _inputEvents;
     private long _selectionReads;
     private long _successfulSelections;
+    private long _pointerDownEvents;
+    private long _pointerUpEvents;
+    private long _cancelEvents;
+    private long _staleEvents;
     private SelectionFailureKind _lastSelectionFailure;
+    private string _lastSelectionDiagnostic = "not-read";
 
     // The native helper filters the frontmost window; geometric UI checks also hit covered windows.
     public MacSelectionRuntime() : this(new MacHelperClient(), isMac: OperatingSystem.IsMacOS) { }
@@ -135,14 +140,18 @@ public sealed class MacSelectionRuntime : ISelectionRuntime, IPlatformPermission
             if (item.Sequence <= _sequence) continue;
             _sequence = item.Sequence;
             Interlocked.Increment(ref _inputEvents);
+            if (item.Kind == MacInputKind.PointerDown) Interlocked.Increment(ref _pointerDownEvents);
+            else if (item.Kind == MacInputKind.PointerUp) Interlocked.Increment(ref _pointerUpEvents);
+            else if (item.Kind == MacInputKind.Cancel) Interlocked.Increment(ref _cancelEvents);
             _pointer = item.Pointer;
             if (item.AgeMilliseconds + System.Diagnostics.Stopwatch.GetElapsedTime(received).TotalMilliseconds > 500)
-            { CancelSelection(); continue; }
+            { Interlocked.Increment(ref _staleEvents); CancelSelection(); continue; }
             if (item.Kind == MacInputKind.Cancel) { CancelSelection(); continue; }
             if (item.Kind == MacInputKind.TranslateClipboard) { TranslateClipboard(); continue; }
-            if (await _isOwnWindow(item.Pointer, cancellationToken).ConfigureAwait(false)
-                || item.AgeMilliseconds + System.Diagnostics.Stopwatch.GetElapsedTime(received).TotalMilliseconds > 500)
+            if (await _isOwnWindow(item.Pointer, cancellationToken).ConfigureAwait(false))
             { CancelSelection(); continue; }
+            if (item.AgeMilliseconds + System.Diagnostics.Stopwatch.GetElapsedTime(received).TotalMilliseconds > 500)
+            { Interlocked.Increment(ref _staleEvents); CancelSelection(); continue; }
             if (item.Kind == MacInputKind.PointerDown)
             {
                 CancelSelection();
@@ -185,6 +194,7 @@ public sealed class MacSelectionRuntime : ISelectionRuntime, IPlatformPermission
             if (!_disposed && _sessionActive && pending.IsCurrent && settings.Enabled && settings == Volatile.Read(ref _configuration))
             {
                 _lastSelectionFailure = result.Failure;
+                Volatile.Write(ref _lastSelectionDiagnostic, result.DiagnosticCode ?? (result.Succeeded ? "none" : "unavailable"));
                 if (result.Succeeded) Interlocked.Increment(ref _successfulSelections);
                 SelectionCaptured?.Invoke(this, new(request, result, duration));
             }
@@ -241,8 +251,15 @@ public sealed class MacSelectionRuntime : ISelectionRuntime, IPlatformPermission
         if (changed && !_disposed) { try { StatusChanged?.Invoke(this, EventArgs.Empty); } catch { } }
     }
 
-    public string CreateDiagnostics(bool chinese) => $"macOS native input: {_state}; Mouse={IsRunning}; Hotkey={IsHotkeyRunning}; Session={IsSessionActive}; Protocol={MacHelperProtocol.Version}\n"
-        + $"Input diagnostic: {_inputDiagnostic ?? "none"}; Events={Interlocked.Read(ref _inputEvents)}; Reads={Interlocked.Read(ref _selectionReads)}; Captured={Interlocked.Read(ref _successfulSelections)}; LastSelection={_lastSelectionFailure}";
+    public string CreateDiagnostics(bool chinese)
+    {
+        var settings = Volatile.Read(ref _configuration);
+        return $"macOS native input: {_state}; Mouse={IsRunning}; Hotkey={IsHotkeyRunning}; Session={IsSessionActive}; Protocol={MacHelperProtocol.Version}\n"
+            + $"Input diagnostic: {_inputDiagnostic ?? "none"}; Events={Interlocked.Read(ref _inputEvents)}; Reads={Interlocked.Read(ref _selectionReads)}; Captured={Interlocked.Read(ref _successfulSelections)}; LastSelection={_lastSelectionFailure}\n"
+            + $"Selection settings: Enabled={settings.Enabled}; ClipboardFallback={settings.Copy}; Delay={settings.Delay}ms\n"
+            + $"Input events: Down={Interlocked.Read(ref _pointerDownEvents)}; Up={Interlocked.Read(ref _pointerUpEvents)}; Cancel={Interlocked.Read(ref _cancelEvents)}; Stale={Interlocked.Read(ref _staleEvents)}\n"
+            + $"Last selection diagnostic: {Volatile.Read(ref _lastSelectionDiagnostic)}";
+    }
     public Task<PermissionState> GetStateAsync(CancellationToken cancellationToken = default) => _reader.GetStateAsync(cancellationToken);
     public Task<PlatformPermissionStatus> GetStatusAsync(CancellationToken cancellationToken = default) => _reader.GetStatusAsync(cancellationToken);
     public async Task RequestAccessibilityPermissionAsync(CancellationToken cancellationToken = default)
